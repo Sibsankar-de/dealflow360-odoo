@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { useGetCompanyByIdQuery } from "@/store/features/company/companyApi";
 import { Building2, Save, CheckCircle2, ShieldCheck, DollarSign } from "lucide-react";
 
@@ -91,16 +92,10 @@ export default function CompanySettingsPage() {
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
               />
-              <Select
+              <CurrencySelector
                 label="Base Currency"
                 value={currency}
                 onChange={(val) => setCurrency(val)}
-                options={[
-                  { key: "USD", value: "USD ($) - US Dollar" },
-                  { key: "EUR", value: "EUR (€) - Euro" },
-                  { key: "GBP", value: "GBP (£) - British Pound" },
-                  { key: "INR", value: "INR (₹) - Indian Rupee" },
-                ]}
               />
             </div>
 

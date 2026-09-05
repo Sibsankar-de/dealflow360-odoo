@@ -5,6 +5,7 @@ import {
   CreateDealRequest,
   UpdateDealRequest,
   ListDealsQuery,
+  ListDealQuotationsQuery,
   DealListData,
 } from "@/types/deal";
 import {
@@ -35,6 +36,21 @@ export const dealApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: (_result, _error, { id }) => [{ type: "Deal", id }],
+    }),
+
+    getDealQuotations: builder.query<
+      ApiResponse<{ docs: QuotationResponse[]; total: number; page: number; limit: number; totalPages: number }>,
+      { companyId: string; dealId: string; params?: ListDealQuotationsQuery }
+    >({
+      query: ({ companyId, dealId, params }) => ({
+        url: `/deals/${companyId}/${dealId}/quotations`,
+        method: "GET",
+        params,
+      }),
+      providesTags: (_result, _error, { dealId }) => [
+        "Quotation",
+        { type: "Deal", id: dealId },
+      ],
     }),
 
     createDeal: builder.mutation<
@@ -119,10 +135,10 @@ export const dealApi = baseApi.injectEndpoints({
   overrideExisting: false,
 });
 
-
 export const {
   useGetDealsQuery,
   useGetDealByIdQuery,
+  useGetDealQuotationsQuery,
   useCreateDealMutation,
   useUpdateDealMutation,
   useDeleteDealMutation,

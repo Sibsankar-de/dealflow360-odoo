@@ -55,7 +55,7 @@ src/
 │           └── app/        # Company member authenticated application layout
 │               ├── access-control/
 │               ├── dashboard/
-│               ├── deals/ & deals/[deal-id]/
+│               ├── deals/ & deals/[deal-id]/ & deals/[deal-id]/quotations/ & deals/[deal-id]/quotations/[quotation-id]
 │               ├── quotations/
 │               ├── products/
 │               ├── warehouses/

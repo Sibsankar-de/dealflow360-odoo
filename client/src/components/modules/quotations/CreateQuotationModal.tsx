@@ -5,6 +5,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { useGetProductsQuery } from "@/store/features/product/productApi";
 import { useCreateDealQuotationMutation } from "@/store/features/deal/dealApi";
 import { Plus, Trash2 } from "lucide-react";
@@ -19,11 +20,11 @@ interface CreateQuotationModalProps {
 
 interface ItemState {
   productId: string;
-  quantity: number;
-  unitPrice: number;
+  quantity: number | string;
+  unitPrice: number | string;
   discountType: "PERCENTAGE" | "FIXED";
-  discountValue: number;
-  taxRate: number;
+  discountValue: number | string;
+  taxRate: number | string;
 }
 
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
@@ -76,7 +77,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
         quantity: 1,
         unitPrice: Number(firstProd.price) || 0,
         discountType: "PERCENTAGE",
-        discountValue: 0,
+        discountValue: "",
         taxRate: 0,
       },
     ]);
@@ -113,11 +114,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
 
   const calculateSubtotal = () => {
     return items.reduce((sum, item) => {
-      const lineBase = item.quantity * item.unitPrice;
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const discVal = Number(item.discountValue) || 0;
+      const lineBase = qty * price;
       const discount =
         item.discountType === "PERCENTAGE"
-          ? (lineBase * item.discountValue) / 100
-          : item.discountValue;
+          ? (lineBase * discVal) / 100
+          : discVal;
       return sum + Math.max(0, lineBase - discount);
     }, 0);
   };
@@ -197,16 +201,10 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
               onChange={(e) => setValidUntil(e.target.value)}
             />
 
-            <Select
+            <CurrencySelector
               label="Currency"
               value={currency}
               onChange={(val) => setCurrency(val)}
-              options={[
-                { key: "USD", value: "USD ($)" },
-                { key: "EUR", value: "EUR (€)" },
-                { key: "GBP", value: "GBP (£)" },
-                { key: "INR", value: "INR (₹)" },
-              ]}
             />
           </div>
 
@@ -267,7 +265,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                             handleItemFieldChange(
                               idx,
                               "quantity",
-                              Math.max(1, parseInt(e.target.value) || 1)
+                              e.target.value
                             )
                           }
                         />
@@ -283,7 +281,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                             handleItemFieldChange(
                               idx,
                               "unitPrice",
-                              parseFloat(e.target.value) || 0
+                              e.target.value
                             )
                           }
                         />
@@ -326,11 +324,12 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                             min="0"
                             step="0.01"
                             value={item.discountValue}
+                            placeholder="0.00"
                             onChange={(e) =>
                               handleItemFieldChange(
                                 idx,
                                 "discountValue",
-                                parseFloat(e.target.value) || 0
+                                e.target.value
                               )
                             }
                           />
@@ -339,10 +338,13 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                       <div className="flex items-center justify-end font-semibold text-text-primary text-sm pt-6">
                         Line Total: $
                         {(
-                          item.quantity * item.unitPrice -
+                          (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) -
                           (item.discountType === "PERCENTAGE"
-                            ? (item.quantity * item.unitPrice * item.discountValue) / 100
-                            : item.discountValue)
+                            ? ((Number(item.quantity) || 0) *
+                                (Number(item.unitPrice) || 0) *
+                                (Number(item.discountValue) || 0)) /
+                              100
+                            : Number(item.discountValue) || 0)
                         ).toFixed(2)}
                       </div>
                     </div>

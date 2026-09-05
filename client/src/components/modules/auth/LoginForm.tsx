@@ -93,20 +93,9 @@ export const LoginForm: React.FC = () => {
       />
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-text-primary select-none">
-            Password <span className="text-danger font-semibold">*</span>
-          </label>
-          <button
-            type="button"
-            className="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors cursor-pointer"
-            onClick={() =>
-              alert("Password reset link will be sent to your email.")
-            }
-          >
-            Forgot password?
-          </button>
-        </div>
+        <label className="text-sm font-medium text-text-primary select-none">
+          Password <span className="text-danger font-semibold">*</span>
+        </label>
 
         <Input
           type={showPassword ? "text" : "password"}

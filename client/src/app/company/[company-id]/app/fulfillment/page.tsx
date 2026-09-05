@@ -76,29 +76,22 @@ export default function FulfillmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <Navbar
-        variant="company"
-        user={mockUser}
-      />
+    <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-8">
+      {/* Header Section */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
+          Fulfillment
+        </h1>
+        <p className="text-sm text-text-secondary mt-1">
+          Warehouse allocation and shipment tracking for confirmed orders.
+        </p>
+      </div>
 
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-8">
-        {/* Header Section */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
-            Fulfillment
-          </h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Warehouse allocation and shipment tracking for confirmed orders.
-          </p>
-        </div>
+      {/* Summary KPI Cards */}
+      <FulfillmentSummaryCards kpi={kpi} />
 
-        {/* Summary KPI Cards */}
-        <FulfillmentSummaryCards kpi={kpi} />
-
-        {/* Orders Table Container */}
-        <FulfillmentOrdersTable orders={orders} />
-      </main>
-    </div>
+      {/* Orders Table Container */}
+      <FulfillmentOrdersTable orders={orders} />
+    </main>
   );
 }

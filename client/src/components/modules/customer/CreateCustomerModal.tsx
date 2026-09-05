@@ -8,18 +8,20 @@ import { Button } from "@/components/ui/Button";
 export interface CreateCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateCustomer: (data: { email: string }) => void;
+  onCreateCustomer: (data: { email: string }) => Promise<void> | void;
+  isLoading?: boolean;
 }
 
 export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
   isOpen,
   onClose,
   onCreateCustomer,
+  isLoading = false,
 }) => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -35,9 +37,14 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
       return;
     }
 
-    onCreateCustomer({ email: trimmedEmail });
-    setEmail("");
-    onClose();
+    try {
+      await onCreateCustomer({ email: trimmedEmail });
+      setEmail("");
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message || "Failed to add customer";
+      setError(msg);
+    }
   };
 
   return (
@@ -45,7 +52,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Add Customer Account"
-      description="Enter the registered DealFlow360 work email to add them as a customer."
+      description="Enter the registered DealFlow360 work email to add them as a customer in this company."
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,7 +65,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
         <Input
           label="Work Email"
           type="email"
-          placeholder="customer@company.com"
+          placeholder="customer@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -70,12 +77,15 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
             type="button"
             variant="outline"
             onClick={onClose}
+            disabled={isLoading}
           >
             Cancel
           </Button>
           <Button
             type="submit"
             variant="primary"
+            isLoading={isLoading}
+            loadingText="Adding..."
           >
             Add Customer
           </Button>

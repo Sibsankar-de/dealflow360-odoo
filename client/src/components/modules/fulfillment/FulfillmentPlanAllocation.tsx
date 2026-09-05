@@ -20,8 +20,8 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
   const [activeMode, setActiveMode] = useState<"Suggested" | "Manual Override">(plan.mode);
 
   // Editable allocations per warehouse ID for Manual Override mode
-  const [overrideAllocations, setOverrideAllocations] = useState<Record<string, number>>(() => {
-    const initialMap: Record<string, number> = {};
+  const [overrideAllocations, setOverrideAllocations] = useState<Record<string, number | string>>(() => {
+    const initialMap: Record<string, number | string> = {};
     plan.warehouses.forEach((wh) => {
       // In the mockup for Manual Override, Main Warehouse is 8 and East Depot is 4
       initialMap[wh.id] = wh.id === "wh_main" ? 8 : wh.allocatedQty;
@@ -30,20 +30,18 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
   });
 
   const handleAllocationInputChange = (warehouseId: string, valueStr: string) => {
-    const parsed = parseInt(valueStr, 10);
-    const newQty = isNaN(parsed) ? 0 : Math.max(0, parsed);
-
     setOverrideAllocations((prev) => ({
       ...prev,
-      [warehouseId]: newQty,
+      [warehouseId]: valueStr,
     }));
   };
 
   // Compute dynamic warehouse quantities based on current mode
   const computedWarehouses = plan.warehouses.map((wh) => {
+    const rawVal = overrideAllocations[wh.id];
     const allocated =
       activeMode === "Manual Override"
-        ? overrideAllocations[wh.id] ?? wh.allocatedQty
+        ? (rawVal !== undefined && rawVal !== "" ? Number(rawVal) || 0 : 0)
         : wh.allocatedQty;
     const remaining = Math.max(0, wh.availableQty - allocated);
 
@@ -63,8 +61,12 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
 
   const handlePrimaryAction = () => {
     if (activeMode === "Manual Override") {
+      const sanitizedMap: Record<string, number> = {};
+      Object.entries(overrideAllocations).forEach(([k, v]) => {
+        sanitizedMap[k] = Number(v) || 0;
+      });
       if (onConfirmOverride) {
-        onConfirmOverride(overrideAllocations);
+        onConfirmOverride(sanitizedMap);
       } else if (onAcceptSplit) {
         onAcceptSplit();
       }

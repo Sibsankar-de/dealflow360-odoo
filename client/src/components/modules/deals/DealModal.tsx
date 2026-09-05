@@ -10,7 +10,7 @@ import {
   useCreateDealMutation,
   useUpdateDealMutation,
 } from "@/store/features/deal/dealApi";
-import { useGetCompanyMembersQuery } from "@/store/features/company/companyApi";
+import { useGetCustomersQuery } from "@/store/features/customer/customerApi";
 
 interface DealModalProps {
   isOpen: boolean;
@@ -46,10 +46,19 @@ export const DealModal: React.FC<DealModalProps> = ({
   const [createDeal, { isLoading: isCreating }] = useCreateDealMutation();
   const [updateDeal, { isLoading: isUpdating }] = useUpdateDealMutation();
 
-  const { data: membersData } = useGetCompanyMembersQuery(companyId, {
-    skip: !isOpen || !companyId,
-  });
-  const members = membersData?.data?.members || [];
+  const { data: customerData } = useGetCustomersQuery(
+    { companyId },
+    { skip: !isOpen || !companyId }
+  );
+  const customers = React.useMemo(() => {
+    if (!customerData?.data) return [];
+    const raw = customerData.data;
+    if (Array.isArray(raw)) return raw;
+    if ("docs" in raw && Array.isArray(raw.docs)) return raw.docs;
+    if ("customers" in raw && Array.isArray(raw.customers)) return raw.customers;
+    return [];
+  }, [customerData]);
+
 
   const [name, setName] = useState(deal?.name || "");
   const [customerId, setCustomerId] = useState(deal?.customerId || "");
@@ -150,14 +159,11 @@ export const DealModal: React.FC<DealModalProps> = ({
     }
   };
 
-  const customerOptions = members
-    .filter((m) => Boolean(m.user || m.userId))
-    .map((m) => ({
-      key: m.user?.id || m.userId,
-      value: m.user
-        ? `${m.user.userName} (${m.user.email})`
-        : `User ${m.userId.slice(0, 8)}`,
-    }));
+  const customerOptions = customers.map((c) => ({
+    key: c.id,
+    value: `${c.name} (${c.email})${c.customerTier ? ` - ${c.customerTier}` : ""}`,
+  }));
+
 
 
   return (
