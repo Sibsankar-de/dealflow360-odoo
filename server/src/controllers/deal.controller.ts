@@ -9,17 +9,27 @@ import {
   dealService as defaultDealService,
 } from "../services/deal.service";
 import {
+  QuotationService,
+  quotationService as defaultQuotationService,
+} from "../services/quotation.service";
+import {
   createDealSchema,
   updateDealSchema,
   dealFilterSchema,
 } from "../schemas/deal.schema";
+import { dealQuotationsQuerySchema } from "../schemas/quotation.schema";
 import { CreateDealDto } from "../dto/deal.dto";
 
 export class DealController {
   private dealService: DealService;
+  private quotationService: QuotationService;
 
-  public constructor(dealService: DealService = defaultDealService) {
+  public constructor(
+    dealService: DealService = defaultDealService,
+    quotationService: QuotationService = defaultQuotationService,
+  ) {
     this.dealService = dealService;
+    this.quotationService = quotationService;
   }
 
   public create = asyncHandler(async (req: Request, res: Response) => {
@@ -95,6 +105,38 @@ export class DealController {
       .status(StatusCodes.OK)
       .json(
         new ApiResponse(StatusCodes.OK, result, "Deals fetched successfully"),
+      );
+  });
+
+  public listQuotations = asyncHandler(async (req: Request, res: Response) => {
+    const dealId = (req.params.dealId || req.params.id) as string;
+    if (!dealId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
+    }
+
+    const filterResult = dealQuotationsQuerySchema.safeParse(req.query);
+    if (!filterResult.success) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid query parameters",
+        filterResult.error.errors,
+      );
+    }
+
+    const result = await this.quotationService.listQuotationsByDeal(
+      dealId,
+      filterResult.data,
+      req.company?.id,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Deal quotations fetched successfully",
+        ),
       );
   });
 }

@@ -30,4 +30,11 @@ router.get("/:companyId/:id", requireRole(...salesRoles), dealController.getById
 router.patch("/:companyId/:id", requireRole(...salesRoles), dealController.update);
 router.put("/:companyId/:id", requireRole(...salesRoles), dealController.update);
 
+// List quotations for a deal.
+router.get(
+  "/:companyId/:id/quotations",
+  requireRole(...salesRoles),
+  dealController.listQuotations,
+);
+
 export default router;

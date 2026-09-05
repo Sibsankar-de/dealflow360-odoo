@@ -203,6 +203,7 @@ Responsibilities:
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
   - Maintain link to the active commercial revision (`current_revision_id`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
+  - Provide paginated quotation listing for deals via GET /api/v1/deals/:companyId/:id/quotations and GET /api/v1/quotations/deal/:dealId.
 - Store active quotation line items (`quotation_items`) representing current products, quantities, unit prices, discount types (`PERCENTAGE`, `FIXED`), discount values, discount amounts, tax rates, final unit prices, and line totals.
 - Store immutable, versioned quotation revisions (`quotation_revisions`) capturing the proposal state at every commercial iteration.
   - Track revision metadata: `revision_no`, author (`created_by`), `revision_type` (`INITIAL`, `SALES_COUNTER`, `CUSTOMER_COUNTER`, `FINAL`), and `status` (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`).

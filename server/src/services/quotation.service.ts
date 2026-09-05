@@ -19,6 +19,10 @@ import {
   UserRepository,
   userRepository as defaultUserRepository,
 } from "../repositories/user.repository";
+import {
+  DealRepository,
+  dealRepository as defaultDealRepository,
+} from "../repositories/deal.repository";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   prismaTransaction,
@@ -34,6 +38,7 @@ import {
   QuotationItemResponseDto,
   QuotationRevisionResponseDto,
   QuotationFilterDto,
+  DealQuotationsQueryDto,
   toQuotationDto,
   toQuotationItemDto,
   toQuotationRevisionDto,
@@ -44,15 +49,18 @@ export class QuotationService {
   private quotationRepo: QuotationRepository;
   private companyRepo: CompanyRepository;
   private userRepo: UserRepository;
+  private dealRepo: DealRepository;
 
   public constructor(
     quotationRepo: QuotationRepository = defaultQuotationRepository,
     companyRepo: CompanyRepository = defaultCompanyRepository,
     userRepo: UserRepository = defaultUserRepository,
+    dealRepo: DealRepository = defaultDealRepository,
   ) {
     this.quotationRepo = quotationRepo;
     this.companyRepo = companyRepo;
     this.userRepo = userRepo;
+    this.dealRepo = dealRepo;
   }
 
   public async createQuotation(
@@ -440,6 +448,53 @@ export class QuotationService {
       where.OR = [
         { quotationNo: { contains: filters.search, mode: "insensitive" } },
       ];
+    }
+
+    const result = await this.quotationRepo.findMany(where, { page, limit });
+
+    return {
+      ...result,
+      docs: result.docs.map(toQuotationDto),
+    };
+  }
+
+  public async listQuotationsByDeal(
+    dealId: string,
+    filters: DealQuotationsQueryDto = {},
+    companyId?: string,
+  ): Promise<PaginatedResult<QuotationResponseDto>> {
+    const deal = await this.dealRepo.findById(dealId);
+    if (!deal) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Deal not found");
+    }
+
+    if (companyId && deal.companyId !== companyId) {
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "Deal does not belong to the specified company",
+      );
+    }
+
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+
+    const where: Prisma.QuotationWhereInput = {
+      dealId,
+    };
+
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.search) {
+      where.quotationNo = {
+        contains: filters.search,
+        mode: Prisma.QueryMode.insensitive,
+      };
     }
 
     const result = await this.quotationRepo.findMany(where, { page, limit });
