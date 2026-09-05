@@ -1,66 +1,33 @@
 import React from "react";
 import { Select, SelectProps } from "./Select";
-
-export interface CurrencyItem {
-  code: string;
-  name: string;
-  symbol?: string;
-}
-
-export const DEFAULT_CURRENCIES: CurrencyItem[] = [
-  { code: "USD", name: "US Dollar", symbol: "$" },
-  { code: "EUR", name: "Euro", symbol: "€" },
-  { code: "GBP", name: "British Pound", symbol: "£" },
-  { code: "INR", name: "Indian Rupee", symbol: "₹" },
-  { code: "JPY", name: "Japanese Yen", symbol: "¥" },
-  { code: "AUD", name: "Australian Dollar", symbol: "A$" },
-  { code: "CAD", name: "Canadian Dollar", symbol: "C$" },
-  { code: "CHF", name: "Swiss Franc", symbol: "CHF" },
-  { code: "CNY", name: "Chinese Yuan", symbol: "¥" },
-  { code: "SGD", name: "Singapore Dollar", symbol: "S$" },
-  { code: "AED", name: "UAE Dirham", symbol: "AED" },
-];
+import currencies from "@/utils/currency-utils";
 
 export interface CurrencySelectorProps extends Omit<SelectProps, "options"> {
-  currencies?: CurrencyItem[];
   value?: string;
-  defaultValue?: string;
+  dropdownClass?: string;
 }
 
-export const CurrencySelector = React.forwardRef<
-  HTMLSelectElement,
-  CurrencySelectorProps
->(
-  (
-    {
-      currencies = DEFAULT_CURRENCIES,
-      value = "INR",
-      placeholder = "Select currency",
-      label = "Currency",
-      id = "currency-selector",
-      ...props
-    },
-    ref
-  ) => {
-    const selectOptions = currencies.map((c) => ({
-      value: c.code,
-      label: `${c.code}${c.symbol ? ` (${c.symbol})` : ""} - ${c.name}`,
-    }));
+export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
+  value,
+  dropdownClass,
+  id = "currency-selector",
+  ...props
+}) => {
+  const options = currencies.map((e) => ({
+    value: e.code,
+    label: `${e.code}${e.symbol ? ` (${e.symbol})` : ""} - ${e.name}`,
+  }));
+  const selectedValue = value || "INR";
 
-    return (
-      <Select
-        ref={ref}
-        id={id}
-        label={label}
-        value={value}
-        options={selectOptions}
-        placeholder={placeholder}
-        {...props}
-      />
-    );
-  }
-);
-
-CurrencySelector.displayName = "CurrencySelector";
+  return (
+    <Select
+      {...props}
+      value={selectedValue}
+      options={options}
+      id={id}
+      className={dropdownClass}
+    />
+  );
+};
 
 export default CurrencySelector;

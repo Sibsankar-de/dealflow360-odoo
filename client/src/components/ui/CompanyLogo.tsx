@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers } from "lucide-react";
+import { Activity } from "lucide-react";
 
 export type CompanyLogoSize = "sm" | "md" | "lg";
 
@@ -48,7 +48,7 @@ export const CompanyLogo: React.FC<CompanyLogoProps> = ({
       <div
         className={`flex items-center justify-center bg-brand-600 text-white shadow-xs shrink-0 ${sizeStyle.iconBox}`}
       >
-        <Layers className={sizeStyle.icon} />
+        <Activity className={sizeStyle.icon} />
       </div>
       {showText && <span className={sizeStyle.text}>{name}</span>}
     </div>

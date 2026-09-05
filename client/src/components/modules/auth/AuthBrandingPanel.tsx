@@ -1,5 +1,7 @@
 import React from "react";
 import { clsx } from "clsx";
+import { ArrowRight } from "lucide-react";
+import AppLogo from "@/components/ui/AppLogo";
 
 const workflowSteps = [
   { label: "Quote", active: true },
@@ -16,41 +18,16 @@ export const AuthBrandingPanel: React.FC<{ className?: string }> = ({
     <div
       className={clsx(
         "relative flex flex-col justify-between bg-navy-950 text-white p-8 lg:p-12 h-full overflow-hidden select-none",
-        className
+        className,
       )}
     >
-      {/* Background radial highlight */}
       <div className="absolute -top-24 -left-24 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Header / Logo */}
-      <div className="relative z-10 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
-          <svg
-            className="w-6 h-6 text-white"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
-            DealFlow360
-          </h1>
-          <p className="text-xs text-text-muted font-medium">
-            Sales Operations Platform
-          </p>
-        </div>
+      <div className="relative z-10">
+        <AppLogo size={40} subtitle="Sales Operations Platform" />
       </div>
 
-      {/* Middle Content */}
       <div className="relative z-10 my-auto space-y-6 max-w-xl">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-navy-700 bg-navy-900/80 text-xs font-medium text-brand-100">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-500 animate-pulse" />
@@ -72,7 +49,6 @@ export const AuthBrandingPanel: React.FC<{ className?: string }> = ({
           </p>
         </div>
 
-        {/* Flowchart Steps */}
         <div className="pt-4">
           <div className="flex flex-wrap items-center gap-2">
             {workflowSteps.map((step, idx) => (
@@ -82,15 +58,13 @@ export const AuthBrandingPanel: React.FC<{ className?: string }> = ({
                     "px-4 py-2 rounded-lg text-xs font-semibold transition-colors border",
                     step.active
                       ? "bg-brand-600 border-brand-500 text-white shadow-md shadow-brand-600/20"
-                      : "bg-navy-900/60 border-navy-700 text-text-muted hover:border-navy-600"
+                      : "bg-navy-900/60 border-navy-700 text-text-muted hover:border-navy-600",
                   )}
                 >
                   {step.label}
                 </div>
                 {idx < workflowSteps.length - 1 && (
-                  <span className="text-text-muted text-xs px-0.5 font-bold">
-                    &rarr;
-                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
                 )}
               </React.Fragment>
             ))}

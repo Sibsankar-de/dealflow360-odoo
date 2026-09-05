@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -45,7 +46,6 @@ export const SignupForm: React.FC = () => {
     }
 
     setIsLoading(true);
-    // Simulate sign up registration workflow
     setTimeout(() => {
       setIsLoading(false);
     }, 1200);
@@ -68,7 +68,6 @@ export const SignupForm: React.FC = () => {
         </div>
       )}
 
-      {/* Full Name */}
       <Input
         label="Full Name"
         type="text"
@@ -79,7 +78,6 @@ export const SignupForm: React.FC = () => {
         autoComplete="name"
       />
 
-      {/* Work Email */}
       <Input
         label="Work Email"
         type="email"
@@ -90,8 +88,7 @@ export const SignupForm: React.FC = () => {
         autoComplete="email"
       />
 
-      {/* Password & Confirm Password */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="flex flex-col gap-3">
         <Input
           label="Password"
           type="password"
@@ -113,7 +110,6 @@ export const SignupForm: React.FC = () => {
         />
       </div>
 
-      {/* Terms agreement */}
       <div className="pt-1">
         <Checkbox
           label={
@@ -142,7 +138,6 @@ export const SignupForm: React.FC = () => {
         />
       </div>
 
-      {/* Submit Button */}
       <Button
         type="submit"
         variant="primary"
@@ -150,47 +145,11 @@ export const SignupForm: React.FC = () => {
         isLoading={isLoading}
         loadingText="Creating Account..."
         className="w-full mt-2"
-        rightIcon={
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-            />
-          </svg>
-        }
+        rightIcon={<ArrowRight className="w-4 h-4" />}
       >
         Create Account
       </Button>
 
-      {/* Role Disclaimer Box */}
-      <div className="p-3 rounded-xl border border-border bg-surface/70 text-xs text-text-secondary flex items-start gap-2">
-        <svg
-          className="w-4 h-4 text-text-muted shrink-0 mt-0.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-        <span>
-          Access is governed by your organization&apos;s role configuration.
-          Contact your administrator if you need elevated permissions.
-        </span>
-      </div>
-
-      {/* Switch to Login */}
       <div className="text-center pt-1">
         <p className="text-xs text-text-secondary font-normal">
           Already have an account?{" "}

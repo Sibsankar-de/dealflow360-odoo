@@ -1,5 +1,6 @@
 import React, { useId } from "react";
 import { clsx } from "clsx";
+import { ChevronDown } from "lucide-react";
 
 export interface SelectOption {
   value: string | number;
@@ -96,16 +97,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
               : children}
           </select>
           <div className="absolute right-3 flex items-center pointer-events-none text-text-muted">
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            <ChevronDown className="h-4 w-4" />
           </div>
         </div>
         {hasError ? (

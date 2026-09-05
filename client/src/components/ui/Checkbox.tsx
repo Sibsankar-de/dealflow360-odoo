@@ -1,5 +1,6 @@
 import React, { useId, useEffect, useRef } from "react";
 import { clsx } from "clsx";
+import { Check, Minus } from "lucide-react";
 
 export interface CheckboxProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
@@ -68,25 +69,9 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
               )}
               {...props}
             />
-            <svg
-              className="absolute h-3 w-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="3"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="absolute h-3 w-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity stroke-[3]" />
             {indeterminate && (
-              <svg
-                className="absolute h-3 w-3 text-brand-600 pointer-events-none"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="3"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-              </svg>
+              <Minus className="absolute h-3 w-3 text-brand-600 pointer-events-none stroke-[3]" />
             )}
           </div>
           {label && (
