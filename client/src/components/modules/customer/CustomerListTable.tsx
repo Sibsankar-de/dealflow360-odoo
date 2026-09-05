@@ -64,7 +64,7 @@ export const CustomerListTable: React.FC<CustomerListTableProps> = ({
       </CardHeader>
 
       <CardContent className="p-0 overflow-x-auto">
-        <table className="w-full text-left text-sm border-collapse min-w-[600px]">
+        <table className="w-full text-left text-sm border-collapse min-w-150">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wider font-semibold text-text-muted bg-surface/30">
               <th className="py-3.5 px-6">Customer</th>

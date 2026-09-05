@@ -36,7 +36,7 @@ export const FulfillmentOrdersTable: React.FC<FulfillmentOrdersTableProps> = ({
         <CardTitle className="text-lg font-bold text-text-primary">Orders</CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
-        <table className="w-full text-left text-sm border-collapse min-w-[750px]">
+        <table className="w-full text-left text-sm border-collapse min-w-187.5">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wider font-semibold text-text-muted bg-surface/30">
               <th className="py-3.5 px-6">Order</th>
@@ -68,7 +68,7 @@ export const FulfillmentOrdersTable: React.FC<FulfillmentOrdersTableProps> = ({
                       {order.orderNumber}
                     </Link>
                   </td>
-                  <td className="py-4 px-4 font-semibold text-text-primary whitespace-nowrap max-w-[220px] truncate">
+                  <td className="py-4 px-4 font-semibold text-text-primary whitespace-nowrap max-w-55 truncate">
                     {order.customerName}
                   </td>
                   <td className="py-4 px-4 text-text-secondary whitespace-nowrap font-medium">
