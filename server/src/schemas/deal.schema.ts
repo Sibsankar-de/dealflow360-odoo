@@ -76,6 +76,16 @@ export const dealFilterSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
+export const customerDealFilterSchema = z.object({
+  companyId: z.string().uuid("Invalid company ID").optional(),
+  stage: z.nativeEnum(DealStage).optional(),
+  status: z.nativeEnum(DealStatus).optional(),
+  search: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20).optional(),
+});
+
 export type CreateDealInput = z.infer<typeof createDealSchema>;
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 export type DealFilterInput = z.infer<typeof dealFilterSchema>;
+export type CustomerDealFilterInput = z.infer<typeof customerDealFilterSchema>;

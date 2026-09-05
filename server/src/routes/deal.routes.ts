@@ -13,8 +13,14 @@ const salesRoles = [
   CompanyUserRole.SALES_MANAGER,
 ];
 
-// All deal routes require authentication and a company context.
+// All deal routes require authentication.
 router.use(verifyAuth);
+
+// Customer deal listing routes (scoped by authenticated user as customerId)
+router.get("/customer", dealController.listCustomerDeals);
+router.get("/customer/:companyId", dealController.listCustomerDeals);
+
+// Company-scoped deal management routes
 router.use("/:companyId", verifyCompanyAccess);
 
 // List deals within the company.

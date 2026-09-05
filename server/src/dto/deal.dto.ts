@@ -5,11 +5,13 @@ import {
   createDealSchema,
   updateDealSchema,
   dealFilterSchema,
+  customerDealFilterSchema,
 } from "../schemas/deal.schema";
 
 export type CreateDealDto = z.infer<typeof createDealSchema>;
 export type UpdateDealDto = z.infer<typeof updateDealSchema>;
 export type DealFilterDto = z.infer<typeof dealFilterSchema>;
+export type CustomerDealFilterDto = z.infer<typeof customerDealFilterSchema>;
 
 export interface DealResponseDto {
   id: string;

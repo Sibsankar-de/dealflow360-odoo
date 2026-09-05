@@ -22,6 +22,7 @@ import {
   CreateDealDto,
   UpdateDealDto,
   DealFilterDto,
+  CustomerDealFilterDto,
   DealResponseDto,
   toDealDto,
 } from "../dto/deal.dto";
@@ -194,6 +195,42 @@ export class DealService {
 
     if (filters.salesRepId) {
       where.salesRepId = filters.salesRepId;
+    }
+
+    if (filters.stage) {
+      where.stage = filters.stage;
+    }
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { dealNo: { contains: filters.search, mode: "insensitive" } },
+      ];
+    }
+
+    const result = await this.dealRepo.findMany(where, { page, limit });
+
+    return {
+      ...result,
+      docs: result.docs.map(toDealDto),
+    };
+  }
+
+  public async listCustomerDeals(
+    customerId: string,
+    filters: CustomerDealFilterDto,
+  ): Promise<PaginatedResult<DealResponseDto>> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+
+    const where: Prisma.DealWhereInput = { customerId };
+
+    if (filters.companyId) {
+      where.companyId = filters.companyId;
     }
 
     if (filters.stage) {

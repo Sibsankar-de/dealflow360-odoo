@@ -165,6 +165,11 @@ Responsibilities:
 
 Persistence models must not become the public API contract automatically.
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 ### 4.6 Company and Multi-Tenancy Context
 
 Responsibilities:
@@ -199,6 +204,11 @@ Responsibilities:
   - Track opportunity progress via `DealStage` enum (`NEW`, `QUALIFICATION`, `REQUIREMENT`, `QUOTATION`, `NEGOTIATION`, `WON`, `LOST`).
   - Track overall outcome via `DealStatus` enum (`OPEN`, `WON`, `LOST`, `CANCELLED`).
   - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
+<<<<<<< Updated upstream
+=======
+  - Provide paginated deal listing for company sales members via GET /api/v1/deals/:companyId.
+  - Provide paginated deal listing for customers via GET /api/v1/deals/customer and GET /api/v1/deals/customer/:companyId scoped to the authenticated user's customer ID with status filtering and pagination.
+>>>>>>> Stashed changes
 - Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
@@ -247,6 +257,10 @@ Responsibilities:
 
 
 
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 ## 5. Core Domain Model
 
 The following relationships describe the intended commercial traceability.

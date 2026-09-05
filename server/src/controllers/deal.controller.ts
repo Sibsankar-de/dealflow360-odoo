@@ -16,6 +16,7 @@ import {
   createDealSchema,
   updateDealSchema,
   dealFilterSchema,
+  customerDealFilterSchema,
 } from "../schemas/deal.schema";
 import { dealQuotationsQuerySchema } from "../schemas/quotation.schema";
 import { CreateDealDto } from "../dto/deal.dto";
@@ -136,6 +137,43 @@ export class DealController {
           StatusCodes.OK,
           result,
           "Deal quotations fetched successfully",
+        ),
+      );
+  });
+
+  public listCustomerDeals = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const filterResult = customerDealFilterSchema.safeParse(req.query);
+    if (!filterResult.success) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid query parameters",
+        filterResult.error.errors,
+      );
+    }
+
+    const companyIdParam =
+      typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined;
+    const companyId = companyIdParam || filterResult.data.companyId;
+
+    const result = await this.dealService.listCustomerDeals(userId, {
+      ...filterResult.data,
+      ...(companyId ? { companyId } : {}),
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Customer deals fetched successfully",
         ),
       );
   });
