@@ -30,6 +30,7 @@ import {
   quotationFilterSchema,
   cancelQuotationSchema,
   rejectQuotationSchema,
+  dealQuotationsQuerySchema,
 } from "../schemas/quotation.schema";
 
 export type AddQuotationItemDto = z.infer<typeof addQuotationItemSchema>;
@@ -39,6 +40,7 @@ export type UpdateQuotationDto = z.infer<typeof updateQuotationSchema>;
 export type QuotationFilterDto = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationDto = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
+export type DealQuotationsQueryDto = z.infer<typeof dealQuotationsQuerySchema>;
 
 export interface QuotationItemResponseDto {
   id: string;

@@ -15,6 +15,7 @@ import {
   quotationFilterSchema,
   cancelQuotationSchema,
   rejectQuotationSchema,
+  dealQuotationsQuerySchema,
 } from "../schemas/quotation.schema";
 import { QuotationStatus } from "@prisma/client";
 
@@ -165,6 +166,38 @@ export class QuotationController {
           StatusCodes.OK,
           result,
           "Quotations fetched successfully",
+        ),
+      );
+  });
+
+  public listByDeal = asyncHandler(async (req: Request, res: Response) => {
+    const dealId = (req.params.dealId || req.params.id) as string;
+    if (!dealId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
+    }
+
+    const filterResult = dealQuotationsQuerySchema.safeParse(req.query);
+    if (!filterResult.success) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid query parameters",
+        filterResult.error.errors,
+      );
+    }
+
+    const result = await this.quotationService.listQuotationsByDeal(
+      dealId,
+      filterResult.data,
+      req.company?.id,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Deal quotations fetched successfully",
         ),
       );
   });

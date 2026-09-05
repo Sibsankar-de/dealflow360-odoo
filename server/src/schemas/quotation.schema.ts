@@ -122,6 +122,13 @@ export const rejectQuotationSchema = z.object({
     .optional(),
 });
 
+export const dealQuotationsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20).optional(),
+  status: z.nativeEnum(QuotationStatus).optional(),
+  search: z.string().optional(),
+});
+
 export type AddQuotationItemInput = z.infer<typeof addQuotationItemSchema>;
 export type CreateQuotationItemInput = z.infer<
   typeof createQuotationItemSchema
@@ -131,3 +138,4 @@ export type UpdateQuotationInput = z.infer<typeof updateQuotationSchema>;
 export type QuotationFilterInput = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationInput = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
+export type DealQuotationsQueryInput = z.infer<typeof dealQuotationsQuerySchema>;

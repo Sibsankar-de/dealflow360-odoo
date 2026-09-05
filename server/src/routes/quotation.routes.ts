@@ -32,6 +32,7 @@ router.post(
 
 // Open to any authenticated user (company members and customers both need to list/read).
 router.get("/", quotationController.list);
+router.get("/deal/:dealId", quotationController.listByDeal);
 router.get("/:id", quotationController.getById);
 router.get("/:id/items", quotationController.getItems);
 router.get("/:id/revisions", quotationController.getRevisions);
