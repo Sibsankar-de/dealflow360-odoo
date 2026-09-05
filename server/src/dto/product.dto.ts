@@ -4,7 +4,10 @@ import {
   ProductDiscountTier,
   ProductType,
   CustomerTier,
+  Category,
+  CategoryProduct,
 } from "@prisma/client";
+import { CategoryResponseDto, toCategoryDto } from "./category.dto";
 
 export interface ProductStockDto {
   id: string;
@@ -36,6 +39,7 @@ export interface ProductResponseDto {
   updatedAt: Date;
   stocks?: ProductStockDto[];
   discountTiers?: ProductDiscountTierDto[];
+  categories?: CategoryResponseDto[];
 }
 
 export interface StockEntryDto {
@@ -50,6 +54,8 @@ export interface CreateProductDto {
   baseUnit?: string;
   type?: ProductType;
   stocks?: StockEntryDto[];
+  categoryIds?: string[];
+  categoryIdList?: string[];
 }
 
 export interface UpdateProductDto {
@@ -58,6 +64,8 @@ export interface UpdateProductDto {
   price?: number;
   baseUnit?: string;
   type?: ProductType;
+  categoryIds?: string[];
+  categoryIdList?: string[];
 }
 
 export interface ProductListDto {
@@ -91,6 +99,7 @@ export const toProductDto = (
   p: Product & {
     productStocks?: ProductStock[];
     discountTiers?: ProductDiscountTier[];
+    categories?: (CategoryProduct & { category: Category })[];
   },
 ): ProductResponseDto => ({
   id: p.id,
@@ -104,4 +113,5 @@ export const toProductDto = (
   updatedAt: p.updatedAt,
   stocks: p.productStocks?.map(toProductStockDto),
   discountTiers: p.discountTiers?.map(toProductDiscountTierDto),
+  categories: p.categories?.map((cp) => toCategoryDto(cp.category)),
 });

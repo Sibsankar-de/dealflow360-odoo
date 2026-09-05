@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { CompanyUserRole } from "@prisma/client";
-import { warehouseController } from "../controllers/warehouse.controller";
+import { categoryController } from "../controllers/category.controller";
 import { verifyAuth } from "../middlewares/auth.middleware";
 import { verifyCompanyAccess } from "../middlewares/company.middleware";
 import { requireRole } from "../middlewares/rbac.middleware";
@@ -18,36 +18,36 @@ router.get(
     CompanyUserRole.SALES_MANAGER,
     CompanyUserRole.FINANCE_MANAGER,
   ),
-  warehouseController.list,
+  categoryController.list,
 );
 
 router.post(
   "/:companyId",
   requireRole(CompanyUserRole.ADMIN),
-  warehouseController.create,
+  categoryController.create,
 );
 
 router.get(
-  "/:companyId/:warehouseId",
+  "/:companyId/:categoryId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
     CompanyUserRole.SALES_MANAGER,
     CompanyUserRole.FINANCE_MANAGER,
   ),
-  warehouseController.getById,
+  categoryController.getById,
 );
 
 router.patch(
-  "/:companyId/:warehouseId",
+  "/:companyId/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
-  warehouseController.update,
+  categoryController.update,
 );
 
 router.delete(
-  "/:companyId/:warehouseId",
+  "/:companyId/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
-  warehouseController.delete,
+  categoryController.delete,
 );
 
 export default router;

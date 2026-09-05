@@ -184,6 +184,9 @@ Responsibilities:
 
 - Store warehouse records (`warehouses`) scoped to a company, containing name, country, postal code (`postal_code`), address line (`address_line`), and soft delete support (`deletedAt`).
 - Store product records (`products`) scoped to a company, containing name, description, monetary price stored as decimal, base unit (`base_unit`), product type (`ProductType` enum: ONE_TIME, RECURRING), and soft delete support (`deletedAt`).
+- Store product category records (`categories`) scoped to a company, containing name and optional description, with a unique constraint across company and name (`company_id`, `name`).
+- Store many-to-many product-category relationships (`category_products`) linking products and categories.
+- Support synchronizing product categories via `addOrRemoveCategories` on product creation, update, and dedicated category management endpoints.
 - Store product inventory levels per warehouse (`product_stocks`) linking products and warehouses with decimal stock quantity (`stock_qty`) and a unique constraint across product and warehouse.
 - Store product discount tiers per customer tier (`product_discount_tiers`) linking products with customer tiers (BRONZE, SILVER, GOLD) and percentage discounts stored as decimal (`discount_percent`).
 

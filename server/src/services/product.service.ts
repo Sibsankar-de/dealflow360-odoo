@@ -8,6 +8,10 @@ import {
   WarehouseRepository,
   warehouseRepository as defaultWarehouseRepository,
 } from "../repositories/warehouse.repository";
+import {
+  CategoryRepository,
+  categoryRepository as defaultCategoryRepository,
+} from "../repositories/category.repository";
 import { ApiError } from "../utils/apiErrorHandler";
 import { prismaTransaction } from "../utils/transactionHandler";
 import {
@@ -21,13 +25,16 @@ import {
 export class ProductService {
   private productRepo: ProductRepository;
   private warehouseRepo: WarehouseRepository;
+  private categoryRepo: CategoryRepository;
 
   public constructor(
     productRepo: ProductRepository = defaultProductRepository,
     warehouseRepo: WarehouseRepository = defaultWarehouseRepository,
+    categoryRepo: CategoryRepository = defaultCategoryRepository,
   ) {
     this.productRepo = productRepo;
     this.warehouseRepo = warehouseRepo;
+    this.categoryRepo = categoryRepo;
   }
 
   public async createProduct(
@@ -57,6 +64,23 @@ export class ProductService {
         }
       }
 
+      const categoryIdList = dto.categoryIdList ?? dto.categoryIds ?? [];
+      if (categoryIdList.length > 0) {
+        const categories = await this.categoryRepo.findByIds(
+          categoryIdList,
+          companyId,
+          tx,
+        );
+        if (categories.length !== categoryIdList.length) {
+          const foundIds = new Set(categories.map((c) => c.id));
+          const missingIds = categoryIdList.filter((id) => !foundIds.has(id));
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Categories not found in this company: ${missingIds.join(", ")}`,
+          );
+        }
+      }
+
       const product = await this.productRepo.create(
         {
           companyId,
@@ -67,6 +91,7 @@ export class ProductService {
           type: dto.type ?? ProductType.ONE_TIME,
         },
         stocks,
+        categoryIdList,
         tx,
       );
 
@@ -118,7 +143,27 @@ export class ProductService {
         throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
 
-      const updated = await this.productRepo.update(
+      const categoryIdList = dto.categoryIdList ?? dto.categoryIds;
+      if (categoryIdList !== undefined) {
+        if (categoryIdList.length > 0) {
+          const categories = await this.categoryRepo.findByIds(
+            categoryIdList,
+            companyId,
+            tx,
+          );
+          if (categories.length !== categoryIdList.length) {
+            const foundIds = new Set(categories.map((c) => c.id));
+            const missingIds = categoryIdList.filter((id) => !foundIds.has(id));
+            throw new ApiError(
+              StatusCodes.BAD_REQUEST,
+              `Categories not found in this company: ${missingIds.join(", ")}`,
+            );
+          }
+        }
+        await this.productRepo.addOrRemoveCategories(productId, categoryIdList, tx);
+      }
+
+      await this.productRepo.update(
         productId,
         {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
@@ -132,7 +177,8 @@ export class ProductService {
         tx,
       );
 
-      return toProductDto(updated);
+      const refreshed = await this.productRepo.findById(productId, companyId, tx);
+      return toProductDto(refreshed!);
     });
   }
 
@@ -200,6 +246,40 @@ export class ProductService {
       }
 
       await this.productRepo.deleteStock(productId, warehouseId, tx);
+    });
+  }
+
+  public async addOrRemoveCategories(
+    productId: string,
+    companyId: string,
+    categoryIdList: string[],
+  ): Promise<ProductResponseDto> {
+    return prismaTransaction(async (tx) => {
+      const product = await this.productRepo.findById(productId, companyId, tx);
+      if (!product) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      }
+
+      if (categoryIdList.length > 0) {
+        const categories = await this.categoryRepo.findByIds(
+          categoryIdList,
+          companyId,
+          tx,
+        );
+        if (categories.length !== categoryIdList.length) {
+          const foundIds = new Set(categories.map((c) => c.id));
+          const missingIds = categoryIdList.filter((id) => !foundIds.has(id));
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Categories not found in this company: ${missingIds.join(", ")}`,
+          );
+        }
+      }
+
+      await this.productRepo.addOrRemoveCategories(productId, categoryIdList, tx);
+
+      const updated = await this.productRepo.findById(productId, companyId, tx);
+      return toProductDto(updated!);
     });
   }
 }

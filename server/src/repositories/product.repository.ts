@@ -5,6 +5,8 @@ import {
   ProductStock,
   ProductDiscountTier,
   ProductType,
+  Category,
+  CategoryProduct,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
@@ -12,6 +14,7 @@ import { TransactionClient } from "../utils/transactionHandler";
 export type ProductWithRelations = Product & {
   productStocks: ProductStock[];
   discountTiers: ProductDiscountTier[];
+  categories: (CategoryProduct & { category: Category })[];
 };
 
 export class ProductRepository {
@@ -19,6 +22,18 @@ export class ProductRepository {
 
   public constructor(prismaClient: PrismaClient = defaultPrisma) {
     this.prisma = prismaClient;
+  }
+
+  private get include() {
+    return {
+      productStocks: true,
+      discountTiers: true,
+      categories: {
+        include: {
+          category: true,
+        },
+      },
+    } as const;
   }
 
   public async create(
@@ -31,6 +46,7 @@ export class ProductRepository {
       type?: ProductType;
     },
     stocks: Array<{ warehouseId: string; stockQty: Prisma.Decimal }> = [],
+    categoryIds: string[] = [],
     tx?: TransactionClient,
   ): Promise<ProductWithRelations> {
     const client = tx || this.prisma;
@@ -49,11 +65,13 @@ export class ProductRepository {
             stockQty: s.stockQty,
           })),
         },
+        categories: {
+          create: categoryIds.map((categoryId) => ({
+            categoryId,
+          })),
+        },
       },
-      include: {
-        productStocks: true,
-        discountTiers: true,
-      },
+      include: this.include,
     });
 
     return product;
@@ -70,10 +88,7 @@ export class ProductRepository {
         id,
         ...(companyId ? { companyId } : {}),
       },
-      include: {
-        productStocks: true,
-        discountTiers: true,
-      },
+      include: this.include,
     });
   }
 
@@ -106,10 +121,7 @@ export class ProductRepository {
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: {
-          productStocks: true,
-          discountTiers: true,
-        },
+        include: this.include,
       }),
       client.product.count({ where }),
     ]);
@@ -126,10 +138,7 @@ export class ProductRepository {
     return client.product.update({
       where: { id },
       data,
-      include: {
-        productStocks: true,
-        discountTiers: true,
-      },
+      include: this.include,
     });
   }
 
@@ -160,6 +169,47 @@ export class ProductRepository {
     const client = tx || this.prisma;
     return client.productStock.delete({
       where: { productId_warehouseId: { productId, warehouseId } },
+    });
+  }
+
+  public async addOrRemoveCategories(
+    productId: string,
+    categoryIdList: string[],
+    tx?: TransactionClient,
+  ): Promise<(CategoryProduct & { category: Category })[]> {
+    const client = tx || this.prisma;
+
+    const existing = await client.categoryProduct.findMany({
+      where: { productId },
+      select: { categoryId: true },
+    });
+    const existingIds = existing.map((e) => e.categoryId);
+
+    const toAdd = categoryIdList.filter((id) => !existingIds.includes(id));
+    const toRemove = existingIds.filter((id) => !categoryIdList.includes(id));
+
+    if (toRemove.length > 0) {
+      await client.categoryProduct.deleteMany({
+        where: {
+          productId,
+          categoryId: { in: toRemove },
+        },
+      });
+    }
+
+    if (toAdd.length > 0) {
+      await client.categoryProduct.createMany({
+        data: toAdd.map((categoryId) => ({
+          productId,
+          categoryId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return client.categoryProduct.findMany({
+      where: { productId },
+      include: { category: true },
     });
   }
 }

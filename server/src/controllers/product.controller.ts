@@ -13,6 +13,7 @@ import {
   updateProductSchema,
   productListQuerySchema,
   upsertStockSchema,
+  addOrRemoveCategorySchema,
 } from "../schemas/product.schema";
 
 export class ProductController {
@@ -199,6 +200,36 @@ export class ProductController {
       .status(StatusCodes.OK)
       .json(
         new ApiResponse(StatusCodes.OK, null, "Stock entry deleted successfully"),
+      );
+  });
+
+  public addOrRemoveCategories = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const { productId } = req.params;
+    if (!productId || typeof productId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Product ID is required");
+    }
+
+    const validated = validateBody(addOrRemoveCategorySchema, req.body);
+    const categoryIdList = validated.categoryIdList ?? validated.categoryIds ?? [];
+
+    const product = await this.productService.addOrRemoveCategories(
+      productId,
+      req.company.id,
+      categoryIdList,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { product },
+          "Product categories updated successfully",
+        ),
       );
   });
 }

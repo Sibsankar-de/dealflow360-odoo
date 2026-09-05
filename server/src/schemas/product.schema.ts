@@ -13,6 +13,8 @@ export const createProductSchema = z.object({
   baseUnit: z.string().min(1).max(20).trim().default("UNIT").optional(),
   type: z.nativeEnum(ProductType).default(ProductType.ONE_TIME).optional(),
   stocks: z.array(stockEntrySchema).optional(),
+  categoryIds: z.array(z.string().uuid()).optional(),
+  categoryIdList: z.array(z.string().uuid()).optional(),
 });
 
 export const updateProductSchema = z.object({
@@ -21,6 +23,8 @@ export const updateProductSchema = z.object({
   price: z.number().positive().optional(),
   baseUnit: z.string().min(1).max(20).trim().optional(),
   type: z.nativeEnum(ProductType).optional(),
+  categoryIds: z.array(z.string().uuid()).optional(),
+  categoryIdList: z.array(z.string().uuid()).optional(),
 });
 
 export const productListQuerySchema = z.object({
@@ -34,7 +38,13 @@ export const upsertStockSchema = z.object({
   stockQty: z.number().nonnegative(),
 });
 
+export const addOrRemoveCategorySchema = z.object({
+  categoryIdList: z.array(z.string().uuid()).optional(),
+  categoryIds: z.array(z.string().uuid()).optional(),
+});
+
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type ProductListQueryInput = z.infer<typeof productListQuerySchema>;
 export type UpsertStockInput = z.infer<typeof upsertStockSchema>;
+export type AddOrRemoveCategoryInput = z.infer<typeof addOrRemoveCategorySchema>;

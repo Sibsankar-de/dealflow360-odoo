@@ -44,7 +44,7 @@ export class DealController {
   });
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const id = req.params.id as string;
+    const id = (req.params.dealId || req.params.id) as string;
     if (!id) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
     }
@@ -59,7 +59,7 @@ export class DealController {
   });
 
   public update = asyncHandler(async (req: Request, res: Response) => {
-    const id = req.params.id as string;
+    const id = (req.params.dealId || req.params.id) as string;
     if (!id) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
     }
