@@ -17,12 +17,14 @@ import {
   Clock,
   User,
   ArrowRight,
+  ShieldCheck,
+  Hourglass,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { QuotationResponse } from "@/types/quotation";
+import { QuotationResponse, NegotiationDetail } from "@/types/quotation";
 import { DealResponseType } from "@/types/deal";
 import {
   useGetNegotiationsQuery,
@@ -79,6 +81,12 @@ const STATUS_BADGES: Record<string, BadgeVariant> = {
   EXPIRED: "outline",
 };
 
+const NEGOTIATION_STATUS_BADGES: Record<string, BadgeVariant> = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "danger",
+};
+
 export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = ({
   quotation,
   deal,
@@ -125,15 +133,20 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
     { skip: !companyId || !quotation.id }
   );
 
-  const negotiations = negotiationsData?.data?.negotiations ?? quotation.negotiations ?? [];
+  const negotiations: NegotiationDetail[] =
+    negotiationsData?.data?.negotiations ?? quotation.negotiations ?? [];
   const revisions = revisionsData?.data?.revisions ?? quotation.revisions ?? [];
 
   const isFinalStatus =
     quotation.status === "ACCEPTED" ||
     quotation.status === "Approved" ||
+    quotation.status === "Confirmed" ||
     quotation.status === "REJECTED" ||
     quotation.status === "CANCELLED" ||
     quotation.status === "EXPIRED";
+
+  const isUnderNegotiation =
+    quotation.status === "NEGOTIATING" || quotation.status === "Negotiation";
 
   const handleFieldChange = (
     index: number,
@@ -228,7 +241,7 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
             <h1 className="text-2xl font-bold text-text-primary tracking-tight">
               Quotation {quotation.quotationNo}
             </h1>
-            {quotation.status !== "SENT" && quotation.status !== "DRAFT" && STATUS_BADGES[quotation.status] && (
+            {STATUS_BADGES[quotation.status] && (
               <Badge variant={STATUS_BADGES[quotation.status]}>
                 {quotation.status}
               </Badge>
@@ -260,16 +273,28 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                   >
                     Reject
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => onApprove()}
-                    isLoading={isLoading}
-                    className="bg-success! text-white hover:brightness-90!"
-                    leftIcon={<CheckCircle2 className="w-4 h-4" />}
-                  >
-                    Approve Quotation
-                  </Button>
+                  {!isUnderNegotiation ? (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => onApprove()}
+                      isLoading={isLoading}
+                      className="bg-success! text-white hover:brightness-90!"
+                      leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                    >
+                      Approve Quotation
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="md"
+                      disabled
+                      className="opacity-70 cursor-not-allowed"
+                      leftIcon={<Hourglass className="w-4 h-4" />}
+                    >
+                      Under Review
+                    </Button>
+                  )}
                 </>
               ) : (
                 <>
@@ -305,6 +330,44 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
         </div>
       )}
 
+      {/* State Banners */}
+      {isUnderNegotiation && !isNegotiating && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-3">
+          <Hourglass className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-sm">Counter-Offer Under Review</p>
+            <p className="text-amber-800 leading-relaxed">
+              Your proposed terms have been submitted and are currently being reviewed by the sales management team.
+              Once internal approval is granted, you will receive the finalized proposal ready for acceptance.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {quotation.status === "ACCEPTED" && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+          <div>
+            <p className="font-bold text-sm">Quotation Accepted</p>
+            <p className="text-emerald-800">
+              This quotation has been officially confirmed and forwarded for fulfillment and delivery.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {quotation.status === "REJECTED" && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-900 flex items-center gap-3">
+          <XCircle className="w-5 h-5 text-danger shrink-0" />
+          <div>
+            <p className="font-bold text-sm">Quotation Rejected</p>
+            <p className="text-red-800">
+              This quotation cycle was concluded. You can request a new quotation from your sales representative.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Overview Context Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="rounded-xl border border-border bg-card p-4">
@@ -317,7 +380,7 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                 Company Workspace
               </span>
               <p className="text-sm font-bold text-text-primary truncate">
-                {deal?.company?.name || "DealFlow360 Partner"}
+                {deal?.company?.name || quotation.company?.name || "DealFlow360 Partner"}
               </p>
             </div>
           </div>
@@ -385,7 +448,7 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
               Itemized list of products with unit prices, requested quantities, and approved discounts.
             </p>
           </div>
-          {!isFinalStatus && !isNegotiating && (
+          {!isFinalStatus && !isNegotiating && !isUnderNegotiation && (
             <Button
               variant="primary"
               size="sm"
@@ -427,7 +490,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                       {item.productName}
                     </td>
 
-                    {/* Quantity Field: Transparent / Readonly by default, editable in Negotiation */}
                     <td className="py-3.5 px-4 text-center">
                       <input
                         type="number"
@@ -450,7 +512,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                       />
                     </td>
 
-                    {/* Unit Price Field */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-text-muted text-xs">$</span>
@@ -477,7 +538,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                       </div>
                     </td>
 
-                    {/* Discount Field */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         {isNegotiating ? (
@@ -524,7 +584,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                       </div>
                     </td>
 
-                    {/* Line Total */}
                     <td className="py-3.5 px-6 text-right font-bold text-text-primary">
                       ${lineTotal.toFixed(2)}
                     </td>
@@ -568,7 +627,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
 
       {/* Notes & Negotiator Message Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Proposal / Terms Note */}
         <Card className="rounded-2xl border border-border bg-card p-5 space-y-2">
           <CardTitle className="text-sm font-bold text-text-primary mb-2">
             Proposal Notes & Terms
@@ -580,7 +638,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
           </div>
         </Card>
 
-        {/* Customer Negotiation Note */}
         <Card className="rounded-2xl border border-border bg-card p-5 space-y-2">
           <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5 mb-2">
             <MessageSquareQuote className="w-4 h-4 text-brand-600" />
@@ -626,20 +683,90 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
         </div>
 
         {showHistory && (
-          <Card className="rounded-2xl border border-border bg-card overflow-hidden">
-            <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
-              <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <span>Negotiation Offers & Revisions Timeline</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {revisions.length === 0 && negotiations.length === 0 ? (
-                <p className="text-xs text-text-muted text-center py-4">
-                  No past negotiation cycles recorded for this quotation yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {revisions.map((rev, i) => (
+          <div className="space-y-4">
+            {/* Negotiations List */}
+            {negotiations.length > 0 && (
+              <Card className="rounded-2xl border border-border bg-card overflow-hidden">
+                <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
+                  <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <MessageSquareQuote className="w-4 h-4 text-brand-600" />
+                    <span>Customer Negotiations ({negotiations.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-3">
+                  {negotiations.map((neg) => (
+                    <div
+                      key={neg.id}
+                      className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-text-primary">
+                            Negotiation Cycle
+                          </span>
+                          <Badge
+                            variant={NEGOTIATION_STATUS_BADGES[neg.status] || "secondary"}
+                          >
+                            {neg.status}
+                          </Badge>
+                          {neg.riskLevel && (
+                            <Badge variant={neg.riskLevel === "LOW" ? "success" : "warning"}>
+                              Risk: {neg.riskLevel}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-text-muted text-[11px]">
+                          {new Date(neg.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      {neg.message && (
+                        <p className="italic text-text-secondary">"{neg.message}"</p>
+                      )}
+
+                      {neg.rejectionReason && (
+                        <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-danger text-[11px]">
+                          <strong>Rejection reason:</strong> {neg.rejectionReason}
+                        </div>
+                      )}
+
+                      {neg.items && neg.items.length > 0 && (
+                        <div className="pt-2 border-t border-border/50 text-[11px] text-text-secondary space-y-1">
+                          <span className="font-semibold text-text-primary block">Requested Terms:</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {neg.items.map((it) => (
+                              <div key={it.id} className="flex justify-between bg-card p-2 rounded border border-border/50">
+                                <span>{it.productName || "Item"} (x{it.requestedQuantity})</span>
+                                <span className="font-semibold text-text-primary">
+                                  ${it.requestedLineTotal.toFixed(2)}
+                                  {it.requestedDiscountValue > 0 && ` (${it.requestedDiscountValue}% off)`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Revisions List */}
+            <Card className="rounded-2xl border border-border bg-card overflow-hidden">
+              <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
+                <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-600" />
+                  <span>Proposal Revisions ({revisions.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-3">
+                {revisions.length === 0 ? (
+                  <p className="text-xs text-text-muted text-center py-2">
+                    No revisions recorded yet.
+                  </p>
+                ) : (
+                  revisions.map((rev, i) => (
                     <div
                       key={rev.id || i}
                       className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2"
@@ -672,11 +799,11 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
 

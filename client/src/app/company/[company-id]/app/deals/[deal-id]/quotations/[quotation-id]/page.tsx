@@ -10,11 +10,16 @@ import {
   useCreateQuotationMutation,
   useUpdateQuotationMutation,
   useSendQuotationMutation,
+  useGetNegotiationsQuery,
+  useGetRevisionsQuery,
+  useApproveNegotiationMutation,
+  useRejectNegotiationMutation,
 } from "@/store/features/quotation/quotationApi";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import {
@@ -27,7 +32,17 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
+  MessageSquareQuote,
+  Check,
+  X,
+  ShieldAlert,
+  History,
+  Clock,
+  ExternalLink,
+  Hourglass,
+  Truck,
 } from "lucide-react";
+import { NegotiationDetail } from "@/types/quotation";
 
 interface LineItemState {
   productId: string;
@@ -52,6 +67,12 @@ const STATUS_BADGES: Record<string, BadgeVariant> = {
   EXPIRED: "outline",
 };
 
+const NEGOTIATION_STATUS_BADGES: Record<string, BadgeVariant> = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "danger",
+};
+
 export default function QuotationEditorPage() {
   const router = useRouter();
   const params = useParams();
@@ -69,6 +90,10 @@ export default function QuotationEditorPage() {
   const [updateQuotation, { isLoading: isUpdating }] =
     useUpdateQuotationMutation();
   const [sendQuotation, { isLoading: isSending }] = useSendQuotationMutation();
+  const [approveNegotiation, { isLoading: isApprovingNeg }] =
+    useApproveNegotiationMutation();
+  const [rejectNegotiation, { isLoading: isRejectingNeg }] =
+    useRejectNegotiationMutation();
 
   const { data: dealData, isLoading: isLoadingDeal } = useGetDealByIdQuery(
     { companyId, id: dealId },
@@ -92,6 +117,21 @@ export default function QuotationEditorPage() {
 
   const products = productData?.data?.products ?? [];
 
+  const { data: negotiationsData } = useGetNegotiationsQuery(
+    { companyId, id: quotationId },
+    { skip: isNew || !quotationId || !companyId }
+  );
+  const negotiations: NegotiationDetail[] =
+    negotiationsData?.data?.negotiations ?? existingQuotation?.negotiations ?? [];
+
+  const { data: revisionsData } = useGetRevisionsQuery(
+    { companyId, id: quotationId },
+    { skip: isNew || !quotationId || !companyId }
+  );
+  const revisions = revisionsData?.data?.revisions ?? existingQuotation?.revisions ?? [];
+
+  const pendingNegotiation = negotiations.find((n) => n.status === "PENDING");
+
   const [items, setItems] = useState<LineItemState[]>([]);
   const [currency, setCurrency] = useState("USD");
   const [validUntil, setValidUntil] = useState("");
@@ -100,11 +140,17 @@ export default function QuotationEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Modals for Negotiation Review
+  const [isApproveNegModalOpen, setIsApproveNegModalOpen] = useState(false);
+  const [approveNotes, setApproveNotes] = useState("");
+  const [isRejectNegModalOpen, setIsRejectNegModalOpen] = useState(false);
+  const [rejectNegReason, setRejectNegReason] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+
   const isReadOnly =
     !isNew &&
     existingQuotation &&
-    existingQuotation.status !== "DRAFT" &&
-    existingQuotation.status !== "NEGOTIATING";
+    existingQuotation.status !== "DRAFT";
 
   useEffect(() => {
     if (isNew && deal) {
@@ -324,7 +370,47 @@ export default function QuotationEditorPage() {
     }
   };
 
+  const handleApproveNegotiation = async () => {
+    if (!pendingNegotiation) return;
+    try {
+      setError(null);
+      await approveNegotiation({
+        companyId,
+        quotationId,
+        negotiationId: pendingNegotiation.id,
+        data: { notes: approveNotes.trim() || undefined },
+      }).unwrap();
+      setIsApproveNegModalOpen(false);
+      setApproveNotes("");
+      setNotification("Customer counter-offer approved! The quotation has been updated and presented to the customer.");
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to approve negotiation";
+      setError(errorMsg);
+    }
+  };
 
+  const handleRejectNegotiation = async () => {
+    if (!pendingNegotiation) return;
+    try {
+      setError(null);
+      await rejectNegotiation({
+        companyId,
+        quotationId,
+        negotiationId: pendingNegotiation.id,
+        data: { reason: rejectNegReason.trim() || "Rejected by reviewer" },
+      }).unwrap();
+      setIsRejectNegModalOpen(false);
+      setRejectNegReason("");
+      setNotification("Customer counter-offer rejected. Original proposal terms have been restored.");
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to reject negotiation";
+      setError(errorMsg);
+    }
+  };
 
   if (isLoadingDeal || isLoadingProducts || (!isNew && isLoadingQuote)) {
     return (
@@ -356,7 +442,6 @@ export default function QuotationEditorPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-
       {/* Notifications and Alerts */}
       {notification && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
@@ -372,16 +457,6 @@ export default function QuotationEditorPage() {
         </div>
       )}
 
-      {isReadOnly && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-800 flex items-center gap-2">
-          <Lock className="w-4 h-4 text-amber-700 shrink-0" />
-          <span>
-            This quotation is locked for editing because its current status is{" "}
-            <strong>{existingQuotation?.status}</strong>. Use "Re-Quote" from the quotations list to generate a new revision cycle.
-          </span>
-        </div>
-      )}
-
       {/* Header & Back Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div className="flex items-center gap-3">
@@ -392,7 +467,7 @@ export default function QuotationEditorPage() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-bold text-text-primary tracking-tight">
                 {isNew
                   ? "Create Quotation"
@@ -444,7 +519,121 @@ export default function QuotationEditorPage() {
             </Button>
           </div>
         )}
+
+        {existingQuotation?.status === "ACCEPTED" && (
+          <Link href={`/company/${companyId}/app/fulfillment/${existingQuotation.id}`}>
+            <Button variant="primary" size="md" leftIcon={<Truck className="w-4 h-4" />}>
+              Fulfill Quotation
+            </Button>
+          </Link>
+        )}
       </div>
+
+      {/* Pending Negotiation Review Section (Manager Review) */}
+      {existingQuotation?.status === "NEGOTIATING" && pendingNegotiation && (
+        <Card className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-6 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800">
+                <MessageSquareQuote className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-amber-950">
+                  Customer Counter-Offer Awaiting Approval
+                </h3>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  The customer has proposed adjusted terms requiring commercial review.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant={pendingNegotiation.riskLevel === "HIGH" ? "danger" : "warning"}>
+                Risk Level: {pendingNegotiation.riskLevel || "MID"}
+              </Badge>
+              {pendingNegotiation.requiredRole && (
+                <Badge variant="purple">
+                  Required Role: {pendingNegotiation.requiredRole}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Customer Message */}
+          {pendingNegotiation.message && (
+            <div className="p-3.5 bg-white rounded-xl border border-amber-200 text-xs text-text-primary">
+              <span className="font-semibold block text-text-secondary text-[11px] uppercase mb-1">
+                Customer Note:
+              </span>
+              <p className="italic">"{pendingNegotiation.message}"</p>
+            </div>
+          )}
+
+          {/* Proposed Items Comparison Table */}
+          {pendingNegotiation.items && pendingNegotiation.items.length > 0 && (
+            <div className="overflow-x-auto bg-white rounded-xl border border-amber-200">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-border text-text-muted uppercase font-semibold bg-surface/30">
+                    <th className="py-2.5 px-4">Product / Item</th>
+                    <th className="py-2.5 px-3 text-center">Requested Qty</th>
+                    <th className="py-2.5 px-3 text-right">Requested Unit Price</th>
+                    <th className="py-2.5 px-3 text-center">Requested Discount</th>
+                    <th className="py-2.5 px-4 text-right">Requested Line Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {pendingNegotiation.items.map((item) => (
+                    <tr key={item.id} className="text-text-primary">
+                      <td className="py-2.5 px-4 font-semibold">
+                        {item.productName || item.productId}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold">
+                        {item.requestedQuantity}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        ${Number(item.requestedUnitPrice).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {item.requestedDiscountValue > 0
+                          ? `${item.requestedDiscountValue}${
+                              item.requestedDiscountType === "PERCENTAGE" ? "%" : "$"
+                            }`
+                          : "-"}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-bold text-brand-600">
+                        ${Number(item.requestedLineTotal).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Reviewer Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsRejectNegModalOpen(true)}
+              className="text-danger border-danger/30 hover:bg-danger/10"
+              leftIcon={<X className="w-4 h-4" />}
+            >
+              Reject Counter-Offer
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsApproveNegModalOpen(true)}
+              className="bg-success text-white hover:bg-emerald-700"
+              leftIcon={<Check className="w-4 h-4" />}
+            >
+              Approve Counter-Offer
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Deal Context Summary Card */}
       <Card className="rounded-2xl border border-border bg-card p-5">
@@ -732,6 +921,140 @@ export default function QuotationEditorPage() {
         </div>
       </Card>
 
+      {/* Revision & Negotiation History Section */}
+      {!isNew && (
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-brand-600" />
+              <span className="text-sm font-bold text-text-primary">
+                Revision & Negotiation History
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHistory(!showHistory)}
+              leftIcon={<History className="w-3.5 h-3.5" />}
+            >
+              {showHistory ? "Hide History" : "View History"}
+            </Button>
+          </div>
+
+          {showHistory && (
+            <div className="space-y-4">
+              {/* Negotiations List */}
+              {negotiations.length > 0 && (
+                <Card className="rounded-2xl border border-border bg-card overflow-hidden">
+                  <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
+                    <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
+                      <MessageSquareQuote className="w-4 h-4 text-brand-600" />
+                      <span>Negotiation Records ({negotiations.length})</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-3">
+                    {negotiations.map((neg) => (
+                      <div
+                        key={neg.id}
+                        className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-text-primary">
+                              Negotiation Cycle
+                            </span>
+                            <Badge
+                              variant={NEGOTIATION_STATUS_BADGES[neg.status] || "secondary"}
+                            >
+                              {neg.status}
+                            </Badge>
+                            {neg.riskLevel && (
+                              <Badge variant={neg.riskLevel === "LOW" ? "success" : "warning"}>
+                                Risk: {neg.riskLevel}
+                              </Badge>
+                            )}
+                            {neg.requiredRole && (
+                              <Badge variant="purple">
+                                Approver: {neg.requiredRole}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-text-muted text-[11px]">
+                            {new Date(neg.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {neg.message && (
+                          <p className="italic text-text-secondary">"{neg.message}"</p>
+                        )}
+
+                        {neg.rejectionReason && (
+                          <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-danger text-[11px]">
+                            <strong>Rejection Reason:</strong> {neg.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Revisions List */}
+              <Card className="rounded-2xl border border-border bg-card overflow-hidden">
+                <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
+                  <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                    <span>Versioned Revisions ({revisions.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-3">
+                  {revisions.length === 0 ? (
+                    <p className="text-xs text-text-muted text-center py-2">
+                      No revisions recorded yet.
+                    </p>
+                  ) : (
+                    revisions.map((rev, i) => (
+                      <div
+                        key={rev.id || i}
+                        className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-text-primary">
+                              Revision #{rev.revisionNo}
+                            </span>
+                            <Badge variant="purple" className="text-[10px] px-1.5 py-0">
+                              {rev.revisionType}
+                            </Badge>
+                            <Badge variant={STATUS_BADGES[rev.status] || "secondary"} className="text-[10px] px-1.5 py-0">
+                              {rev.status}
+                            </Badge>
+                          </div>
+                          <span className="text-text-muted text-[11px]">
+                            {new Date(rev.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                          <div className="text-text-secondary">
+                            {rev.customerNote && (
+                              <p className="italic text-text-primary">"{rev.customerNote}"</p>
+                            )}
+                          </div>
+                          <div className="font-bold text-text-primary">
+                            Total: ${Number(rev.totalAmount).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bottom Actions Bar */}
       <div className="flex items-center justify-end gap-3 pt-2">
         <Link
@@ -766,6 +1089,104 @@ export default function QuotationEditorPage() {
           </>
         )}
       </div>
+
+      {/* Approve Negotiation Modal */}
+      <Modal
+        isOpen={isApproveNegModalOpen}
+        onClose={() => setIsApproveNegModalOpen(false)}
+        title="Approve Customer Counter-Offer"
+        description="Approving will replace quotation items with the negotiated terms, create a new revision, and present final terms to the customer for acceptance."
+        size="md"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-center gap-2">
+            <Check className="w-4 h-4 text-success shrink-0" />
+            <span>The quotation status will transition to <strong>SENT</strong>.</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-text-primary block mb-1">
+              Internal Approval Notes (Optional)
+            </label>
+            <textarea
+              rows={3}
+              value={approveNotes}
+              onChange={(e) => setApproveNotes(e.target.value)}
+              placeholder="E.g., Approved as per manager margin guidelines..."
+              className="w-full rounded-xl border border-border bg-card p-3 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 shadow-xs resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsApproveNegModalOpen(false)}
+              disabled={isApprovingNeg}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleApproveNegotiation}
+              isLoading={isApprovingNeg}
+              className="bg-success hover:bg-emerald-700 text-white border-transparent"
+            >
+              Confirm Approval
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reject Negotiation Modal */}
+      <Modal
+        isOpen={isRejectNegModalOpen}
+        onClose={() => setIsRejectNegModalOpen(false)}
+        title="Reject Customer Counter-Offer"
+        description="Rejecting will preserve original quotation terms and allow the customer to re-negotiate or accept the original proposal."
+        size="md"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-danger shrink-0" />
+            <span>The customer will be notified of the rejection reason.</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-text-primary block mb-1">
+              Reason for Rejection
+            </label>
+            <textarea
+              rows={3}
+              value={rejectNegReason}
+              onChange={(e) => setRejectNegReason(e.target.value)}
+              placeholder="E.g., Requested discount exceeds maximum policy threshold..."
+              className="w-full rounded-xl border border-border bg-card p-3 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger shadow-xs resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsRejectNegModalOpen(false)}
+              disabled={isRejectingNeg}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleRejectNegotiation}
+              isLoading={isRejectingNeg}
+              className="bg-danger hover:bg-red-700 text-white border-transparent"
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { baseApi } from "@/store/baseApi";
 import { ApiResponse } from "@/types/auth";
 import {
   CustomerResponseType,
+  CustomerSummaryResponseType,
   CustomerListData,
   ListCustomersQuery,
   AddCustomerRequest,
@@ -20,6 +21,17 @@ export const customerApi = baseApi.injectEndpoints({
         params,
       }),
       providesTags: ["Customer"],
+    }),
+
+    searchCustomers: builder.query<
+      ApiResponse<CustomerSummaryResponseType[]>,
+      { companyId: string; query: string; limit?: number }
+    >({
+      query: ({ companyId, query, limit = 10 }) => ({
+        url: `/customers/${companyId}/search`,
+        method: "GET",
+        params: { query, limit },
+      }),
     }),
 
     getCustomerById: builder.query<
@@ -56,6 +68,9 @@ export const customerApi = baseApi.injectEndpoints({
 export const {
   useGetCustomersQuery,
   useLazyGetCustomersQuery,
+  useSearchCustomersQuery,
+  useLazySearchCustomersQuery,
   useGetCustomerByIdQuery,
   useAddCustomerMutation,
 } = customerApi;
+

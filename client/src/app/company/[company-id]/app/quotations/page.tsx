@@ -1,108 +1,70 @@
 "use client";
 
 import React, { useState } from "react";
-import { QuotationItem, QuotationStatus } from "@/types/quotation";
-import { QuotationKanbanBoard } from "@/components/modules/quotations/QuotationKanbanBoard";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useGetQuotationsQuery } from "@/store/features/quotation/quotationApi";
 import { QuotationTable } from "@/components/modules/quotations/QuotationTable";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Plus, LayoutGrid, Table, CheckCircle2 } from "lucide-react";
-
-const INITIAL_QUOTATIONS: QuotationItem[] = [
-  {
-    id: "q_01",
-    quotationNumber: "QT-2025-001",
-    customerName: "Acme Corp",
-    totalAmount: 12400,
-    currency: "USD",
-    status: "Draft",
-    createdAt: "2025-09-01",
-  },
-  {
-    id: "q_02",
-    quotationNumber: "QT-2025-002",
-    customerName: "Delta LLC",
-    totalAmount: 3200,
-    currency: "USD",
-    status: "Draft",
-    createdAt: "2025-09-02",
-  },
-  {
-    id: "q_03",
-    quotationNumber: "QT-2025-003",
-    customerName: "Beta Industries",
-    totalAmount: 28900,
-    currency: "USD",
-    status: "Pending Approval",
-    createdAt: "2025-09-03",
-  },
-  {
-    id: "q_04",
-    quotationNumber: "QT-2025-004",
-    customerName: "Nova Retail",
-    totalAmount: 9750,
-    currency: "USD",
-    status: "Approved",
-    createdAt: "2025-09-03",
-  },
-  {
-    id: "q_05",
-    quotationNumber: "QT-2025-005",
-    customerName: "Zenith Co",
-    totalAmount: 15300,
-    currency: "USD",
-    status: "Negotiation",
-    createdAt: "2025-09-04",
-  },
-  {
-    id: "q_06",
-    quotationNumber: "QT-2025-006",
-    customerName: "Orion Ltd",
-    totalAmount: 41000,
-    currency: "USD",
-    status: "Confirmed",
-    createdAt: "2025-09-04",
-  },
-];
+import { Pagination } from "@/components/ui/Pagination";
+import { Plus, Search, FileText, CheckCircle2 } from "lucide-react";
+import { QuotationResponse } from "@/types/quotation";
 
 export default function CompanyQuotationsPage() {
-  const [quotations, setQuotations] = useState<QuotationItem[]>(INITIAL_QUOTATIONS);
-  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
+  const params = useParams();
+  const companyId =
+    typeof params?.["company-id"] === "string" ? params["company-id"] : "";
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
   const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
+
+  const { data: quotationsData, isLoading } = useGetQuotationsQuery(
+    {
+      companyId,
+      params: {
+        page,
+        limit: 10,
+        search: search.trim() || undefined,
+        status: statusFilter !== "ALL" ? statusFilter : undefined,
+      },
+    },
+    { skip: !companyId }
+  );
+
+  const quotations: QuotationResponse[] = quotationsData?.data?.docs || [];
+  const totalPages = quotationsData?.data?.totalPages ?? 1;
 
   const showNotification = (msg: string) => {
     setSelectedNotification(msg);
     setTimeout(() => setSelectedNotification(null), 3500);
   };
 
-  const handleSelectQuotation = (item: QuotationItem) => {
-    showNotification(`Opened quotation for ${item.customerName} (${item.quotationNumber})`);
-  };
-
-  const handleUpdateQuotationStatus = (id: string, newStatus: QuotationStatus) => {
-    setQuotations((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
-    );
-    showNotification(`Quotation status updated to ${newStatus}`);
-  };
-
-  const handleNewQuotation = () => {
-    showNotification("Opening new quotation creator wizard...");
-  };
-
-  const toggleViewMode = () => {
-    setViewMode((prev) => (prev === "kanban" ? "table" : "kanban"));
-  };
-
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">
-          Quotations ({viewMode === "kanban" ? "List" : "Table"})
-        </h1>
-        <p className="text-sm text-text-secondary">
-          Every quotation in the system, one row per quotation, click a row to open it
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
+            Quotations
+          </h1>
+          <p className="text-sm text-text-secondary mt-0.5">
+            Manage, track, and review all commercial quotations across deals
+          </p>
+        </div>
+
+        <Link href={`/company/${companyId}/app/deals`}>
+          <Button
+            variant="primary"
+            leftIcon={<Plus className="w-4 h-4" />}
+            className="font-semibold px-4 py-2.5 rounded-xl shadow-xs"
+          >
+            Create Quotation via Deal
+          </Button>
+        </Link>
       </div>
 
       {selectedNotification && (
@@ -112,48 +74,65 @@ export default function CompanyQuotationsPage() {
         </div>
       )}
 
-      {/* Main Board / Table View */}
-      {viewMode === "kanban" ? (
-        <QuotationKanbanBoard
-          quotations={quotations}
-          onSelectQuotation={handleSelectQuotation}
-          onUpdateQuotationStatus={handleUpdateQuotationStatus}
-        />
-      ) : (
-        <QuotationTable
-          quotations={quotations}
-          onSelectQuotation={handleSelectQuotation}
-          onUpdateQuotationStatus={handleUpdateQuotationStatus}
-        />
-      )}
+      {/* Filter and Search Bar */}
+      <div className="bg-card p-4 rounded-xl border border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="w-full sm:w-80">
+          <Input
+            placeholder="Search quotation number or customer..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            leftIcon={<Search className="w-4 h-4 text-text-muted" />}
+          />
+        </div>
 
-      {/* Bottom Action Bar */}
-      <div className="flex items-center gap-3 pt-2">
-        <Button
-          variant="primary"
-          onClick={handleNewQuotation}
-          leftIcon={<Plus className="w-4 h-4" />}
-          className="font-semibold px-5 py-2.5 rounded-xl shadow-xs"
-        >
-          New Quotation
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={toggleViewMode}
-          leftIcon={
-            viewMode === "kanban" ? (
-              <Table className="w-4 h-4 text-text-muted" />
-            ) : (
-              <LayoutGrid className="w-4 h-4 text-text-muted" />
-            )
-          }
-          className="border border-border text-text-primary hover:bg-card px-4 py-2.5 rounded-xl"
-        >
-          {viewMode === "kanban" ? "Switch to Table View" : "Switch to Kanban View"}
-        </Button>
+        <div className="w-full sm:w-56">
+          <Select
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val);
+              setPage(1);
+            }}
+            options={[
+              { key: "ALL", value: "All Statuses" },
+              { key: "DRAFT", value: "Draft" },
+              { key: "SENT", value: "Sent" },
+              { key: "NEGOTIATING", value: "Negotiating" },
+              { key: "ACCEPTED", value: "Accepted" },
+              { key: "REJECTED", value: "Rejected" },
+              { key: "CANCELLED", value: "Cancelled" },
+            ]}
+          />
+        </div>
       </div>
+
+      {/* Quotations Table */}
+      {isLoading ? (
+        <div className="p-12 text-center text-text-muted">
+          <FileText className="w-8 h-8 animate-pulse mx-auto mb-2 text-brand-600" />
+          <p className="text-xs">Loading company quotations...</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <QuotationTable
+            quotations={quotations}
+            companyId={companyId}
+            onSelectQuotation={(q) => showNotification(`Selected quotation ${q.quotationNo}`)}
+          />
+
+          {totalPages > 1 && (
+            <div className="pt-2 flex justify-center">
+              <Pagination
+                currentPage={page}
+                totalPage={totalPages}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-

@@ -5,7 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { SearchableInput } from "@/components/ui/SearchableInput";
-import { useGetCustomersQuery } from "@/store/features/customer/customerApi";
+import { useSearchCustomersQuery } from "@/store/features/customer/customerApi";
+import { useAuth } from "@/context/AuthContext";
 import { User, Check } from "lucide-react";
 
 export interface CreateCustomerModalProps {
@@ -31,24 +32,44 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
   onCreateCustomer,
   isLoading = false,
 }) => {
+  const { user: currentUser } = useAuth();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { data: searchResults, isFetching } = useGetCustomersQuery(
+  const { data: searchResults, isFetching } = useSearchCustomersQuery(
     {
       companyId,
-      params: { search: email.trim() || undefined, limit: 10 },
+      query: email.trim(),
+      limit: 10,
     },
-    { skip: !isOpen || !companyId }
+    { skip: !isOpen || !companyId || !email.trim() }
   );
 
-  const customerMatches: CustomerSearchItem[] = (searchResults?.data?.docs ?? []).map((c) => ({
+  const rawResults = searchResults?.data ?? [];
+  const filteredResults = rawResults.filter((c) => {
+    if (!currentUser) return true;
+    if (currentUser.id && c.id === currentUser.id) return false;
+    if (
+      currentUser.email &&
+      c.email?.toLowerCase() === currentUser.email?.toLowerCase()
+    )
+      return false;
+    return true;
+  });
+
+  const customerMatches: CustomerSearchItem[] = filteredResults.map((c) => ({
     id: c.id,
     label: c.email,
     value: c.email,
     name: c.name,
     customerTier: c.customerTier,
   }));
+
+  const handleClose = () => {
+    setEmail("");
+    setError(null);
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +102,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title="Add Customer Account"
       description="Enter or search the registered DealFlow360 work email to add them as a customer in this company."
       size="md"
@@ -149,7 +170,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isLoading}
           >
             Cancel

@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useGetCustomerDealByIdQuery } from "@/store/features/deal/dealApi";
 import {
   useGetQuotationByIdQuery,
-  useSubmitCounterOfferMutation,
-  useUpdateQuotationStatusMutation,
+  useSubmitNegotiationMutation,
+  useAcceptQuotationMutation,
   useRejectQuotationMutation,
 } from "@/store/features/quotation/quotationApi";
 import { CustomerQuotationReview } from "@/components/modules/quotations/CustomerQuotationReview";
@@ -40,10 +40,10 @@ export default function CustomerQuotationDetailPage() {
   );
   const quotation = quoteData?.data?.quotation;
 
-  const [submitCounterOffer, { isLoading: isCounterOffering }] =
-    useSubmitCounterOfferMutation();
-  const [updateQuotationStatus, { isLoading: isStatusUpdating }] =
-    useUpdateQuotationStatusMutation();
+  const [submitNegotiation, { isLoading: isCounterOffering }] =
+    useSubmitNegotiationMutation();
+  const [acceptQuotation, { isLoading: isStatusUpdating }] =
+    useAcceptQuotationMutation();
   const [rejectQuotation, { isLoading: isRejecting }] =
     useRejectQuotationMutation();
 
@@ -51,10 +51,9 @@ export default function CustomerQuotationDetailPage() {
     if (!quotation) return;
     try {
       setError(null);
-      await updateQuotationStatus({
+      await acceptQuotation({
         companyId,
         id: quotation.id,
-        status: "ACCEPTED",
       }).unwrap();
       setNotification("Quotation approved successfully! The deal is now confirmed.");
     } catch (err: unknown) {
@@ -99,7 +98,7 @@ export default function CustomerQuotationDetailPage() {
     if (!quotation) return;
     try {
       setError(null);
-      await submitCounterOffer({
+      await submitNegotiation({
         companyId,
         id: quotation.id,
         data: {
@@ -108,7 +107,7 @@ export default function CustomerQuotationDetailPage() {
         },
       }).unwrap();
       setNotification(
-        "Counter-offer submitted to the sales team successfully! They will review your requested terms."
+        "Counter-offer submitted to the sales team successfully! They will review your requested terms.",
       );
     } catch (err: unknown) {
       const msg =
