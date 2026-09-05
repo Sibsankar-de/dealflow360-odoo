@@ -28,22 +28,10 @@ router.patch(
   requireRole(CompanyUserRole.ADMIN),
   companyController.update,
 );
-router.put(
-  "/:id",
-  verifyCompanyAccess,
-  requireRole(CompanyUserRole.ADMIN),
-  companyController.update,
-);
 
 // Company settings
 router.get("/:id/settings", verifyCompanyAccess, companyController.getSettings);
 router.patch(
-  "/:id/settings",
-  verifyCompanyAccess,
-  requireRole(CompanyUserRole.ADMIN),
-  companyController.updateSettings,
-);
-router.put(
   "/:id/settings",
   verifyCompanyAccess,
   requireRole(CompanyUserRole.ADMIN),
@@ -70,12 +58,6 @@ router.post(
   companyController.addMember,
 );
 router.patch(
-  "/:id/users",
-  verifyCompanyAccess,
-  requireRole(CompanyUserRole.ADMIN),
-  companyController.updateMemberRole,
-);
-router.put(
   "/:id/users",
   verifyCompanyAccess,
   requireRole(CompanyUserRole.ADMIN),

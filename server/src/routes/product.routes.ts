@@ -79,16 +79,4 @@ router.put(
   productController.addOrRemoveCategories,
 );
 
-router.patch(
-  "/:companyId/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
-router.post(
-  "/:companyId/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
 export default router;

@@ -64,12 +64,6 @@ router.post(
   requireRole(...salesRoles),
   quotationController.send,
 );
-router.patch(
-  "/:companyId/:id/send",
-  verifyCompanyAccess,
-  requireRole(...salesRoles),
-  quotationController.send,
-);
 
 // Customer status updates (accept, reject, negotiate).
 router.patch("/:companyId/:id/status", quotationController.updateStatus);
@@ -81,29 +75,21 @@ router.post(
   requireRole(...salesRoles),
   quotationController.cancel,
 );
-router.patch(
-  "/:companyId/:id/cancel",
-  verifyCompanyAccess,
-  requireRole(...salesRoles),
-  quotationController.cancel,
-);
 
 // Customer rejection.
 router.post("/:companyId/:id/reject", quotationController.reject);
-router.patch("/:companyId/:id/reject", quotationController.reject);
 
 // Customer counter-offer and negotiation.
 router.post("/:companyId/:id/counter-offer", quotationController.counterOffer);
-router.patch("/:companyId/:id/counter-offer", quotationController.counterOffer);
 router.post("/:companyId/:id/negotiate", quotationController.counterOffer);
-router.patch("/:companyId/:id/negotiate", quotationController.counterOffer);
 
-// Negotiation history and offers.
+// Negotiation history.
 router.get("/:companyId/:id/negotiations", quotationController.getNegotiations);
-router.get("/:companyId/:id/offers", quotationController.getNegotiations);
 
 // Discount violation evaluation.
-router.get("/:companyId/:id/discount-evaluation", quotationController.getDiscountEvaluation);
-router.get("/:companyId/:id/evaluation", quotationController.getDiscountEvaluation);
+router.get(
+  "/:companyId/:id/discount-evaluation",
+  quotationController.getDiscountEvaluation,
+);
 
 export default router;

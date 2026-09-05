@@ -28,7 +28,6 @@ router.get("/:companyId/:id", requireRole(...salesRoles), dealController.getById
 
 // Update deal fields.
 router.patch("/:companyId/:id", requireRole(...salesRoles), dealController.update);
-router.put("/:companyId/:id", requireRole(...salesRoles), dealController.update);
 
 // List quotations for a deal.
 router.get(
