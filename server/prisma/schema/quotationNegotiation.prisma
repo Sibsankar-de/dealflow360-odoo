@@ -1,0 +1,30 @@
+enum NegotiationStatus {
+  APPROVED
+  UNDER_REVIEW
+  REJECTED
+}
+
+model QuotationNegotiation {
+  id               String            @id @default(uuid()) @db.Uuid
+  quotationId      String            @db.Uuid
+  productId        String?           @db.Uuid
+  createdById      String            @map("created_by") @db.Uuid
+  proposedDiscount Decimal?          @map("proposed_discount") @db.Decimal(12, 2)
+  proposedTotal    Decimal?          @map("proposed_total") @db.Decimal(12, 2)
+  customerMessage  String?           @map("customer_message")
+  adminMessage     String?           @map("admin_message")
+  status           NegotiationStatus @default(UNDER_REVIEW)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  creator   User      @relation("NegotiationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+  @@index([productId])
+  @@index([createdById])
+  @@index([status])
+  @@map("quotation_negotiations")
+}

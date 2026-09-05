@@ -15,9 +15,10 @@ model Product {
   updatedAt   DateTime    @updatedAt
 
   // Relations
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  productStocks  ProductStock[]
-  quotationItems QuotationItem[]
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productStocks         ProductStock[]
+  quotationItems        QuotationItem[]
+  quotationNegotiations QuotationNegotiation[]
 
   @@index([companyId])
   @@index([type])

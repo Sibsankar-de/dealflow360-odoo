@@ -26,10 +26,11 @@ model Quotation {
   updatedAt       DateTime        @updatedAt
 
   // Relations
-  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creator  User            @relation("QuotationCreator", fields: [creatorId], references: [id], onDelete: Restrict)
-  customer User            @relation("QuotationCustomer", fields: [customerId], references: [id], onDelete: Restrict)
-  items    QuotationItem[]
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator      User                   @relation("QuotationCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  customer     User                   @relation("QuotationCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  items        QuotationItem[]
+  negotiations QuotationNegotiation[]
 
   @@unique([companyId, quotationNumber])
   @@index([companyId])
