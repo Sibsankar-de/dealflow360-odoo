@@ -1,18 +1,14 @@
 import { z } from "zod";
 import { QuotationStatus, DiscountType } from "@prisma/client";
 
-export const addQuotationItemSchema = z
-  .object({
-    productId: z.string().uuid("Invalid product ID").optional(),
-    product_id: z.string().uuid("Invalid product ID").optional(),
-    quantity: z
-      .number({ required_error: "Quantity is required" })
-      .positive("Quantity must be greater than 0"),
-  })
-  .refine((data) => data.productId || data.product_id, {
-    message: "Product ID is required",
-    path: ["productId"],
-  });
+export const addQuotationItemSchema = z.object({
+  productId: z
+    .string({ required_error: "Product ID is required" })
+    .uuid("Invalid product ID"),
+  quantity: z
+    .number({ required_error: "Quantity is required" })
+    .positive("Quantity must be greater than 0"),
+});
 
 export const createQuotationItemSchema = z.object({
   productId: z
@@ -42,63 +38,33 @@ export const createQuotationItemSchema = z.object({
     .optional(),
 });
 
-export const createQuotationSchema = z
-  .object({
-    companyId: z.string().uuid("Invalid company ID").optional(),
-    company_id: z.string().uuid("Invalid company ID").optional(),
-    dealId: z.string().uuid("Invalid deal ID").optional(),
-    deal_id: z.string().uuid("Invalid deal ID").optional(),
-    customerId: z.string().uuid("Invalid customer ID").optional(),
-    customer_id: z.string().uuid("Invalid customer ID").optional(),
-    salesRepId: z.string().uuid("Invalid sales rep ID").optional(),
-    sales_rep_id: z.string().uuid("Invalid sales rep ID").optional(),
-    validUntil: z
-      .string()
-      .datetime({ offset: true })
-      .or(z.string())
-      .optional()
-      .nullable(),
-    valid_until: z
-      .string()
-      .datetime({ offset: true })
-      .or(z.string())
-      .optional()
-      .nullable(),
-    currency: z.string().min(2).max(10).trim().optional(),
-    customerNote: z
-      .string()
-      .max(2000, "Customer note cannot exceed 2000 characters")
-      .optional()
-      .nullable(),
-    customer_note: z
-      .string()
-      .max(2000, "Customer note cannot exceed 2000 characters")
-      .optional()
-      .nullable(),
-    internalNote: z
-      .string()
-      .max(2000, "Internal note cannot exceed 2000 characters")
-      .optional()
-      .nullable(),
-    internal_note: z
-      .string()
-      .max(2000, "Internal note cannot exceed 2000 characters")
-      .optional()
-      .nullable(),
-    items: z.array(createQuotationItemSchema).optional(),
-    discountAmount: z
-      .number()
-      .nonnegative("Discount amount cannot be negative")
-      .optional(),
-  })
-  .refine((data) => data.dealId || data.deal_id, {
-    message: "Deal ID is required",
-    path: ["dealId"],
-  })
-  .refine((data) => data.customerId || data.customer_id, {
-    message: "Customer ID is required",
-    path: ["customerId"],
-  });
+export const createQuotationSchema = z.object({
+  companyId: z.string().uuid("Invalid company ID").optional(),
+  dealId: z
+    .string({ required_error: "Deal ID is required" })
+    .uuid("Invalid deal ID"),
+  customerId: z
+    .string({ required_error: "Customer ID is required" })
+    .uuid("Invalid customer ID"),
+  salesRepId: z.string().uuid("Invalid sales rep ID").optional(),
+  validUntil: z
+    .string()
+    .datetime({ offset: true })
+    .or(z.string())
+    .optional()
+    .nullable(),
+  currency: z.string().min(2).max(10).trim().optional(),
+  customerNote: z
+    .string()
+    .max(2000, "Customer note cannot exceed 2000 characters")
+    .optional()
+    .nullable(),
+  internalNote: z
+    .string()
+    .max(2000, "Internal note cannot exceed 2000 characters")
+    .optional()
+    .nullable(),
+});
 
 
 export const updateQuotationSchema = z.object({

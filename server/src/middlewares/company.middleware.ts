@@ -33,13 +33,11 @@ export class CompanyMiddleware {
         req.params?.companyId ||
         headerCompanyId ||
         req.body?.companyId ||
-        req.body?.company_id ||
         (typeof req.query?.companyId === "string" ? req.query.companyId : undefined) ||
-        (typeof req.query?.company_id === "string" ? req.query.company_id : undefined) ||
         req.params?.id;
 
-      if (!rawCompanyId && (req.body?.dealId || req.body?.deal_id)) {
-        const dealId = req.body.dealId || req.body.deal_id;
+      if (!rawCompanyId && req.body?.dealId) {
+        const dealId = req.body.dealId;
         const deal = await defaultPrisma.deal.findUnique({
           where: { id: dealId },
         });

@@ -36,7 +36,7 @@ export class QuotationController {
     const validated = validateBody(createQuotationSchema, req.body);
     const quotation = await this.quotationService.createQuotation(userId, {
       ...validated,
-      companyId: req.company?.id || validated.companyId || validated.company_id,
+      companyId: req.company?.id || validated.companyId,
     });
 
     return res
@@ -51,20 +51,12 @@ export class QuotationController {
   });
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const quotation = await this.quotationService.getQuotationById(
-      quotationId,
-      userId,
-    );
+    const quotation = await this.quotationService.getQuotationById(quotationId);
 
     return res
       .status(StatusCodes.OK)
@@ -78,20 +70,12 @@ export class QuotationController {
   });
 
   public getItems = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const items = await this.quotationService.getQuotationItems(
-      quotationId,
-      userId,
-    );
+    const items = await this.quotationService.getQuotationItems(quotationId);
 
     return res
       .status(StatusCodes.OK)
@@ -105,11 +89,6 @@ export class QuotationController {
   });
 
   public addItem = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
@@ -118,7 +97,6 @@ export class QuotationController {
     const validated = validateBody(addQuotationItemSchema, req.body);
     const item = await this.quotationService.addQuotationItem(
       quotationId,
-      userId,
       validated,
     );
 
@@ -134,11 +112,6 @@ export class QuotationController {
   });
 
   public removeItem = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
@@ -152,7 +125,6 @@ export class QuotationController {
     const result = await this.quotationService.removeQuotationItem(
       quotationId,
       itemId,
-      userId,
     );
 
     return res
@@ -227,20 +199,12 @@ export class QuotationController {
   });
 
   public send = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const quotation = await this.quotationService.sendQuotation(
-      quotationId,
-      userId,
-    );
+    const quotation = await this.quotationService.sendQuotation(quotationId);
 
     return res
       .status(StatusCodes.OK)
@@ -254,20 +218,13 @@ export class QuotationController {
   });
 
   public getRevisions = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const revisions = await this.quotationService.getQuotationRevisions(
-      quotationId,
-      userId,
-    );
+    const revisions =
+      await this.quotationService.getQuotationRevisions(quotationId);
 
     return res
       .status(StatusCodes.OK)
@@ -314,26 +271,16 @@ export class QuotationController {
   });
 
   public cancel = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const validated =
-      req.body && Object.keys(req.body).length > 0
-        ? validateBody(cancelQuotationSchema, req.body)
-        : undefined;
+    if (req.body && Object.keys(req.body).length > 0) {
+      validateBody(cancelQuotationSchema, req.body);
+    }
 
-    const cancelled = await this.quotationService.cancelQuotation(
-      quotationId,
-      userId,
-      validated,
-    );
+    const cancelled = await this.quotationService.cancelQuotation(quotationId);
 
     return res
       .status(StatusCodes.OK)
@@ -347,26 +294,16 @@ export class QuotationController {
   });
 
   public reject = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const validated =
-      req.body && Object.keys(req.body).length > 0
-        ? validateBody(rejectQuotationSchema, req.body)
-        : undefined;
+    if (req.body && Object.keys(req.body).length > 0) {
+      validateBody(rejectQuotationSchema, req.body);
+    }
 
-    const rejected = await this.quotationService.rejectQuotation(
-      quotationId,
-      userId,
-      validated,
-    );
+    const rejected = await this.quotationService.rejectQuotation(quotationId);
 
     return res
       .status(StatusCodes.OK)

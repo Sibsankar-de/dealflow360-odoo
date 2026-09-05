@@ -18,6 +18,7 @@ import {
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
+import { paginate, PaginatedResult, PaginateOptions } from "../utils/paginate";
 
 export type QuotationWithRelations = Quotation & {
   items: (QuotationItem & { product: Product })[];
@@ -396,45 +397,40 @@ export class QuotationRepository {
 
   public async findMany(
     where: Prisma.QuotationWhereInput,
-    page: number = 1,
-    limit: number = 20,
-    tx?: TransactionClient,
-  ): Promise<{ quotations: QuotationWithRelations[]; total: number }> {
-    const client = tx || this.prisma;
-    const skip = (page - 1) * limit;
-
-    const [quotations, total] = await Promise.all([
-      client.quotation.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
+    options: PaginateOptions,
+  ): Promise<PaginatedResult<QuotationWithRelations>> {
+    const include = {
+      items: { include: { product: true } },
+      currentRevision: {
         include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-          currentRevision: {
-            include: {
-              items: {
-                include: {
-                  product: true,
-                },
-              },
-              creator: true,
-            },
-          },
-          deal: true,
-          salesRep: true,
-          customer: true,
-          company: true,
+          items: { include: { product: true } },
+          creator: true,
         },
-      }),
-      client.quotation.count({ where }),
-    ]);
+      },
+      deal: true,
+      salesRep: true,
+      customer: true,
+      company: true,
+    };
 
-    return { quotations, total };
+    const prisma = this.prisma;
+    const model = {
+      findMany: (args: {
+        where?: object;
+        orderBy?: object | object[];
+        skip?: number;
+        take?: number;
+        include?: object;
+      }) =>
+        prisma.quotation.findMany({
+          ...args,
+          include,
+        }) as Promise<QuotationWithRelations[]>,
+      count: (args: { where?: object }) =>
+        prisma.quotation.count(args as { where?: Prisma.QuotationWhereInput }),
+    };
+
+    return paginate(model, where, { createdAt: "desc" }, options);
   }
 
   public async update(
