@@ -17,6 +17,7 @@ const ROLE_BADGE_VARIANTS: Record<CompanyRole, BadgeVariant> = {
   "Sales Representative": "primary",
   "Sales Manager": "info",
   "Finance Manager": "success",
+  Customer: "warning",
   User: "secondary",
 };
 

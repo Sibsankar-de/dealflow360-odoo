@@ -8,12 +8,14 @@ import { CompanyCard } from "./CompanyCard";
 
 export interface CompanyListProps {
   companies: CompanyAffiliation[];
+  isLoading?: boolean;
   onViewCompany?: (company: CompanyAffiliation) => void;
   onCreateCompany?: () => void;
 }
 
 export const CompanyList: React.FC<CompanyListProps> = ({
   companies,
+  isLoading = false,
   onViewCompany,
   onCreateCompany,
 }) => {
@@ -23,9 +25,11 @@ export const CompanyList: React.FC<CompanyListProps> = ({
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-lg font-semibold text-text-primary">Companies & Affiliations</h2>
-            <Badge variant="primary" icon={<Building2 className="w-3 h-3" />}>
-              {companies.length}
-            </Badge>
+            {!isLoading && (
+              <Badge variant="primary" icon={<Building2 className="w-3 h-3" />}>
+                {companies.length}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-text-secondary mt-0.5">
             Manage your company workspaces and role permissions
@@ -43,7 +47,16 @@ export const CompanyList: React.FC<CompanyListProps> = ({
         </Button>
       </div>
 
-      {companies.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col gap-3 mt-6">
+          {[1, 2].map((idx) => (
+            <div
+              key={idx}
+              className="p-5 border border-border rounded-xl bg-surface/50 animate-pulse h-20"
+            />
+          ))}
+        </div>
+      ) : companies.length === 0 ? (
         <div className="py-12 text-center flex flex-col items-center">
           <div className="w-12 h-12 rounded-full bg-surface border border-border flex items-center justify-center text-text-muted mb-3">
             <Building2 className="w-6 h-6" />

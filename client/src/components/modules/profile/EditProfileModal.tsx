@@ -2,36 +2,53 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { User, Phone } from "lucide-react";
+import { User } from "lucide-react";
 
 export interface EditProfileModalProps {
   isOpen: boolean;
   initialFullName: string;
-  initialPhone?: string;
   onClose: () => void;
-  onSave: (data: { fullName: string; phone: string }) => void;
+  onSave: (data: { fullName: string }) => Promise<void> | void;
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   initialFullName,
-  initialPhone = "",
   onClose,
   onSave,
 }) => {
   const [fullName, setFullName] = useState(initialFullName);
-  const [phone, setPhone] = useState(initialPhone);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (isOpen) {
+      setFullName(initialFullName);
+      setError(null);
+    }
+  }, [isOpen, initialFullName]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       setError("Full name is required.");
       return;
     }
     setError(null);
-    onSave({ fullName: fullName.trim(), phone: phone.trim() });
-    onClose();
+    setIsLoading(true);
+    try {
+      await onSave({ fullName: fullName.trim() });
+      onClose();
+    } catch (err: unknown) {
+      const errorObj = err as { data?: { message?: string }; message?: string };
+      setError(
+        errorObj.data?.message ||
+          errorObj.message ||
+          "Failed to update profile. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -39,7 +56,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Profile"
-      description="Update your personal details and contact information"
+      description="Update your personal details"
       size="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -56,15 +73,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           onChange={(e) => setFullName(e.target.value)}
           leftIcon={<User className="w-4 h-4" />}
           placeholder="e.g. John Doe"
-        />
-
-        <Input
-          label="Phone Number"
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          leftIcon={<Phone className="w-4 h-4" />}
-          placeholder="+1 (555) 000-0000"
         />
 
         <div className="pt-3 flex items-center justify-end gap-3">

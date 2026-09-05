@@ -59,12 +59,16 @@ src/
 │       ├── finance/      # Invoices, financial approvals
 │       ├── customers/    # Customer directory and interaction history
 │       └── company/      # Team, roles, product management
-├── services/             # Centralized API clients and endpoint definitions
-│   └── api/              # Base API configuration and domain services
+├── context/              # React Context Providers (AuthContext.tsx, AuthProvider)
 ├── hooks/                # Reusable custom React hooks
-├── store/                # Global state management (Redux Toolkit / RTK Query)
-│   └── slices/           # Client-side UI slices
-├── types/                # Global TypeScript interfaces and type definitions
+├── schemas/              # Zod validation schemas (auth.schema.ts, company.schema.ts)
+├── store/                # Global state management (Redux Toolkit store, StoreProvider)
+│   ├── baseApi.ts        # Base RTK Query API configuration with re-auth interceptor
+│   ├── features/         # Feature slices & injected endpoints
+│   │   ├── user/         # userSlice.ts, userApi.ts
+│   │   └── company/      # companyApi.ts (user company affiliations, company creation)
+│   └── index.ts          # Central Redux store configuration
+├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, SelectType.ts)
 ├── utils/                # Pure helper functions and formatters
 └── assets/               # Static assets, icons, and media
 ```
@@ -77,20 +81,23 @@ State is strictly divided into two categories:
 
 ### 1. Server State
 * **Examples**: Quotations, Deals, Products, Invoices, Delivery Batches, Users, Notifications.
-* **Management**: Centralized API services / RTK Query caching and invalidation.
+* **Management**: Centralized RTK Query caching (`store/baseApi.ts`) with feature endpoints (e.g. `store/features/user/userApi.ts`) and tag invalidation (`User`, `Company`, `Quotation`).
+* **Authentication**: Automatic session recovery via `baseQueryWithReauth` in `baseApi.ts` on `401 Unauthorized` responses by calling `/auth/refresh`.
 * **Rules**: Do not duplicate server data in local client state. Rely on normalized query caching.
 
 ### 2. Client State
 * **Examples**: Modal open/close state, active filters, form draft steps, temporary selection IDs.
-* **Management**: React local state (`useState`, `useReducer`) for component-level state, and Redux Toolkit slices for shared cross-component UI state.
+* **Management**: React local state (`useState`, `useReducer`), `AuthContext` (`useAuth()` hook for user session lifecycle), and Redux Toolkit feature slices (`store/features/user/userSlice.ts`).
 
 ---
 
 ## API Layer & Data Flow
 
-* All API calls must go through centralized services under `src/services/api/`.
+* All API calls must go through RTK Query services under `src/store/features/`.
+* Feature APIs inject endpoints directly into `src/store/baseApi.ts`.
+* `credentials: "include"` is configured by default for httpOnly cookie authentication (`accessToken`, `refreshToken`).
 * Direct `fetch` or `axios` calls inside UI components are prohibited.
-* Requests and responses must use strictly typed interfaces defined in `src/types/`.
+* Requests and responses must use strictly typed interfaces defined in `src/types/auth.ts`.
 * Standardized loading, empty, and error handling must be implemented across all views.
 
 ---
@@ -117,9 +124,13 @@ Routes are structured around user roles and core platform workflows:
 
 ## Security & Authentication Flow
 
-* Authentication tokens and company context headers are managed centrally in the API client layer.
-* Role-based access control (RBAC) boundaries (Platform User, Company Admin, Sales Rep, Sales Manager, Finance Manager) are respected across routing guards and UI actions.
-* Multi-company context: requests include the active company identifier header to maintain tenant isolation.
+* **Session Validation & Route Protection**:
+  - Client-side `<ProtectedRoute>` wraps all private layouts (`ProfileLayout`, `CompanyDashboardLayout`), verifying live `useAuth()` status and redirecting unauthenticated users to `/login?redirect=<path>`.
+* **Tokens**:
+  - `accessToken` and `refreshToken` are stored in httpOnly cookies set by the backend.
+  - Automatic `401` re-authentication happens seamlessly in `baseQueryWithReauth` (`baseApi.ts`).
+* **Role-based access control (RBAC)** boundaries (Platform User, Company Admin, Sales Rep, Sales Manager, Finance Manager) are respected across routing guards and UI actions.
+* **Multi-company context**: requests include active company context parameters to preserve tenant isolation.
 
 ---
 

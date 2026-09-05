@@ -1,66 +1,42 @@
 "use client";
 
 import React, { useState } from "react";
-import { UserProfile, CompanyAffiliation } from "@/types/profile";
+import { UserProfile, CompanyAffiliation, mapCompanyResponseToAffiliation } from "@/types/profile";
 import { ProfileInfoCard } from "@/components/modules/profile/ProfileInfoCard";
 import { CompanyList } from "@/components/modules/profile/CompanyList";
 import { EditProfileModal } from "@/components/modules/profile/EditProfileModal";
 import { ChangePasswordModal } from "@/components/modules/profile/ChangePasswordModal";
 import { CreateCompanyModal, CreateCompanyData } from "@/components/modules/profile/CreateCompanyModal";
 import { CheckCircle2 } from "lucide-react";
-
-const INITIAL_USER: UserProfile = {
-  id: "usr_01",
-  fullName: "Alex Rivera",
-  email: "alex.rivera@example.com",
-  phone: "+1 (555) 234-5678",
-  platformRole: "User",
-  companies: [
-    {
-      id: "12983hufiu42",
-      name: "Acme Industrial Supplies",
-      code: "ACME-IND",
-      country: "United States",
-      postalCode: "94103",
-      addressLine: "100 Market St, San Francisco, CA",
-      currency: "USD",
-      role: "Company Admin",
-      status: "Active",
-      joinedAt: "2025-01-10",
-    },
-    {
-      id: "comp_02",
-      name: "Apex Logistics Corp",
-      code: "APEX-LOG",
-      country: "United Kingdom",
-      postalCode: "EC1A 1BB",
-      addressLine: "25 Old Broad Street, London",
-      currency: "GBP",
-      role: "Sales Representative",
-      status: "Active",
-      joinedAt: "2025-03-15",
-    },
-    {
-      id: "comp_03",
-      name: "Horizon Global Trading",
-      code: "HZN-TRD",
-      country: "Singapore",
-      postalCode: "018981",
-      addressLine: "10 Marina Boulevard, Tower 2",
-      currency: "SGD",
-      role: "Finance Manager",
-      status: "Active",
-      joinedAt: "2025-06-20",
-    },
-  ],
-};
+import { useAuth } from "@/context/AuthContext";
+import {
+  useGetUserCompaniesQuery,
+  useCreateCompanyMutation,
+} from "@/store/features/company/companyApi";
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserProfile>(INITIAL_USER);
+  const { user: authUser, updateProfile, updatePassword } = useAuth();
+
+  const { data: companiesData, isLoading: isCompaniesLoading } = useGetUserCompaniesQuery();
+  const [createCompanyMutation] = useCreateCompanyMutation();
+
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  const companies: CompanyAffiliation[] = React.useMemo(() => {
+    if (!companiesData?.data?.companies) return [];
+    return companiesData.data.companies.map(mapCompanyResponseToAffiliation);
+  }, [companiesData]);
+
+  const displayUser: UserProfile = {
+    id: authUser?.id || "",
+    fullName: authUser?.userName || "User",
+    email: authUser?.email || "",
+    platformRole: authUser?.role || "User",
+    companies,
+  };
 
   const showNotification = (message: string) => {
     setFeedbackMessage(message);
@@ -69,44 +45,27 @@ export default function ProfilePage() {
     }, 4000);
   };
 
-  const handleSaveProfile = (data: { fullName: string; phone: string }) => {
-    setUser((prev) => ({
-      ...prev,
-      fullName: data.fullName,
-      phone: data.phone,
-    }));
+  const handleSaveProfile = async (data: { fullName: string }) => {
+    await updateProfile({ userName: data.fullName });
     showNotification("Profile details updated successfully.");
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async (data: { currentPassword: string; newPassword: string }) => {
+    await updatePassword(data);
     showNotification("Password changed successfully.");
   };
 
-  const handleCreateCompany = (data: CreateCompanyData) => {
-    const generatedCode = data.name
-      .trim()
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .substring(0, 6)
-      .toUpperCase();
-
-    const newCompany: CompanyAffiliation = {
-      id: `comp_${Date.now()}`,
+  const handleCreateCompany = async (data: CreateCompanyData) => {
+    const response = await createCompanyMutation({
       name: data.name,
-      code: generatedCode,
       country: data.country,
       postalCode: data.postalCode,
       addressLine: data.addressLine,
       currency: data.currency,
-      role: "Company Admin",
-      status: "Active",
-      joinedAt: new Date().toISOString().split("T")[0],
-    };
+    }).unwrap();
 
-    setUser((prev) => ({
-      ...prev,
-      companies: [newCompany, ...prev.companies],
-    }));
-    showNotification(`Company "${data.name}" created successfully in ${data.country}. You are assigned as Company Admin.`);
+    const createdCompanyName = response.data?.company?.name || data.name;
+    showNotification(`Company "${createdCompanyName}" created successfully. You are assigned as Company Admin.`);
   };
 
   const handleViewCompany = (company: CompanyAffiliation) => {
@@ -131,21 +90,21 @@ export default function ProfilePage() {
         )}
 
         <ProfileInfoCard
-          user={user}
+          user={displayUser}
           onEditProfile={() => setIsEditOpen(true)}
           onChangePassword={() => setIsPasswordOpen(true)}
         />
 
         <CompanyList
-          companies={user.companies}
+          companies={displayUser.companies}
+          isLoading={isCompaniesLoading}
           onViewCompany={handleViewCompany}
           onCreateCompany={() => setIsCreateCompanyOpen(true)}
         />
 
         <EditProfileModal
           isOpen={isEditOpen}
-          initialFullName={user.fullName}
-          initialPhone={user.phone}
+          initialFullName={displayUser.fullName}
           onClose={() => setIsEditOpen(false)}
           onSave={handleSaveProfile}
         />

@@ -7,7 +7,7 @@ import { Lock } from "lucide-react";
 export interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { currentPassword: string; newPassword: string }) => void;
+  onSave: (data: { currentPassword: string; newPassword: string }) => Promise<void> | void;
 }
 
 export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
@@ -19,8 +19,18 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (isOpen) {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword) {
       setError("Current password is required.");
@@ -36,11 +46,23 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     }
 
     setError(null);
-    onSave({ currentPassword, newPassword });
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    onClose();
+    setIsLoading(true);
+    try {
+      await onSave({ currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      onClose();
+    } catch (err: unknown) {
+      const errorObj = err as { data?: { message?: string }; message?: string };
+      setError(
+        errorObj.data?.message ||
+          errorObj.message ||
+          "Failed to update password. Please check your current password."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

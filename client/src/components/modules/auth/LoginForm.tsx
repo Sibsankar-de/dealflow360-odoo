@@ -2,41 +2,67 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useAuth } from "@/context/AuthContext";
+
+import { loginSchema } from "@/schemas/auth.schema";
 
 export const LoginForm: React.FC = () => {
+  const router = useRouter();
+  const { login } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setGeneralError(null);
+    setFieldErrors({});
 
-    if (!email.trim()) {
-      setError("Please enter your work email.");
-      return;
-    }
+    const result = loginSchema.safeParse({
+      email: email.trim(),
+      password,
+    });
 
-    if (!password) {
-      setError("Please enter your password.");
+    if (!result.success) {
+      const formattedErrors: { email?: string; password?: string } = {};
+      result.error.issues.forEach((err) => {
+        const field = err.path[0] as "email" | "password";
+        if (field && !formattedErrors[field]) {
+          formattedErrors[field] = err.message;
+        }
+      });
+      setFieldErrors(formattedErrors);
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await login(result.data);
+      router.push("/profile");
+    } catch (err: unknown) {
+      const errorObj = err as { data?: { message?: string }; message?: string };
+      setGeneralError(
+        errorObj.data?.message ||
+          errorObj.message ||
+          "Failed to sign in. Please check your credentials."
+      );
+    } finally {
       setIsLoading(false);
-    }, 1200);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 w-full">
+    <form onSubmit={handleSubmit} className="space-y-5 w-full" noValidate>
       <div className="space-y-1 text-left">
         <h3 className="text-2xl font-bold text-text-primary tracking-tight">
           Welcome back
@@ -46,9 +72,9 @@ export const LoginForm: React.FC = () => {
         </p>
       </div>
 
-      {error && (
+      {generalError && (
         <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
-          {error}
+          {generalError}
         </div>
       )}
 
@@ -57,7 +83,11 @@ export const LoginForm: React.FC = () => {
         type="email"
         placeholder="rahul.sharma@acmecorp.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+        }}
+        error={fieldErrors.email}
         required
         autoComplete="email"
       />
@@ -82,7 +112,11 @@ export const LoginForm: React.FC = () => {
           type={showPassword ? "text" : "password"}
           placeholder="••••••••••••"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+          }}
+          error={fieldErrors.password}
           required
           autoComplete="current-password"
           rightIcon={
