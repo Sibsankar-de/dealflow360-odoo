@@ -1,10 +1,10 @@
 class ApiError extends Error {
-  statusCode: number;
-  data: null;
-  success: false;
-  errors: unknown[];
+  public statusCode: number;
+  public data: null;
+  public success: false;
+  public errors: unknown[];
 
-  constructor(
+  public constructor(
     statusCode: number,
     message = "Something went wrong",
     errors: unknown[] = [],

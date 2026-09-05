@@ -15,6 +15,7 @@ export const env = {
   APP_DEBUG: parseBoolean(process.env.APP_DEBUG, true),
 
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:3000",
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || "localhost",
 
   DB_HOST: process.env.DB_HOST || "localhost",
   DB_PORT: Number(process.env.DB_PORT || 5432),
@@ -22,4 +23,16 @@ export const env = {
   DB_PASSWORD: process.env.DB_PASSWORD || "root",
   DB_NAME: process.env.DB_NAME || "dealflow",
   DB_SSL: parseBoolean(process.env.DB_SSL, false),
+
+  ACCESS_TOKEN_SECRET:
+    process.env.ACCESS_TOKEN_SECRET || "default_access_token_secret_key",
+  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || "15m",
+  REFRESH_TOKEN_EXPIRY: Number(process.env.REFRESH_TOKEN_EXPIRY || 10),
+
+  ACCESS_TOKEN_COOKIE_EXPIRY: Number(
+    process.env.ACCESS_TOKEN_COOKIE_EXPIRY || 15,
+  ),
+  REFRESH_TOKEN_COOKIE_EXPIRY: Number(
+    process.env.REFRESH_TOKEN_COOKIE_EXPIRY || 10,
+  ),
 } as const;
