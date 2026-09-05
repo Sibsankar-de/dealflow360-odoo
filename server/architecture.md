@@ -218,6 +218,33 @@ Responsibilities:
 
 - Store company key-value configurations (`company_configs`) with unique constraints per company and config key (`companyId`, `config_key`).
 
+### 4.10 Sales Order, Delivery, Backorder, and Invoice Persistence Context
+
+Responsibilities:
+
+- Store confirmed sales orders (`sales_orders`) linking company, customer, sales representative, and originating quotation.
+  - Track order progress via `SalesOrderStatus` enum (`DRAFT`, `CONFIRMED`, `PROCESSING`, `PARTIALLY_DELIVERED`, `DELIVERED`, `CANCELLED`).
+  - Store financial totals: `subtotal`, `discount_amount`, `tax_amount`, `total_amount`, and currency.
+- Store sales order line items (`sales_order_items`) linking orders and products.
+  - Track line quantities: `ordered_quantity`, `delivered_quantity`, `invoiced_quantity`.
+  - Maintain commercial line terms: `unit_price`, `discount`, `tax_rate`, `final_unit_price`, and `line_total`.
+- Store fulfillment delivery records (`deliveries`) linking company and sales order.
+  - Track delivery status via `DeliveryStatus` enum (`PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`).
+  - Track delivery metadata: `delivery_no`, `tracking_number`, `shipped_at`, and `delivered_at`.
+- Store delivery line items (`delivery_items`) linking deliveries to sales order items and products with `delivered_quantity`.
+- Store backorders (`backorders`) created automatically upon partial deliveries for remaining undelivered quantities.
+  - Track backorder hierarchy via self-relation `parent_backorder_id`.
+  - Track backorder status via `BackorderStatus` enum (`PENDING`, `PARTIALLY_FULFILLED`, `FULFILLED`, `CANCELLED`).
+  - Track quantities: `total_quantity`, `fulfilled_quantity`, and `remaining_quantity`.
+- Store backorder line items (`backorder_items`) linking backorders to sales order items and products.
+  - Track line-level quantities: `ordered_quantity`, `fulfilled_quantity`, and `remaining_quantity`.
+- Store customer invoices (`invoices`) generated strictly for delivered quantities.
+  - Track invoice status via `InvoiceStatus` enum (`DRAFT`, `POSTED`, `PARTIALLY_PAID`, `PAID`, `CANCELLED`, `VOID`).
+  - Track dates and terms: `issue_date`, `due_date`, `paid_at`, and `payment_terms`.
+  - Track financial totals: `subtotal`, `discount`, `tax`, `total`, `paid_amount`, and `remaining_amount`.
+- Store invoice line items (`invoice_items`) linking invoices to sales order items and products.
+  - Track line-level quantities and commercial values: `delivered_quantity`, `unit_price`, `discount`, `tax`, and `line_total`.
+
 
 
 ## 5. Core Domain Model
@@ -524,7 +551,17 @@ Sales Order Line
 
 The backorder must remain traceable to the original order and line.
 
-"Consolidate remaining backorder" means combining eligible remaining quantities into a later fulfillment operation instead of treating each remaining quantity as an unrelated order.
+When a delivery is executed with partial quantities (POST /api/v1/sales-orders/:id/deliver):
+- A Delivery record is created with the delivered quantities.
+- A Backorder record is automatically created for the remaining undelivered quantities.
+- When fulfilling a backorder (POST /api/v1/backorders/:id/deliver), any remaining quantities create a child backorder with parentBackorderId linking back to the parent.
+- Backorder endpoints:
+  - GET /api/v1/backorders: List backorders with filters and pagination.
+  - GET /api/v1/backorders/:id: Retrieve backorder details including hierarchy, items, and linked deliveries.
+  - POST /api/v1/backorders/:id/deliver: Fulfill backorder (partial fulfillment updates status to PARTIALLY_FULFILLED and creates child backorder; full fulfillment sets status to FULFILLED).
+- Delivery endpoints:
+  - GET /api/v1/deliveries: List deliveries with filters and pagination.
+  - GET /api/v1/deliveries/:id: Retrieve delivery details and line items.
 
 ## 8. Invoicing Workflow
 
@@ -561,7 +598,16 @@ The two invoices map back to the same customer order through their order and ord
 
 A partial invoice is not a separate customer order. It is a financial document representing part of the fulfillment of the same order.
 
-The server must prevent billing quantities that violate the configured invoicing policy.
+Invoices strictly include only quantities actually delivered:
+- An invoice can be generated from a delivery (deliveryId) or for a sales order with specified delivered quantities.
+- Attempting to invoice quantities exceeding uninvoiced delivered quantities is rejected by the server.
+- Invoices track invoice number, status (DRAFT, POSTED, PARTIALLY_PAID, PAID, CANCELLED, VOID), dates (issueDate, dueDate, paidAt), currency, payment terms, subtotal, discount, tax, total, paid amount, and remaining amount.
+- Invoice items track the related sales order item, product, delivered quantity, unit price, discount, tax, and line total.
+- Invoice endpoints:
+  - POST /api/v1/invoices: Create invoice for delivered quantities.
+  - GET /api/v1/invoices: List invoices with company scoping, status filtering, and pagination.
+  - GET /api/v1/invoices/:id: Retrieve detailed invoice with items, customer, sales order, and delivery relations.
+  - POST /api/v1/invoices/:id/pay: Record payment against an invoice (updates paidAmount, remainingAmount, and status).
 
 ## 9. Delivery and Invoice Reconciliation
 

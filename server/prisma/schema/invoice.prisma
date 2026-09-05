@@ -1,0 +1,70 @@
+enum InvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  VOID
+}
+
+model Invoice {
+  id              String        @id @default(uuid()) @db.Uuid
+  companyId       String        @map("company_id") @db.Uuid
+  invoiceNo       String        @unique @map("invoice_no")
+  salesOrderId    String        @map("sales_order_id") @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  deliveryId      String?       @map("delivery_id") @db.Uuid
+  status          InvoiceStatus @default(POSTED)
+  issueDate       DateTime      @default(now()) @map("issue_date")
+  dueDate         DateTime?     @map("due_date")
+  paidAt          DateTime?     @map("paid_at")
+  currency        String        @default("USD")
+  paymentTerms    String?       @map("payment_terms")
+  subtotal        Decimal       @default(0) @db.Decimal(12, 2)
+  discount        Decimal       @default(0) @db.Decimal(12, 2)
+  tax             Decimal       @default(0) @db.Decimal(12, 2)
+  total           Decimal       @default(0) @db.Decimal(12, 2)
+  paidAmount      Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  remainingAmount Decimal       @default(0) @map("remaining_amount") @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrder SalesOrder    @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  customer   User          @relation("InvoiceCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  delivery   Delivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  items      InvoiceItem[]
+
+  @@index([companyId])
+  @@index([salesOrderId])
+  @@index([customerId])
+  @@index([deliveryId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  invoiceId         String   @map("invoice_id") @db.Uuid
+  salesOrderItemId  String   @map("sales_order_item_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  deliveredQuantity Decimal  @map("delivered_quantity") @db.Decimal(12, 2)
+  unitPrice         Decimal  @map("unit_price") @db.Decimal(12, 2)
+  discount          Decimal  @default(0) @db.Decimal(12, 2)
+  tax               Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal         Decimal  @map("line_total") @db.Decimal(12, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  salesOrderItem SalesOrderItem @relation(fields: [salesOrderItemId], references: [id], onDelete: Restrict)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([salesOrderItemId])
+  @@index([productId])
+  @@map("invoice_items")
+}

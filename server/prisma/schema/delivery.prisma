@@ -1,0 +1,55 @@
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Delivery {
+  id             String         @id @default(uuid()) @db.Uuid
+  companyId      String         @map("company_id") @db.Uuid
+  deliveryNo     String         @unique @map("delivery_no")
+  salesOrderId   String         @map("sales_order_id") @db.Uuid
+  backorderId    String?        @map("backorder_id") @db.Uuid
+  status         DeliveryStatus @default(DELIVERED)
+  trackingNumber String?        @map("tracking_number")
+  shippedAt      DateTime?      @map("shipped_at")
+  deliveredAt    DateTime?      @map("delivered_at")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrder SalesOrder     @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  backorder  Backorder?     @relation(fields: [backorderId], references: [id], onDelete: SetNull)
+  items      DeliveryItem[]
+  invoices   Invoice[]
+
+  @@index([companyId])
+  @@index([salesOrderId])
+  @@index([backorderId])
+  @@index([status])
+  @@map("deliveries")
+}
+
+model DeliveryItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  deliveryId        String   @map("delivery_id") @db.Uuid
+  salesOrderItemId  String   @map("sales_order_item_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  deliveredQuantity Decimal  @map("delivered_quantity") @db.Decimal(12, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  delivery       Delivery       @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  salesOrderItem SalesOrderItem @relation(fields: [salesOrderItemId], references: [id], onDelete: Restrict)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([deliveryId])
+  @@index([salesOrderItemId])
+  @@index([productId])
+  @@map("delivery_items")
+}

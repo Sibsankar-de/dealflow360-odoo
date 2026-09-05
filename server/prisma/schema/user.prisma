@@ -38,6 +38,11 @@ model User {
   receivedQuotations    Quotation[]            @relation("QuotationCustomer")
   createdRevisions      QuotationRevision[]    @relation("RevisionCreator")
 
+  // Sales Order & Invoice Relations
+  salesOrdersAsCustomer SalesOrder[]           @relation("SalesOrderCustomer")
+  salesOrdersAsSalesRep SalesOrder[]           @relation("SalesOrderSalesRep")
+  invoicesAsCustomer    Invoice[]              @relation("InvoiceCustomer")
+
   @@index([email])
   @@map("users")
 }

@@ -27,6 +27,10 @@ model Company {
   settings     CompanySetting?
   configs      CompanyConfig[]
   categories   Category[]
+  salesOrders  SalesOrder[]
+  deliveries   Delivery[]
+  backorders   Backorder[]
+  invoices     Invoice[]
 
   @@index([ownerId])
   @@index([status])
