@@ -39,3 +39,18 @@ export interface AddCustomerRequest {
   userEmail: string;
   role?: BackendCompanyRole;
 }
+
+export interface CustomerDealItem {
+  id: string;
+  dealNo: string;
+  name: string;
+  companyName: string;
+  expiryDate: string;
+  expectedValue: number;
+  stage: import("./deal").DealStage;
+  status: import("./deal").DealStatus;
+  probability: number;
+  quotationsCount: number;
+  description: string;
+}
+
