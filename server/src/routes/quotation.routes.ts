@@ -11,6 +11,7 @@ const salesRoles = [
   CompanyUserRole.ADMIN,
   CompanyUserRole.SALES_REP,
   CompanyUserRole.SALES_MANAGER,
+  CompanyUserRole.FINANCE_MANAGER,
 ];
 
 // All routes require authentication.

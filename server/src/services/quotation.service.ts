@@ -386,10 +386,7 @@ export class QuotationService {
       }
 
       if (quotation.status === QuotationStatus.SENT) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Quotation has already been sent",
-        );
+        return toQuotationDto(quotation);
       }
 
       if (quotation.status !== QuotationStatus.DRAFT) {
@@ -785,7 +782,8 @@ export class QuotationService {
 
       if (
         quotation.status !== QuotationStatus.DRAFT &&
-        quotation.status !== QuotationStatus.NEGOTIATING
+        quotation.status !== QuotationStatus.NEGOTIATING &&
+        quotation.status !== QuotationStatus.SENT
       ) {
         throw new ApiError(
           StatusCodes.BAD_REQUEST,
@@ -833,9 +831,9 @@ export class QuotationService {
           quotationId,
           requestingUserId,
           RevisionType.SALES_COUNTER,
-          quotation.status === QuotationStatus.NEGOTIATING
-            ? RevisionStatus.SENT
-            : RevisionStatus.DRAFT,
+          quotation.status === QuotationStatus.DRAFT
+            ? RevisionStatus.DRAFT
+            : RevisionStatus.SENT,
           {
             subtotal: calculated.subtotal,
             discountAmount: calculated.totalDiscount,
@@ -879,7 +877,22 @@ export class QuotationService {
             }
           : {}),
         ...(dto.currency ? { currency: dto.currency } : {}),
+        ...(quotation.status === QuotationStatus.NEGOTIATING ||
+        quotation.status === QuotationStatus.SENT
+          ? { status: QuotationStatus.SENT }
+          : {}),
       };
+
+      if (quotation.status === QuotationStatus.NEGOTIATING) {
+        await tx.negotiation.updateMany({
+          where: { quotationId, status: NegotiationStatus.PENDING },
+          data: {
+            status: NegotiationStatus.APPROVED,
+            approvedBy: requestingUserId,
+            approvedAt: new Date(),
+          },
+        });
+      }
 
       const updated = await this.quotationRepo.update(
         quotationId,
