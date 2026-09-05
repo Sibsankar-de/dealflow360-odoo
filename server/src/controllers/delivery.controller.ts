@@ -19,7 +19,7 @@ export class DeliveryController {
   }
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const deliveryId = req.params.id || req.params.deliveryId;
+    const deliveryId = String(req.params.id || req.params.deliveryId || "");
     if (!deliveryId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Delivery ID is required");
     }

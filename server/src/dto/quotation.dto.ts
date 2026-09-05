@@ -22,6 +22,10 @@ import {
   Company,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
+import { SalesOrderResponseDto } from "./salesOrder.dto";
+import { DeliveryResponseDto } from "./delivery.dto";
+import { InvoiceResponseDto } from "./invoice.dto";
+import { BackorderResponseDto } from "./backorder.dto";
 import { DiscountViolationEvaluation } from "../utils/discount-violation.util";
 import {
   addQuotationItemSchema,
@@ -34,6 +38,8 @@ import {
   dealQuotationsQuerySchema,
   counterOfferItemSchema,
   submitCounterOfferSchema,
+  approveQuotationSchema,
+  fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
 
 export type AddQuotationItemDto = z.infer<typeof addQuotationItemSchema>;
@@ -46,6 +52,17 @@ export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryDto = z.infer<typeof dealQuotationsQuerySchema>;
 export type CounterOfferItemDto = z.infer<typeof counterOfferItemSchema>;
 export type SubmitCounterOfferDto = z.infer<typeof submitCounterOfferSchema>;
+export type ApproveQuotationDto = z.infer<typeof approveQuotationSchema>;
+export type FulfillQuotationDto = z.infer<typeof fulfillQuotationSchema>;
+
+export interface FulfillmentResultDto {
+  quotation: QuotationResponseDto;
+  salesOrder: SalesOrderResponseDto;
+  delivery: DeliveryResponseDto | null;
+  invoice: InvoiceResponseDto | null;
+  backorder: BackorderResponseDto | null;
+  deal?: DealResponseDto | null;
+}
 
 export interface QuotationItemResponseDto {
   id: string;

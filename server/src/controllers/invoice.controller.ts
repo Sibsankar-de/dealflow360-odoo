@@ -52,7 +52,7 @@ export class InvoiceController {
   });
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const invoiceId = req.params.id || req.params.invoiceId;
+    const invoiceId = String(req.params.id || req.params.invoiceId || "");
     if (!invoiceId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invoice ID is required");
     }
@@ -115,7 +115,7 @@ export class InvoiceController {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
     }
 
-    const invoiceId = req.params.id || req.params.invoiceId;
+    const invoiceId = String(req.params.id || req.params.invoiceId || "");
     if (!invoiceId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invoice ID is required");
     }

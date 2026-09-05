@@ -3,6 +3,8 @@ import {
   DeliveryStatus,
   BackorderStatus,
   SalesOrderStatus,
+  DealStage,
+  DealStatus,
 } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
@@ -311,6 +313,21 @@ export class DeliveryService {
         },
         tx,
       );
+
+      if (allItemsDelivered && order.quotationId) {
+        const quotation = await tx.quotation.findUnique({
+          where: { id: order.quotationId },
+        });
+        if (quotation?.dealId) {
+          await tx.deal.update({
+            where: { id: quotation.dealId },
+            data: {
+              stage: DealStage.WON,
+              status: DealStatus.WON,
+            },
+          });
+        }
+      }
 
       const loadedDelivery = await this.deliveryRepo.findByIdWithRelations(
         delivery.id,

@@ -5,10 +5,15 @@ import {
   RevisionType,
   RevisionStatus,
   DealStage,
+  DealStatus,
   NegotiationStatus,
   OfferParty,
   OfferStatus,
   CompanyUserRole,
+  SalesOrderStatus,
+  DeliveryStatus,
+  BackorderStatus,
+  InvoiceStatus,
 } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
@@ -27,6 +32,30 @@ import {
   DealRepository,
   dealRepository as defaultDealRepository,
 } from "../repositories/deal.repository";
+import {
+  SalesOrderRepository,
+  salesOrderRepository as defaultSalesOrderRepository,
+} from "../repositories/salesOrder.repository";
+import {
+  DeliveryRepository,
+  deliveryRepository as defaultDeliveryRepository,
+} from "../repositories/delivery.repository";
+import {
+  InvoiceRepository,
+  invoiceRepository as defaultInvoiceRepository,
+} from "../repositories/invoice.repository";
+import {
+  BackorderRepository,
+  backorderRepository as defaultBackorderRepository,
+} from "../repositories/backorder.repository";
+import {
+  WarehouseRepository,
+  warehouseRepository as defaultWarehouseRepository,
+} from "../repositories/warehouse.repository";
+import {
+  ProductRepository,
+  productRepository as defaultProductRepository,
+} from "../repositories/product.repository";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   prismaTransaction,
@@ -45,35 +74,80 @@ import {
   DealQuotationsQueryDto,
   RejectQuotationDto,
   SubmitCounterOfferDto,
+  ApproveQuotationDto,
+  FulfillQuotationDto,
+  FulfillmentResultDto,
   NegotiationResponseDto,
   toQuotationDto,
   toQuotationItemDto,
   toQuotationRevisionDto,
   toNegotiationDto,
 } from "../dto/quotation.dto";
+import { toSalesOrderDto } from "../dto/salesOrder.dto";
+import { DeliveryResponseDto, toDeliveryDto } from "../dto/delivery.dto";
+import { InvoiceResponseDto, toInvoiceDto } from "../dto/invoice.dto";
+import { BackorderResponseDto, toBackorderDto } from "../dto/backorder.dto";
+import { toDealDto } from "../dto/deal.dto";
 import { customerDiscountTierConverter } from "../converters/companySetting.converter";
 import {
   calculateDiscountViolations,
   DiscountLineItemInput,
   DiscountViolationEvaluation,
+  RiskLevel,
 } from "../utils/discount-violation.util";
+
+interface DeliverableLineItem {
+  salesOrderItemId: string;
+  productId: string;
+  orderedQuantity: number;
+  deliverableQuantity: number;
+  backorderQuantity: number;
+  warehouseId: string;
+  unitPrice: number;
+  discount: number;
+  taxRate: number;
+  finalUnitPrice: number;
+}
+
+interface EvaluatedFulfillmentLines {
+  deliveredLines: DeliverableLineItem[];
+  backorderLines: DeliverableLineItem[];
+}
 
 export class QuotationService {
   private quotationRepo: QuotationRepository;
   private companyRepo: CompanyRepository;
   private userRepo: UserRepository;
   private dealRepo: DealRepository;
+  private salesOrderRepo: SalesOrderRepository;
+  private deliveryRepo: DeliveryRepository;
+  private invoiceRepo: InvoiceRepository;
+  private backorderRepo: BackorderRepository;
+  private warehouseRepo: WarehouseRepository;
+  private productRepo: ProductRepository;
 
   public constructor(
     quotationRepo: QuotationRepository = defaultQuotationRepository,
     companyRepo: CompanyRepository = defaultCompanyRepository,
     userRepo: UserRepository = defaultUserRepository,
     dealRepo: DealRepository = defaultDealRepository,
+    salesOrderRepo: SalesOrderRepository = defaultSalesOrderRepository,
+    deliveryRepo: DeliveryRepository = defaultDeliveryRepository,
+    invoiceRepo: InvoiceRepository = defaultInvoiceRepository,
+    backorderRepo: BackorderRepository = defaultBackorderRepository,
+    warehouseRepo: WarehouseRepository = defaultWarehouseRepository,
+    productRepo: ProductRepository = defaultProductRepository,
   ) {
     this.quotationRepo = quotationRepo;
     this.companyRepo = companyRepo;
     this.userRepo = userRepo;
     this.dealRepo = dealRepo;
+    this.salesOrderRepo = salesOrderRepo;
+    this.deliveryRepo = deliveryRepo;
+    this.invoiceRepo = invoiceRepo;
+    this.backorderRepo = backorderRepo;
+    this.warehouseRepo = warehouseRepo;
+    this.productRepo = productRepo;
   }
 
   public async createQuotation(
@@ -232,7 +306,7 @@ export class QuotationService {
       const discountAmt = grossLine * (discountPercent / 100);
       const finalUnitPriceNum = Math.max(
         0,
-        unitPriceNum - (discountAmt / quantity),
+        unitPriceNum - discountAmt / quantity,
       );
       const lineTotalNum = Math.max(0, grossLine - discountAmt);
 
@@ -279,10 +353,7 @@ export class QuotationService {
         tx,
       );
       if (!item) {
-        throw new ApiError(
-          StatusCodes.NOT_FOUND,
-          "Quotation item not found",
-        );
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation item not found");
       }
 
       await this.quotationRepo.removeItem(quotationId, itemId, tx);
@@ -480,6 +551,16 @@ export class QuotationService {
         ? Number(config.configValue)
         : 0;
 
+    const midConfig = await this.companyRepo.findConfig(
+      quotation.companyId,
+      "MANAGER_APPROVAL_THRESHOLD",
+      tx,
+    );
+    const midThreshold =
+      midConfig?.configValue && !isNaN(Number(midConfig.configValue))
+        ? Number(midConfig.configValue)
+        : 15;
+
     const discountInputs: DiscountLineItemInput[] = [];
 
     for (const item of quotation.items || []) {
@@ -518,7 +599,11 @@ export class QuotationService {
       });
     }
 
-    return calculateDiscountViolations(discountInputs, blendedThreshold);
+    return calculateDiscountViolations(
+      discountInputs,
+      blendedThreshold,
+      midThreshold,
+    );
   }
 
   public async getQuotationById(
@@ -531,7 +616,8 @@ export class QuotationService {
 
     const dto = toQuotationDto(quotation);
     if (quotation.items && quotation.items.length > 0) {
-      dto.discountEvaluation = await this.evaluateDiscountViolations(quotationId);
+      dto.discountEvaluation =
+        await this.evaluateDiscountViolations(quotationId);
     }
     return dto;
   }
@@ -588,9 +674,8 @@ export class QuotationService {
         where.companyId = filters.companyId;
       }
     } else {
-      const memberships = await this.companyRepo.findUserCompanies(
-        requestingUserId,
-      );
+      const memberships =
+        await this.companyRepo.findUserCompanies(requestingUserId);
       const companyIds = memberships.map((m) => m.company.id);
 
       where.OR = [
@@ -1152,13 +1237,6 @@ export class QuotationService {
         );
       }
 
-      if (quotation.status === QuotationStatus.REJECTED) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Cannot negotiate a rejected quotation",
-        );
-      }
-
       if (quotation.status === QuotationStatus.CANCELLED) {
         throw new ApiError(
           StatusCodes.BAD_REQUEST,
@@ -1402,6 +1480,16 @@ export class QuotationService {
           ? Number(config.configValue)
           : 0;
 
+      const midConfig = await this.companyRepo.findConfig(
+        quotation.companyId,
+        "MANAGER_APPROVAL_THRESHOLD",
+        tx,
+      );
+      const midThreshold =
+        midConfig?.configValue && !isNaN(Number(midConfig.configValue))
+          ? Number(midConfig.configValue)
+          : 15;
+
       const counterDiscountInputs: DiscountLineItemInput[] = [];
       for (const revItem of revisionItemsData) {
         const qty = Number(revItem.quantity);
@@ -1442,54 +1530,116 @@ export class QuotationService {
       const counterDiscountEvaluation = calculateDiscountViolations(
         counterDiscountInputs,
         blendedThreshold,
+        midThreshold,
       );
-      const counterEvalNote = `Counter-Offer Discount Evaluation: maxLineViolation=${counterDiscountEvaluation.maxLineViolation}%, blendedViolationScore=${counterDiscountEvaluation.blendedViolationScore}%, requiresApproval=${counterDiscountEvaluation.requiresApproval}`;
+      const counterEvalNote = `Counter-Offer Discount Evaluation: maxLineViolation=${counterDiscountEvaluation.maxLineViolation}%, blendedViolationScore=${counterDiscountEvaluation.blendedViolationScore}%, riskLevel=${counterDiscountEvaluation.riskLevel}, requiredApproval=${counterDiscountEvaluation.requiredApprovalRole || "NONE"}`;
 
       const revisionCount = await tx.quotationRevision.count({
         where: { quotationId },
       });
 
-      const revision = await tx.quotationRevision.create({
-        data: {
-          quotationId,
-          revisionNo: revisionCount + 1,
-          createdById: requestingUserId,
-          revisionType: RevisionType.CUSTOMER_COUNTER,
-          status: RevisionStatus.SENT,
-          subtotal: calculatedSubtotal,
-          discountAmount: calculatedTotalDiscount,
-          taxAmount: calculatedTax,
-          totalAmount: calculatedTotal,
-          customerNote: dto.message || null,
-          internalNote: counterEvalNote,
-          items: {
-            create: revisionItemsData,
+      const isLowRisk = counterDiscountEvaluation.riskLevel === RiskLevel.LOW;
+
+      if (isLowRisk) {
+        await tx.negotiationOffer.updateMany({
+          where: {
+            negotiationId: negotiation.id,
+            status: OfferStatus.PENDING,
           },
-        },
-      });
-
-      await tx.quotation.update({
-        where: { id: quotationId },
-        data: {
-          status: QuotationStatus.NEGOTIATING,
-          currentRevisionId: revision.id,
-        },
-      });
-
-      const deal = await tx.deal.findUnique({
-        where: { id: quotation.dealId },
-      });
-      if (
-        deal &&
-        (deal.stage === DealStage.NEW ||
-          deal.stage === DealStage.QUALIFICATION ||
-          deal.stage === DealStage.REQUIREMENT ||
-          deal.stage === DealStage.QUOTATION)
-      ) {
-        await tx.deal.update({
-          where: { id: deal.id },
-          data: { stage: DealStage.NEGOTIATION },
+          data: { status: OfferStatus.ACCEPTED },
         });
+
+        const revision = await tx.quotationRevision.create({
+          data: {
+            quotationId,
+            revisionNo: revisionCount + 1,
+            createdById: requestingUserId,
+            revisionType: RevisionType.CUSTOMER_COUNTER,
+            status: RevisionStatus.ACCEPTED,
+            subtotal: calculatedSubtotal,
+            discountAmount: calculatedTotalDiscount,
+            taxAmount: calculatedTax,
+            totalAmount: calculatedTotal,
+            customerNote: dto.message || null,
+            internalNote: `${counterEvalNote} | Auto-approved (Low Risk)`,
+            items: {
+              create: revisionItemsData,
+            },
+          },
+        });
+
+        await this.quotationRepo.deleteItemsByQuotationId(quotationId, tx);
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: {
+            status: QuotationStatus.ACCEPTED,
+            currentRevisionId: revision.id,
+            items: {
+              create: revisionItemsData.map((it) => ({
+                productId: it.productId,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                discountType: it.discountType,
+                discountValue: it.discountValue,
+                discountAmount: it.discountAmount,
+                taxRate: it.taxRate,
+                finalUnitPrice: it.finalUnitPrice,
+                lineTotal: it.lineTotal,
+              })),
+            },
+          },
+        });
+
+        await tx.negotiation.update({
+          where: { id: negotiation.id },
+          data: {
+            status: NegotiationStatus.CLOSED,
+            closedAt: new Date(),
+          },
+        });
+      } else {
+        const revision = await tx.quotationRevision.create({
+          data: {
+            quotationId,
+            revisionNo: revisionCount + 1,
+            createdById: requestingUserId,
+            revisionType: RevisionType.CUSTOMER_COUNTER,
+            status: RevisionStatus.SENT,
+            subtotal: calculatedSubtotal,
+            discountAmount: calculatedTotalDiscount,
+            taxAmount: calculatedTax,
+            totalAmount: calculatedTotal,
+            customerNote: dto.message || null,
+            internalNote: counterEvalNote,
+            items: {
+              create: revisionItemsData,
+            },
+          },
+        });
+
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: {
+            status: QuotationStatus.NEGOTIATING,
+            currentRevisionId: revision.id,
+          },
+        });
+
+        const deal = await tx.deal.findUnique({
+          where: { id: quotation.dealId },
+        });
+        if (
+          deal &&
+          (deal.stage === DealStage.NEW ||
+            deal.stage === DealStage.QUALIFICATION ||
+            deal.stage === DealStage.REQUIREMENT ||
+            deal.stage === DealStage.QUOTATION)
+        ) {
+          await tx.deal.update({
+            where: { id: deal.id },
+            data: { stage: DealStage.NEGOTIATION },
+          });
+        }
       }
 
       const refreshed = await this.quotationRepo.findById(quotationId, tx);
@@ -1497,6 +1647,911 @@ export class QuotationService {
       refreshedDto.discountEvaluation = counterDiscountEvaluation;
       return refreshedDto;
     });
+  }
+
+  public async approveQuotation(
+    companyId: string,
+    quotationId: string,
+    reviewerUserId: string,
+    reviewerRole: CompanyUserRole,
+    dto?: ApproveQuotationDto,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation || quotation.companyId !== companyId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      this.validateQuotationCanBeApproved(quotation.status);
+
+      const discountEvaluation = await this.evaluateDiscountViolations(
+        quotationId,
+        tx,
+      );
+
+      this.validateReviewerApprovalPermission(
+        reviewerRole,
+        reviewerUserId,
+        quotation.company.ownerId,
+        discountEvaluation.requiredApprovalRole,
+      );
+
+      const pendingOffer = await tx.negotiationOffer.findFirst({
+        where: {
+          negotiation: { quotationId },
+          status: OfferStatus.PENDING,
+          ...(dto?.offerId ? { id: dto.offerId } : {}),
+        },
+        include: {
+          items: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (pendingOffer) {
+        await this.acceptNegotiationOffer(
+          quotationId,
+          companyId,
+          pendingOffer,
+          reviewerUserId,
+          reviewerRole,
+          dto?.notes,
+          tx,
+        );
+      } else {
+        await this.acceptCurrentQuotationRevision(quotation, reviewerRole, tx);
+      }
+
+      await this.closeOpenNegotiations(quotationId, tx);
+
+      const updated = await this.quotationRepo.findById(quotationId, tx);
+      const resDto = toQuotationDto(updated!);
+      resDto.discountEvaluation = discountEvaluation;
+      return resDto;
+    });
+  }
+
+  private validateQuotationCanBeApproved(status: QuotationStatus): void {
+    if (status === QuotationStatus.ACCEPTED) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Quotation has already been accepted",
+      );
+    }
+
+    if (
+      status !== QuotationStatus.NEGOTIATING &&
+      status !== QuotationStatus.SENT
+    ) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Cannot approve a quotation with status ${status}`,
+      );
+    }
+  }
+
+  private validateReviewerApprovalPermission(
+    reviewerRole: CompanyUserRole,
+    reviewerUserId: string,
+    companyOwnerId: string,
+    requiredRole: CompanyUserRole | null,
+  ): void {
+    const isAdmin =
+      reviewerRole === CompanyUserRole.ADMIN ||
+      companyOwnerId === reviewerUserId;
+
+    if (!isAdmin && requiredRole) {
+      if (
+        requiredRole === CompanyUserRole.FINANCE_MANAGER &&
+        reviewerRole !== CompanyUserRole.FINANCE_MANAGER
+      ) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "This high-risk quotation requires approval by a Finance Manager",
+        );
+      }
+      if (
+        requiredRole === CompanyUserRole.SALES_MANAGER &&
+        reviewerRole !== CompanyUserRole.SALES_MANAGER &&
+        reviewerRole !== CompanyUserRole.FINANCE_MANAGER
+      ) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "This quotation requires approval by a Sales Manager or Finance Manager",
+        );
+      }
+    }
+  }
+
+  private async acceptNegotiationOffer(
+    quotationId: string,
+    companyId: string,
+    pendingOffer: {
+      id: string;
+      items: Array<{
+        productId: string;
+        requestedQuantity: Prisma.Decimal;
+        requestedUnitPrice: Prisma.Decimal;
+        requestedDiscountType: DiscountType;
+        requestedDiscountValue: Prisma.Decimal;
+      }>;
+    },
+    reviewerUserId: string,
+    reviewerRole: CompanyUserRole,
+    notes: string | undefined,
+    tx: TransactionClient,
+  ): Promise<void> {
+    await tx.negotiationOffer.update({
+      where: { id: pendingOffer.id },
+      data: { status: OfferStatus.ACCEPTED },
+    });
+
+    if (pendingOffer.items.length === 0) {
+      return;
+    }
+
+    const productIds = pendingOffer.items.map((i) => i.productId);
+    const products = await this.quotationRepo.findProductsByIds(
+      productIds,
+      companyId,
+      tx,
+    );
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    const calculated = this.calculateQuotationTotals(
+      pendingOffer.items.map((item) => ({
+        productId: item.productId,
+        quantity: Number(item.requestedQuantity),
+        unitPrice: Number(item.requestedUnitPrice),
+        discountType: item.requestedDiscountType,
+        discountValue: Number(item.requestedDiscountValue),
+      })),
+      productMap,
+    );
+
+    await this.quotationRepo.deleteItemsByQuotationId(quotationId, tx);
+
+    const revision = await this.quotationRepo.createRevision(
+      quotationId,
+      reviewerUserId,
+      RevisionType.FINAL,
+      RevisionStatus.ACCEPTED,
+      {
+        subtotal: calculated.subtotal,
+        discountAmount: calculated.totalDiscount,
+        taxAmount: calculated.taxAmount,
+        totalAmount: calculated.total,
+        customerNote: notes || null,
+        internalNote: `Approved by ${reviewerRole} (${reviewerUserId})`,
+      },
+      calculated.itemsToCreate,
+      tx,
+    );
+
+    await tx.quotation.update({
+      where: { id: quotationId },
+      data: {
+        status: QuotationStatus.ACCEPTED,
+        currentRevisionId: revision.id,
+        items: {
+          create: calculated.itemsToCreate.map((it) => ({
+            productId: it.productId,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            discountType: it.discountType,
+            discountValue: it.discountValue,
+            discountAmount: it.discountAmount,
+            taxRate: it.taxRate,
+            finalUnitPrice: it.finalUnitPrice,
+            lineTotal: it.lineTotal,
+          })),
+        },
+      },
+    });
+  }
+
+  private async acceptCurrentQuotationRevision(
+    quotation: {
+      id: string;
+      currentRevisionId: string | null;
+      currentRevision?: { internalNote?: string | null } | null;
+    },
+    reviewerRole: CompanyUserRole,
+    tx: TransactionClient,
+  ): Promise<void> {
+    if (quotation.currentRevisionId) {
+      await tx.quotationRevision.update({
+        where: { id: quotation.currentRevisionId },
+        data: {
+          status: RevisionStatus.ACCEPTED,
+          internalNote:
+            `${quotation.currentRevision?.internalNote || ""} | Approved by ${reviewerRole}`.trim(),
+        },
+      });
+    }
+
+    await this.quotationRepo.update(
+      quotation.id,
+      { status: QuotationStatus.ACCEPTED },
+      tx,
+    );
+  }
+
+  private async closeOpenNegotiations(
+    quotationId: string,
+    tx: TransactionClient,
+  ): Promise<void> {
+    await tx.negotiation.updateMany({
+      where: { quotationId, status: NegotiationStatus.OPEN },
+      data: {
+        status: NegotiationStatus.CLOSED,
+        closedAt: new Date(),
+      },
+    });
+  }
+
+  public async fulfillQuotation(
+    companyId: string,
+    quotationId: string,
+    _userId: string,
+    dto: FulfillQuotationDto,
+  ): Promise<FulfillmentResultDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation || quotation.companyId !== companyId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      this.validateQuotationCanBeFulfilled(quotation);
+
+      const defaultWarehouseId = await this.resolveDefaultWarehouseId(
+        companyId,
+        dto.warehouseId,
+        tx,
+      );
+
+      const salesOrder = await this.getOrCreateSalesOrderForQuotation(
+        quotation,
+        companyId,
+        dto.notes,
+        tx,
+      );
+
+      const { deliveredLines, backorderLines } =
+        await this.evaluateStockAndDeliverableLines(
+          salesOrder,
+          companyId,
+          defaultWarehouseId,
+          dto.items,
+          tx,
+        );
+
+      let createdDelivery: DeliveryResponseDto | null = null;
+      let createdInvoice: InvoiceResponseDto | null = null;
+      let createdBackorder: BackorderResponseDto | null = null;
+
+      if (deliveredLines.length > 0) {
+        createdDelivery = await this.createFulfillmentDelivery(
+          companyId,
+          salesOrder,
+          deliveredLines,
+          dto,
+          tx,
+        );
+
+        createdInvoice = await this.createFulfillmentInvoice(
+          companyId,
+          quotation,
+          salesOrder,
+          createdDelivery.id,
+          deliveredLines,
+          dto,
+          tx,
+        );
+      }
+
+      if (backorderLines.length > 0) {
+        createdBackorder = await this.createFulfillmentBackorder(
+          companyId,
+          salesOrder.id,
+          backorderLines,
+          dto.notes,
+          tx,
+        );
+      } else {
+        await this.finalizeSalesOrderAndDeal(
+          salesOrder.id,
+          quotation.dealId,
+          tx,
+        );
+      }
+
+      return this.assembleFulfillmentResult(
+        quotationId,
+        salesOrder.id,
+        quotation.dealId,
+        companyId,
+        createdDelivery,
+        createdInvoice,
+        createdBackorder,
+        tx,
+      );
+    });
+  }
+
+  private validateQuotationCanBeFulfilled(quotation: {
+    status: QuotationStatus;
+    items?: Array<unknown>;
+  }): void {
+    if (quotation.status !== QuotationStatus.ACCEPTED) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Cannot fulfill a quotation with status ${quotation.status}. Quotation must be ACCEPTED first.`,
+      );
+    }
+
+    if (!quotation.items || quotation.items.length === 0) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Cannot fulfill a quotation with no line items",
+      );
+    }
+  }
+
+  private async resolveDefaultWarehouseId(
+    companyId: string,
+    requestedWarehouseId: string | undefined,
+    tx: TransactionClient,
+  ): Promise<string> {
+    if (!requestedWarehouseId) {
+      const result = await this.warehouseRepo.findMany(companyId, 1, 1, tx);
+      if (result.warehouses.length > 0) {
+        return result.warehouses[0].id;
+      }
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "No warehouse available for fulfillment. Please create or specify a warehouse.",
+      );
+    }
+
+    const warehouse = await this.warehouseRepo.findById(
+      requestedWarehouseId,
+      companyId,
+      tx,
+    );
+    if (!warehouse) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Warehouse not found");
+    }
+    return requestedWarehouseId;
+  }
+
+  private async getOrCreateSalesOrderForQuotation(
+    quotation: {
+      id: string;
+      customerId: string;
+      salesRepId: string | null;
+      currency: string;
+      items?: Array<{
+        id: string;
+        productId: string;
+        quantity: Prisma.Decimal;
+        unitPrice: Prisma.Decimal;
+        discountAmount: Prisma.Decimal;
+        taxRate: Prisma.Decimal;
+        finalUnitPrice: Prisma.Decimal;
+        lineTotal: Prisma.Decimal;
+      }>;
+    },
+    companyId: string,
+    notes: string | null | undefined,
+    tx: TransactionClient,
+  ) {
+    let salesOrder = await tx.salesOrder.findFirst({
+      where: { quotationId: quotation.id, companyId },
+      include: {
+        items: true,
+        customer: true,
+        salesRep: true,
+        company: true,
+      },
+    });
+
+    if (!salesOrder) {
+      const orderNo = await this.generateSalesOrderNo(tx);
+      let subtotal = new Prisma.Decimal(0);
+      let discountAmount = new Prisma.Decimal(0);
+      let taxAmount = new Prisma.Decimal(0);
+      let totalAmount = new Prisma.Decimal(0);
+
+      const items = quotation.items || [];
+      const orderItemsData = items.map((qItem) => {
+        subtotal = subtotal.add(qItem.unitPrice.mul(qItem.quantity));
+        discountAmount = discountAmount.add(qItem.discountAmount);
+        taxAmount = taxAmount.add(
+          qItem.lineTotal.sub(
+            qItem.unitPrice.mul(qItem.quantity).sub(qItem.discountAmount),
+          ),
+        );
+        totalAmount = totalAmount.add(qItem.lineTotal);
+
+        return {
+          productId: qItem.productId,
+          quotationItemId: qItem.id,
+          orderedQuantity: qItem.quantity,
+          deliveredQuantity: new Prisma.Decimal(0),
+          invoicedQuantity: new Prisma.Decimal(0),
+          unitPrice: qItem.unitPrice,
+          discount: qItem.discountAmount,
+          taxRate: qItem.taxRate,
+          finalUnitPrice: qItem.finalUnitPrice,
+          lineTotal: qItem.lineTotal,
+        };
+      });
+
+      const createdOrder = await this.salesOrderRepo.create(
+        {
+          company: { connect: { id: companyId } },
+          customer: { connect: { id: quotation.customerId } },
+          salesRep: quotation.salesRepId
+            ? { connect: { id: quotation.salesRepId } }
+            : undefined,
+          quotation: { connect: { id: quotation.id } },
+          orderNo,
+          status: SalesOrderStatus.CONFIRMED,
+          currency: quotation.currency,
+          subtotal: Number(subtotal.toFixed(2)),
+          discountAmount: Number(discountAmount.toFixed(2)),
+          taxAmount: Number(taxAmount.toFixed(2)),
+          totalAmount: Number(totalAmount.toFixed(2)),
+          notes: notes || null,
+          items: {
+            create: orderItemsData.map((item) => ({
+              product: { connect: { id: item.productId } },
+              quotationItemId: item.quotationItemId,
+              orderedQuantity: item.orderedQuantity,
+              deliveredQuantity: 0,
+              invoicedQuantity: 0,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
+              taxRate: item.taxRate,
+              finalUnitPrice: item.finalUnitPrice,
+              lineTotal: item.lineTotal,
+            })),
+          },
+        },
+        tx,
+      );
+
+      salesOrder = await tx.salesOrder.findUnique({
+        where: { id: createdOrder.id },
+        include: {
+          items: true,
+          customer: true,
+          salesRep: true,
+          company: true,
+        },
+      });
+    }
+
+    if (!salesOrder) {
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Failed to process sales order for quotation",
+      );
+    }
+
+    return salesOrder;
+  }
+
+  private async evaluateStockAndDeliverableLines(
+    salesOrder: {
+      items: Array<{
+        id: string;
+        productId: string;
+        orderedQuantity: Prisma.Decimal;
+        deliveredQuantity: Prisma.Decimal;
+        unitPrice: Prisma.Decimal;
+        discount: Prisma.Decimal;
+        taxRate: Prisma.Decimal;
+        finalUnitPrice: Prisma.Decimal;
+      }>;
+    },
+    companyId: string,
+    defaultWarehouseId: string,
+    itemWarehouseOverrides:
+      Array<{ productId: string; warehouseId?: string }> | undefined,
+    tx: TransactionClient,
+  ): Promise<EvaluatedFulfillmentLines> {
+    const itemWarehouseMap = new Map<string, string>();
+    if (itemWarehouseOverrides && itemWarehouseOverrides.length > 0) {
+      for (const it of itemWarehouseOverrides) {
+        if (it.warehouseId) {
+          itemWarehouseMap.set(it.productId, it.warehouseId);
+        }
+      }
+    }
+
+    const evaluatedLines: DeliverableLineItem[] = [];
+
+    for (const orderItem of salesOrder.items) {
+      const remainingToDeliver =
+        Number(orderItem.orderedQuantity) - Number(orderItem.deliveredQuantity);
+      if (remainingToDeliver <= 0) {
+        continue;
+      }
+
+      const targetWarehouseId =
+        itemWarehouseMap.get(orderItem.productId) || defaultWarehouseId;
+
+      const wh = await this.warehouseRepo.findById(
+        targetWarehouseId,
+        companyId,
+        tx,
+      );
+      if (!wh) {
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          `Warehouse ${targetWarehouseId} not found`,
+        );
+      }
+
+      const stockRecord = await tx.productStock.findUnique({
+        where: {
+          productId_warehouseId: {
+            productId: orderItem.productId,
+            warehouseId: targetWarehouseId,
+          },
+        },
+      });
+
+      const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
+      const deliverableQuantity = Math.max(
+        0,
+        Math.min(availableStock, remainingToDeliver),
+      );
+      const backorderQuantity = Math.max(
+        0,
+        remainingToDeliver - deliverableQuantity,
+      );
+
+      evaluatedLines.push({
+        salesOrderItemId: orderItem.id,
+        productId: orderItem.productId,
+        orderedQuantity: remainingToDeliver,
+        deliverableQuantity,
+        backorderQuantity,
+        warehouseId: targetWarehouseId,
+        unitPrice: Number(orderItem.unitPrice),
+        discount: Number(orderItem.discount),
+        taxRate: Number(orderItem.taxRate),
+        finalUnitPrice: Number(orderItem.finalUnitPrice),
+      });
+
+      if (deliverableQuantity > 0 && stockRecord) {
+        const newStockQty = Number(
+          (availableStock - deliverableQuantity).toFixed(4),
+        );
+        await tx.productStock.update({
+          where: { id: stockRecord.id },
+          data: { stockQty: new Prisma.Decimal(newStockQty) },
+        });
+      }
+    }
+
+    return {
+      deliveredLines: evaluatedLines.filter((l) => l.deliverableQuantity > 0),
+      backorderLines: evaluatedLines.filter((l) => l.backorderQuantity > 0),
+    };
+  }
+
+  private async createFulfillmentDelivery(
+    companyId: string,
+    salesOrder: {
+      id: string;
+      items: Array<{ id: string; deliveredQuantity: Prisma.Decimal }>;
+    },
+    deliveredLines: DeliverableLineItem[],
+    dto: FulfillQuotationDto,
+    tx: TransactionClient,
+  ): Promise<DeliveryResponseDto> {
+    const deliveryNo = await this.generateDeliveryNo(tx);
+    const delivery = await this.deliveryRepo.create(
+      {
+        company: { connect: { id: companyId } },
+        salesOrder: { connect: { id: salesOrder.id } },
+        deliveryNo,
+        status: DeliveryStatus.DELIVERED,
+        trackingNumber: dto.trackingNumber,
+        shippedAt: new Date(),
+        deliveredAt: new Date(),
+        notes: dto.notes,
+        items: {
+          create: deliveredLines.map((l) => ({
+            salesOrderItem: { connect: { id: l.salesOrderItemId } },
+            product: { connect: { id: l.productId } },
+            deliveredQuantity: l.deliverableQuantity,
+          })),
+        },
+      },
+      tx,
+    );
+
+    for (const l of deliveredLines) {
+      const oi = salesOrder.items.find((i) => i.id === l.salesOrderItemId)!;
+      const newDelivered = Number(oi.deliveredQuantity) + l.deliverableQuantity;
+      await this.salesOrderRepo.updateItem(
+        l.salesOrderItemId,
+        { deliveredQuantity: newDelivered },
+        tx,
+      );
+    }
+
+    const loadedDelivery = await this.deliveryRepo.findByIdWithRelations(
+      delivery.id,
+      companyId,
+      tx,
+    );
+    return toDeliveryDto(loadedDelivery!);
+  }
+
+  private async createFulfillmentInvoice(
+    companyId: string,
+    quotation: { customerId: string; currency: string },
+    salesOrder: {
+      id: string;
+      items: Array<{ id: string; invoicedQuantity: Prisma.Decimal }>;
+    },
+    deliveryId: string,
+    deliveredLines: DeliverableLineItem[],
+    dto: FulfillQuotationDto,
+    tx: TransactionClient,
+  ): Promise<InvoiceResponseDto> {
+    let invSubtotal = 0;
+    let invDiscount = 0;
+    let invTax = 0;
+    let invTotal = 0;
+
+    const invoiceItemsData = deliveredLines.map((l) => {
+      const gross = l.deliverableQuantity * l.unitPrice;
+      const ratio =
+        l.orderedQuantity > 0 ? l.deliverableQuantity / l.orderedQuantity : 1;
+      const lineDiscount = Number((l.discount * ratio).toFixed(2));
+      const taxable = Math.max(0, gross - lineDiscount);
+      const lineTax = Number(((taxable * l.taxRate) / 100).toFixed(2));
+      const lineTotal = Number((taxable + lineTax).toFixed(2));
+
+      invSubtotal += gross;
+      invDiscount += lineDiscount;
+      invTax += lineTax;
+      invTotal += lineTotal;
+
+      return {
+        salesOrderItemId: l.salesOrderItemId,
+        productId: l.productId,
+        deliveredQuantity: l.deliverableQuantity,
+        unitPrice: l.unitPrice,
+        discount: lineDiscount,
+        tax: lineTax,
+        lineTotal,
+      };
+    });
+
+    invSubtotal = Number(invSubtotal.toFixed(2));
+    invDiscount = Number(invDiscount.toFixed(2));
+    invTax = Number(invTax.toFixed(2));
+    invTotal = Number((invSubtotal - invDiscount + invTax).toFixed(2));
+
+    const invoiceNo = await this.generateInvoiceNo(tx);
+    const issueDate = new Date();
+    const dueDate = new Date(issueDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const invoice = await this.invoiceRepo.create(
+      {
+        company: { connect: { id: companyId } },
+        salesOrder: { connect: { id: salesOrder.id } },
+        customer: { connect: { id: quotation.customerId } },
+        delivery: { connect: { id: deliveryId } },
+        invoiceNo,
+        status: InvoiceStatus.POSTED,
+        issueDate,
+        dueDate,
+        currency: quotation.currency,
+        paymentTerms: dto.paymentTerms || "Net 30",
+        subtotal: invSubtotal,
+        discount: invDiscount,
+        tax: invTax,
+        total: invTotal,
+        paidAmount: 0,
+        remainingAmount: invTotal,
+        notes: dto.notes,
+        items: {
+          create: invoiceItemsData.map((it) => ({
+            salesOrderItem: { connect: { id: it.salesOrderItemId } },
+            product: { connect: { id: it.productId } },
+            deliveredQuantity: it.deliveredQuantity,
+            unitPrice: it.unitPrice,
+            discount: it.discount,
+            tax: it.tax,
+            lineTotal: it.lineTotal,
+          })),
+        },
+      },
+      tx,
+    );
+
+    for (const it of invoiceItemsData) {
+      const oi = salesOrder.items.find((i) => i.id === it.salesOrderItemId)!;
+      const newInvoiced = Number(oi.invoicedQuantity) + it.deliveredQuantity;
+      await this.salesOrderRepo.updateItem(
+        it.salesOrderItemId,
+        { invoicedQuantity: newInvoiced },
+        tx,
+      );
+    }
+
+    const loadedInvoice = await this.invoiceRepo.findByIdWithRelations(
+      invoice.id,
+      companyId,
+      tx,
+    );
+    return toInvoiceDto(loadedInvoice!);
+  }
+
+  private async createFulfillmentBackorder(
+    companyId: string,
+    salesOrderId: string,
+    backorderLines: DeliverableLineItem[],
+    notes: string | null | undefined,
+    tx: TransactionClient,
+  ): Promise<BackorderResponseDto> {
+    const totalRemaining = backorderLines.reduce(
+      (sum, l) => sum + l.backorderQuantity,
+      0,
+    );
+    const backorderNo = await this.generateBackorderNo(tx);
+
+    const backorder = await this.backorderRepo.create(
+      {
+        company: { connect: { id: companyId } },
+        salesOrder: { connect: { id: salesOrderId } },
+        backorderNo,
+        status: BackorderStatus.PENDING,
+        totalQuantity: totalRemaining,
+        fulfilledQuantity: 0,
+        remainingQuantity: totalRemaining,
+        notes: notes || null,
+        items: {
+          create: backorderLines.map((l) => ({
+            salesOrderItem: { connect: { id: l.salesOrderItemId } },
+            product: { connect: { id: l.productId } },
+            orderedQuantity: l.backorderQuantity,
+            fulfilledQuantity: 0,
+            remainingQuantity: l.backorderQuantity,
+          })),
+        },
+      },
+      tx,
+    );
+
+    await this.salesOrderRepo.update(
+      salesOrderId,
+      { status: SalesOrderStatus.PARTIALLY_DELIVERED },
+      tx,
+    );
+
+    const loadedBackorder = await this.backorderRepo.findByIdWithRelations(
+      backorder.id,
+      companyId,
+      tx,
+    );
+    return toBackorderDto(loadedBackorder!);
+  }
+
+  private async finalizeSalesOrderAndDeal(
+    salesOrderId: string,
+    dealId: string,
+    tx: TransactionClient,
+  ): Promise<void> {
+    await this.salesOrderRepo.update(
+      salesOrderId,
+      { status: SalesOrderStatus.DELIVERED },
+      tx,
+    );
+
+    await tx.deal.update({
+      where: { id: dealId },
+      data: {
+        stage: DealStage.WON,
+        status: DealStatus.WON,
+      },
+    });
+  }
+
+  private async assembleFulfillmentResult(
+    quotationId: string,
+    salesOrderId: string,
+    dealId: string,
+    companyId: string,
+    delivery: DeliveryResponseDto | null,
+    invoice: InvoiceResponseDto | null,
+    backorder: BackorderResponseDto | null,
+    tx: TransactionClient,
+  ): Promise<FulfillmentResultDto> {
+    const refreshedOrder = await this.salesOrderRepo.findByIdWithRelations(
+      salesOrderId,
+      companyId,
+      tx,
+    );
+    const refreshedQuotation = await this.quotationRepo.findById(
+      quotationId,
+      tx,
+    );
+    const refreshedDeal = await this.dealRepo.findById(dealId, tx);
+
+    return {
+      quotation: toQuotationDto(refreshedQuotation!),
+      salesOrder: toSalesOrderDto(refreshedOrder!),
+      delivery,
+      invoice,
+      backorder,
+      deal: refreshedDeal ? toDealDto(refreshedDeal) : undefined,
+    };
+  }
+
+  private async generateSalesOrderNo(tx?: TransactionClient): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const count = await this.salesOrderRepo.countOrders(tx);
+    let seqNum = count + 1;
+    let orderNo = `SO-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    while (await this.salesOrderRepo.findByOrderNo(orderNo, tx)) {
+      seqNum++;
+      orderNo = `SO-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    }
+    return orderNo;
+  }
+
+  private async generateDeliveryNo(tx?: TransactionClient): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const count = await this.deliveryRepo.countDeliveries(tx);
+    let seqNum = count + 1;
+    let deliveryNo = `DEL-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    while (await this.deliveryRepo.findByDeliveryNo(deliveryNo, tx)) {
+      seqNum++;
+      deliveryNo = `DEL-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    }
+    return deliveryNo;
+  }
+
+  private async generateInvoiceNo(tx?: TransactionClient): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const count = await this.invoiceRepo.countInvoices(tx);
+    let seqNum = count + 1;
+    let invoiceNo = `INV-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    while (await this.invoiceRepo.findByInvoiceNo(invoiceNo, tx)) {
+      seqNum++;
+      invoiceNo = `INV-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    }
+    return invoiceNo;
+  }
+
+  private async generateBackorderNo(tx?: TransactionClient): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const count = await this.backorderRepo.countBackorders(tx);
+    let seqNum = count + 1;
+    let backorderNo = `BO-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    while (await this.backorderRepo.findByBackorderNo(backorderNo, tx)) {
+      seqNum++;
+      backorderNo = `BO-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    }
+    return backorderNo;
   }
 
   private calculateQuotationTotals(
@@ -1568,8 +2623,7 @@ export class QuotationService {
       };
     });
 
-    const finalTotalDiscountNum =
-      itemDiscountSum + (extraDiscountAmount || 0);
+    const finalTotalDiscountNum = itemDiscountSum + (extraDiscountAmount || 0);
     const finalTotalNum = Math.max(0, totalNum - (extraDiscountAmount || 0));
 
     return {

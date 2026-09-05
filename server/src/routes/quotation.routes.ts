@@ -86,6 +86,26 @@ router.post("/:companyId/:id/negotiate", quotationController.counterOffer);
 // Negotiation history.
 router.get("/:companyId/:id/negotiations", quotationController.getNegotiations);
 
+// Approve quotation or negotiation counter-offer.
+router.post(
+  "/:companyId/:id/approve",
+  verifyCompanyAccess,
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_MANAGER,
+    CompanyUserRole.FINANCE_MANAGER,
+  ),
+  quotationController.approve,
+);
+
+// Fulfill quotation: warehouse stock deduction, delivery, invoice, and backorder creation.
+router.post(
+  "/:companyId/:id/fulfill",
+  verifyCompanyAccess,
+  requireRole(CompanyUserRole.ADMIN, CompanyUserRole.FINANCE_MANAGER),
+  quotationController.fulfill,
+);
+
 // Discount violation evaluation.
 router.get(
   "/:companyId/:id/discount-evaluation",

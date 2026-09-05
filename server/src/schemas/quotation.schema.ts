@@ -172,6 +172,37 @@ export const dealQuotationsQuerySchema = z.object({
   search: z.string().optional(),
 });
 
+export const approveQuotationSchema = z.object({
+  offerId: z.string().uuid("Invalid offer ID").optional(),
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+});
+
+export const fulfillQuotationItemSchema = z.object({
+  productId: z.string().uuid("Invalid product ID"),
+  warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
+  quantity: z.number().positive("Quantity must be greater than 0").optional(),
+});
+
+export const fulfillQuotationSchema = z.object({
+  warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
+  items: z.array(fulfillQuotationItemSchema).optional(),
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+  trackingNumber: z
+    .string()
+    .max(255, "Tracking number cannot exceed 255 characters")
+    .optional(),
+  paymentTerms: z
+    .string()
+    .max(100, "Payment terms cannot exceed 100 characters")
+    .optional(),
+});
+
 export type AddQuotationItemInput = z.infer<typeof addQuotationItemSchema>;
 export type CreateQuotationItemInput = z.infer<
   typeof createQuotationItemSchema
@@ -184,3 +215,5 @@ export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryInput = z.infer<typeof dealQuotationsQuerySchema>;
 export type CounterOfferItemInput = z.infer<typeof counterOfferItemSchema>;
 export type SubmitCounterOfferInput = z.infer<typeof submitCounterOfferSchema>;
+export type ApproveQuotationInput = z.infer<typeof approveQuotationSchema>;
+export type FulfillQuotationInput = z.infer<typeof fulfillQuotationSchema>;

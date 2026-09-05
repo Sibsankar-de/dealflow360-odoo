@@ -17,6 +17,8 @@ import {
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
   submitCounterOfferSchema,
+  approveQuotationSchema,
+  fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
 import { QuotationStatus } from "@prisma/client";
 
@@ -444,6 +446,89 @@ export class QuotationController {
         );
     },
   );
+
+  public approve = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const reviewerRole = req.companyRole;
+    if (!reviewerRole) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "No company role found for user",
+      );
+    }
+
+    const validated = req.body && Object.keys(req.body).length > 0
+      ? validateBody(approveQuotationSchema, req.body)
+      : {};
+    const quotation = await this.quotationService.approveQuotation(
+      companyId,
+      quotationId,
+      userId,
+      reviewerRole,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation },
+          "Quotation approved successfully",
+        ),
+      );
+  });
+
+  public fulfill = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const validated = req.body && Object.keys(req.body).length > 0
+      ? validateBody(fulfillQuotationSchema, req.body)
+      : {};
+    const result = await this.quotationService.fulfillQuotation(
+      companyId,
+      quotationId,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Quotation fulfillment processed successfully",
+        ),
+      );
+  });
 }
 
 export const quotationController = new QuotationController();

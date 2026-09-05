@@ -53,7 +53,7 @@ export class SalesOrderController {
   });
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const orderId = req.params.id || req.params.orderId;
+    const orderId = String(req.params.id || req.params.orderId || "");
     if (!orderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Order ID is required");
     }
@@ -113,7 +113,7 @@ export class SalesOrderController {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
     }
 
-    const orderId = req.params.id || req.params.orderId;
+    const orderId = String(req.params.id || req.params.orderId || "");
     if (!orderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Order ID is required");
     }

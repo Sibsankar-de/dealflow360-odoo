@@ -23,7 +23,7 @@ export class BackorderController {
   }
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const backorderId = req.params.id || req.params.backorderId;
+    const backorderId = String(req.params.id || req.params.backorderId || "");
     if (!backorderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Backorder ID is required");
     }
@@ -86,7 +86,7 @@ export class BackorderController {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
     }
 
-    const backorderId = req.params.id || req.params.backorderId;
+    const backorderId = String(req.params.id || req.params.backorderId || "");
     if (!backorderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Backorder ID is required");
     }
