@@ -18,12 +18,12 @@ Reduce quotation approval delays while maintaining pricing control, risk managem
 
 The platform should:
 
-* Automate low-risk quotation approvals.
-* Escalate high-risk quotations through configurable approval chains.
-* Provide customers with a simple quotation review experience.
-* Track quotation health throughout its lifecycle.
-* Support partial deliveries and backorder management.
-* Generate invoices based on delivered quantities.
+- Automate low-risk quotation approvals.
+- Escalate high-risk quotations through configurable approval chains.
+- Provide customers with a simple quotation review experience.
+- Track quotation health throughout its lifecycle.
+- Support partial deliveries and backorder management.
+- Generate invoices based on delivered quantities.
 
 ---
 
@@ -68,8 +68,8 @@ Example:
 
 User A:
 
-* Company X -> Admin
-* Company Y -> Sales Representative
+- Company X -> Admin
+- Company Y -> Sales Representative
 
 Permissions must always be evaluated within the currently selected company context.
 
@@ -79,16 +79,16 @@ Permissions must always be evaluated within the currently selected company conte
 
 When a user creates a company:
 
-* The company is created.
-* The creator becomes Company Admin.
-* Initial company setup begins.
+- The company is created.
+- The creator becomes Company Admin.
+- Initial company setup begins.
 
 Company Admin is responsible for:
 
-* Product management
-* Team management
-* Workflow configuration
-* Business rule configuration
+- Product management
+- Team management
+- Workflow configuration
+- Business rule configuration
 
 ---
 
@@ -100,9 +100,9 @@ Platform-level role.
 
 Capabilities:
 
-* View quotations received as a customer.
-* Create companies.
-* Join companies.
+- View quotations received as a customer.
+- Create companies.
+- Join companies.
 
 ---
 
@@ -110,11 +110,11 @@ Capabilities:
 
 Responsibilities:
 
-* Manage company configuration.
-* Add and update products.
-* Configure approval rules.
-* Manage collaborators.
-* Access all company data.
+- Manage company configuration.
+- Add and update products.
+- Configure approval rules.
+- Manage collaborators.
+- Access all company data.
 
 ---
 
@@ -122,10 +122,10 @@ Responsibilities:
 
 Responsibilities:
 
-* Create quotations.
-* Manage customer discussions.
-* Request approvals.
-* Track quotation progress.
+- Create quotations.
+- Manage customer discussions.
+- Request approvals.
+- Track quotation progress.
 
 ---
 
@@ -133,10 +133,10 @@ Responsibilities:
 
 Responsibilities:
 
-* Review quotations requiring managerial approval.
-* Approve or reject escalated quotations.
-* Escalate high-risk quotations to finance when necessary.
-* Participate in quotation discussions.
+- Review quotations requiring managerial approval.
+- Approve or reject escalated quotations.
+- Escalate high-risk quotations to finance when necessary.
+- Participate in quotation discussions.
 
 ---
 
@@ -144,11 +144,11 @@ Responsibilities:
 
 Responsibilities:
 
-* Review financially sensitive quotations.
-* Review fulfillment feasibility.
-* Approve fulfillment.
-* Generate invoices.
-* Manage delivery and backorder status.
+- Review financially sensitive quotations.
+- Review fulfillment feasibility.
+- Approve fulfillment.
+- Generate invoices.
+- Manage delivery and backorder status.
 
 ---
 
@@ -158,14 +158,14 @@ Products are maintained by Company Admins.
 
 A product may contain:
 
-* Name
-* Description
-* Price
-* Maximum Allowed Discount
-* Minimum Quantity
-* Inventory Information
-* Approval Constraints
-* Risk Constraints
+- Name
+- Description
+- Price
+- Maximum Allowed Discount
+- Minimum Quantity
+- Inventory Information
+- Approval Constraints
+- Risk Constraints
 
 Additional product attributes may be added later.
 
@@ -198,11 +198,11 @@ Quotation contains:
 
 System evaluates quotation using:
 
-* Product rules
-* Discount thresholds
-* Quantity constraints
-* Risk constraints
-* Future business rules
+- Product rules
+- Discount thresholds
+- Quantity constraints
+- Risk constraints
+- Future business rules
 
 Possible outcomes:
 
@@ -224,34 +224,36 @@ Quotation is routed to Finance Manager.
 
 Reviewers may:
 
-* Approve
-* Reject
-* Escalate
-* Add comments
+- Approve
+- Reject
+- Escalate
+- Add comments
 
 Comments form part of quotation history.
 
 Commenting may be performed by:
 
-* Sales Representative
-* Sales Manager
-* Finance Manager
+- Sales Representative
+- Sales Manager
+- Finance Manager
 
 ---
 
 ### Step 4 - Customer Review
 
-Customer receives quotation through email.
+Once approved internally, the quotation becomes available to the target customer inside DealFlow360.
 
-Email contains secure quotation link.
+The customer is a registered platform user.
 
-Authorization and validation are handled by backend services.
+The customer may be notified through email and/or in-app notifications.
+
+The customer accesses the quotation through their authenticated DealFlow360 account.
 
 Customer may:
 
-* Approve
-* Negotiate
-* Reject
+- Approve
+- Negotiate
+- Reject
 
 ---
 
@@ -259,10 +261,10 @@ Customer may:
 
 If customer negotiates:
 
-* Quotation returns to internal workflow.
-* New comments may be added.
-* Revised quotation may be generated.
-* Approval chain may execute again.
+- Quotation returns to internal workflow.
+- New comments may be added.
+- Revised quotation may be generated.
+- Approval chain may execute again.
 
 ---
 
@@ -278,15 +280,15 @@ Quotation proceeds to fulfillment review.
 
 Finance Manager reviews:
 
-* Inventory availability
-* Delivery feasibility
-* Operational constraints
+- Inventory availability
+- Delivery feasibility
+- Operational constraints
 
 Possible outcomes:
 
-* Fulfillment Approved
-* Fulfillment Delayed
-* Fulfillment Rejected
+- Fulfillment Approved
+- Fulfillment Delayed
+- Fulfillment Rejected
 
 ---
 
@@ -300,8 +302,8 @@ Ordered Quantity: 100
 
 Delivered:
 
-* Batch 1 -> 60
-* Batch 2 -> 40
+- Batch 1 -> 60
+- Batch 2 -> 40
 
 The system must support multiple deliveries for a single quotation.
 
@@ -317,11 +319,11 @@ Delivered: 60
 
 Invoice Generated:
 
-* 60 units
+- 60 units
 
 Remaining:
 
-* 40 units
+- 40 units
 
 Second invoice generated when remaining quantity is delivered.
 
@@ -333,11 +335,32 @@ Undelivered quantities become Backorders.
 
 Backorders should:
 
-* Remain linked to original quotation.
-* Be visible separately.
-* Be grouped and tracked until fulfilled.
+- Remain linked to original quotation.
+- Be visible separately.
+- Be grouped and tracked until fulfilled.
 
 ---
+
+## Customer Model
+
+Customers are registered DealFlow360 users.
+
+A quotation must always reference an existing user account.
+
+Benefits:
+
+- No anonymous quotation access.
+- Complete negotiation history.
+- Centralized customer activity tracking.
+- Consistent authorization and auditing.
+- Better deal health analytics.
+
+Future enhancements may include:
+
+- Customer organizations
+- Multiple customer contacts
+- Customer teams
+- Customer-side collaboration
 
 ## Deal Health Monitoring
 
@@ -345,11 +368,11 @@ The platform should continuously evaluate quotation and deal health.
 
 Examples:
 
-* No activity for 9 days.
-* Approval pending too long.
-* Customer has not responded.
-* Backorder unresolved.
-* Fulfillment delayed.
+- No activity for 9 days.
+- Approval pending too long.
+- Customer has not responded.
+- Backorder unresolved.
+- Fulfillment delayed.
 
 Health indicators should identify deals requiring attention.
 
@@ -361,12 +384,12 @@ The platform should surface unusual situations.
 
 Examples:
 
-* Excessive discount requests.
-* Repeated negotiations.
-* Long approval chains.
-* Stalled quotations.
-* Unusual order quantities.
-* Repeated fulfillment failures.
+- Excessive discount requests.
+- Repeated negotiations.
+- Long approval chains.
+- Stalled quotations.
+- Unusual order quantities.
+- Repeated fulfillment failures.
 
 Specific anomaly rules will be defined later.
 
@@ -376,39 +399,39 @@ Specific anomaly rules will be defined later.
 
 Platform Module
 
-* Authentication
-* User Management
-* Company Management
+- Authentication
+- User Management
+- Company Management
 
 Company Module
 
-* Role Management
-* Product Management
-* Collaborator Management
+- Role Management
+- Product Management
+- Collaborator Management
 
 Quotation Module
 
-* Creation
-* Evaluation
-* Approval
-* Negotiation
-* Commenting
+- Creation
+- Evaluation
+- Approval
+- Negotiation
+- Commenting
 
 Fulfillment Module
 
-* Delivery Tracking
-* Backorder Tracking
+- Delivery Tracking
+- Backorder Tracking
 
 Finance Module
 
-* Invoice Generation
-* Financial Approval
+- Invoice Generation
+- Financial Approval
 
 Insights Module
 
-* Deal Health
-* Anomaly Detection
-* Reporting
+- Deal Health
+- Anomaly Detection
+- Reporting
 
 ---
 
