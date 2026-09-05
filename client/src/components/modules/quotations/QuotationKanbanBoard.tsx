@@ -5,6 +5,7 @@ import { QuotationKanbanColumn } from "./QuotationKanbanColumn";
 export interface QuotationKanbanBoardProps {
   quotations: QuotationItem[];
   onSelectQuotation?: (quotation: QuotationItem) => void;
+  onUpdateQuotationStatus?: (id: string, status: QuotationStatus) => void;
 }
 
 const KANBAN_COLUMNS: QuotationStatus[] = [
@@ -18,6 +19,7 @@ const KANBAN_COLUMNS: QuotationStatus[] = [
 export const QuotationKanbanBoard: React.FC<QuotationKanbanBoardProps> = ({
   quotations,
   onSelectQuotation,
+  onUpdateQuotationStatus,
 }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
@@ -29,6 +31,7 @@ export const QuotationKanbanBoard: React.FC<QuotationKanbanBoardProps> = ({
             status={status}
             quotations={columnQuotations}
             onSelectQuotation={onSelectQuotation}
+            onUpdateQuotationStatus={onUpdateQuotationStatus}
           />
         );
       })}
@@ -37,3 +40,4 @@ export const QuotationKanbanBoard: React.FC<QuotationKanbanBoardProps> = ({
 };
 
 export default QuotationKanbanBoard;
+

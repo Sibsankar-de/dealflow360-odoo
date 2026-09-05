@@ -5,6 +5,7 @@ import {
   CompanyUser,
   CompanyUserRole,
   CompanySetting,
+  CompanyConfig,
   User,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
@@ -291,6 +292,41 @@ export class CompanyRepository {
         companyId,
         customerDiscountTier: (data.customerDiscountTier as Prisma.InputJsonValue) || {},
       },
+    });
+  }
+
+  public async findConfig(
+    companyId: string,
+    configKey: string,
+    tx?: TransactionClient,
+  ): Promise<CompanyConfig | null> {
+    const client = tx || this.prisma;
+    return client.companyConfig.findUnique({
+      where: {
+        companyId_configKey: {
+          companyId,
+          configKey,
+        },
+      },
+    });
+  }
+
+  public async upsertConfig(
+    companyId: string,
+    configKey: string,
+    configValue: string,
+    tx?: TransactionClient,
+  ): Promise<CompanyConfig> {
+    const client = tx || this.prisma;
+    return client.companyConfig.upsert({
+      where: {
+        companyId_configKey: {
+          companyId,
+          configKey,
+        },
+      },
+      update: { configValue },
+      create: { companyId, configKey, configValue },
     });
   }
 }

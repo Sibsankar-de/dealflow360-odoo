@@ -134,7 +134,7 @@ export const SignupForm: React.FC = () => {
         <Input
           label="Password"
           type={showPassword ? "text" : "password"}
-          placeholder="••••••••••••"
+          placeholder="••••••"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -163,7 +163,7 @@ export const SignupForm: React.FC = () => {
         <Input
           label="Confirm Password"
           type={showConfirmPassword ? "text" : "password"}
-          placeholder="••••••••••••"
+          placeholder="••••••"
           value={confirmPassword}
           onChange={(e) => {
             setConfirmPassword(e.target.value);

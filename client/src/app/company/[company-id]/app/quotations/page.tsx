@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { QuotationItem } from "@/types/quotation";
+import { QuotationItem, QuotationStatus } from "@/types/quotation";
 import { QuotationKanbanBoard } from "@/components/modules/quotations/QuotationKanbanBoard";
+import { QuotationTable } from "@/components/modules/quotations/QuotationTable";
 import { Button } from "@/components/ui/Button";
 import { Plus, LayoutGrid, Table, CheckCircle2 } from "lucide-react";
 
@@ -77,6 +78,13 @@ export default function CompanyQuotationsPage() {
     showNotification(`Opened quotation for ${item.customerName} (${item.quotationNumber})`);
   };
 
+  const handleUpdateQuotationStatus = (id: string, newStatus: QuotationStatus) => {
+    setQuotations((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+    );
+    showNotification(`Quotation status updated to ${newStatus}`);
+  };
+
   const handleNewQuotation = () => {
     showNotification("Opening new quotation creator wizard...");
   };
@@ -104,16 +112,19 @@ export default function CompanyQuotationsPage() {
         </div>
       )}
 
-      {/* Main Board View in Light Mode */}
+      {/* Main Board / Table View */}
       {viewMode === "kanban" ? (
         <QuotationKanbanBoard
           quotations={quotations}
           onSelectQuotation={handleSelectQuotation}
+          onUpdateQuotationStatus={handleUpdateQuotationStatus}
         />
       ) : (
-        <div className="p-12 border border-border rounded-2xl bg-card text-center">
-          <p className="text-sm text-text-secondary">Table view mode</p>
-        </div>
+        <QuotationTable
+          quotations={quotations}
+          onSelectQuotation={handleSelectQuotation}
+          onUpdateQuotationStatus={handleUpdateQuotationStatus}
+        />
       )}
 
       {/* Bottom Action Bar */}
@@ -124,7 +135,7 @@ export default function CompanyQuotationsPage() {
           leftIcon={<Plus className="w-4 h-4" />}
           className="font-semibold px-5 py-2.5 rounded-xl shadow-xs"
         >
-          + New Quotation
+          New Quotation
         </Button>
 
         <Button
@@ -145,3 +156,4 @@ export default function CompanyQuotationsPage() {
     </div>
   );
 }
+

@@ -8,15 +8,18 @@ import { StoreInfo } from "./StoreInfo";
 import {
   LayoutDashboard,
   FileText,
-  Columns,
+  Briefcase,
   Users,
   Package,
+  Warehouse,
+  ShoppingBag,
   RefreshCw,
   Receipt,
   Activity,
   HelpCircle,
   Settings,
   PanelLeftClose,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface SidebarProps {
@@ -58,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Dashboard",
-          href: `/company/${companyId}/dashboard`,
+          href: `/company/${companyId}/app/dashboard`,
           icon: <LayoutDashboard className="w-4 h-4" />,
         },
       ],
@@ -67,19 +70,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: "SALES",
       items: [
         {
+          label: "Deals",
+          href: `/company/${companyId}/app/deals`,
+          icon: <Briefcase className="w-4 h-4" />,
+        },
+        {
           label: "Quotations",
-          href: `/company/${companyId}/quotations`,
+          href: `/company/${companyId}/app/quotations`,
           icon: <FileText className="w-4 h-4" />,
         },
         {
           label: "Customers",
-          href: `/customers`,
+          href: `/company/${companyId}/app/customers`,
           icon: <Users className="w-4 h-4" />,
-        },
-        {
-          label: "Pipeline",
-          href: `/company/${companyId}/pipeline`,
-          icon: <Columns className="w-4 h-4" />,
         },
       ],
     },
@@ -87,18 +90,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: "OPERATIONS",
       items: [
         {
+          label: "Products",
+          href: `/company/${companyId}/app/products`,
+          icon: <ShoppingBag className="w-4 h-4" />,
+        },
+        {
+          label: "Warehouses",
+          href: `/company/${companyId}/app/warehouses`,
+          icon: <Warehouse className="w-4 h-4" />,
+        },
+        {
           label: "Fulfillment",
-          href: `/company/${companyId}/fulfillment`,
+          href: `/company/${companyId}/app/fulfillment`,
           icon: <Package className="w-4 h-4" />,
         },
         {
           label: "Subscriptions",
-          href: `/company/${companyId}/subscriptions`,
+          href: `/company/${companyId}/app/subscriptions`,
           icon: <RefreshCw className="w-4 h-4" />,
         },
         {
           label: "Invoices",
-          href: `/company/${companyId}/invoices`,
+          href: `/company/${companyId}/app/invoices`,
           icon: <Receipt className="w-4 h-4" />,
         },
       ],
@@ -108,8 +121,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Deal Health",
-          href: `/company/${companyId}/deal-health`,
+          href: `/company/${companyId}/app/deal-health`,
           icon: <Activity className="w-4 h-4" />,
+        },
+      ],
+    },
+    {
+      title: "TEAM",
+      items: [
+        {
+          label: "Access Control",
+          href: `/company/${companyId}/app/access-control`,
+          icon: <ShieldCheck className="w-4 h-4" />,
         },
       ],
     },
@@ -141,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <>
               <Link
-                href={`/company/${companyId}/quotations`}
+                href={`/company/${companyId}/app/quotations`}
                 className="flex items-center min-w-0 hover:opacity-90 transition-opacity"
               >
                 <AppLogo
@@ -204,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Secondary Utility Links */}
         <div className="space-y-0.5">
           <Link
-            href={`/company/${companyId}/help`}
+            href={`/company/${companyId}/app/help`}
             title={isCollapsed ? "Help & Support" : undefined}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:text-white hover:bg-navy-900 transition-colors ${
               isCollapsed ? "justify-center px-0" : ""
@@ -214,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && <span>Help & Support</span>}
           </Link>
           <Link
-            href={`/company/${companyId}/settings`}
+            href={`/company/${companyId}/app/settings`}
             title={isCollapsed ? "Settings" : undefined}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:text-white hover:bg-navy-900 transition-colors ${
               isCollapsed ? "justify-center px-0" : ""

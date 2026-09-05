@@ -5,6 +5,10 @@ import {
   RevisionType,
   RevisionStatus,
   DealStage,
+  NegotiationStatus,
+  OfferParty,
+  OfferStatus,
+  CompanyUserRole,
 } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
@@ -39,11 +43,20 @@ import {
   QuotationRevisionResponseDto,
   QuotationFilterDto,
   DealQuotationsQueryDto,
+  RejectQuotationDto,
+  SubmitCounterOfferDto,
+  NegotiationResponseDto,
   toQuotationDto,
   toQuotationItemDto,
   toQuotationRevisionDto,
+  toNegotiationDto,
 } from "../dto/quotation.dto";
 import { customerDiscountTierConverter } from "../converters/companySetting.converter";
+import {
+  calculateDiscountViolations,
+  DiscountLineItemInput,
+  DiscountViolationEvaluation,
+} from "../utils/discount-violation.util";
 
 export class QuotationService {
   private quotationRepo: QuotationRepository;
@@ -333,10 +346,72 @@ export class QuotationService {
         );
       }
 
+      const discountEvaluation = await this.evaluateDiscountViolations(
+        quotationId,
+        tx,
+      );
+      const evalNote = `Discount Evaluation: maxLineViolation=${discountEvaluation.maxLineViolation}%, blendedViolationScore=${discountEvaluation.blendedViolationScore}%, requiresApproval=${discountEvaluation.requiresApproval}`;
+
       if (quotation.currentRevisionId) {
         await tx.quotationRevision.update({
           where: { id: quotation.currentRevisionId },
-          data: { status: RevisionStatus.SENT },
+          data: {
+            status: RevisionStatus.SENT,
+            internalNote: quotation.currentRevision?.internalNote
+              ? `${quotation.currentRevision.internalNote} | ${evalNote}`
+              : evalNote,
+          },
+        });
+      } else {
+        let subtotal = new Prisma.Decimal(0);
+        let discountTotal = new Prisma.Decimal(0);
+        let taxTotal = new Prisma.Decimal(0);
+        let totalAmount = new Prisma.Decimal(0);
+
+        const revisionItems = (quotation.items || []).map((item) => {
+          subtotal = subtotal.add(item.unitPrice.mul(item.quantity));
+          discountTotal = discountTotal.add(item.discountAmount);
+          taxTotal = taxTotal.add(
+            item.lineTotal.sub(
+              item.unitPrice.mul(item.quantity).sub(item.discountAmount),
+            ),
+          );
+          totalAmount = totalAmount.add(item.lineTotal);
+
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            finalUnitPrice: item.finalUnitPrice,
+            lineTotal: item.lineTotal,
+          };
+        });
+
+        const revision = await tx.quotationRevision.create({
+          data: {
+            quotationId: quotation.id,
+            revisionNo: 1,
+            createdById: quotation.salesRepId,
+            revisionType: RevisionType.INITIAL,
+            status: RevisionStatus.SENT,
+            subtotal,
+            discountAmount: discountTotal,
+            taxAmount: taxTotal,
+            totalAmount,
+            internalNote: evalNote,
+            items: {
+              create: revisionItems,
+            },
+          },
+        });
+
+        await tx.quotation.update({
+          where: { id: quotation.id },
+          data: { currentRevisionId: revision.id },
         });
       }
 
@@ -362,8 +437,88 @@ export class QuotationService {
         tx,
       );
 
-      return toQuotationDto(updated);
+      const dto = toQuotationDto(updated);
+      dto.discountEvaluation = discountEvaluation;
+      return dto;
     });
+  }
+
+  public async evaluateDiscountViolations(
+    quotationId: string,
+    tx?: TransactionClient,
+  ): Promise<DiscountViolationEvaluation> {
+    const quotation = await this.quotationRepo.findById(quotationId, tx);
+    if (!quotation) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+    }
+
+    const companyUser = await this.companyRepo.findCompanyUser(
+      quotation.companyId,
+      quotation.customerId,
+      tx,
+    );
+    const customerTier = companyUser?.customerTier ?? null;
+
+    let defaultTierMap: Record<string, number> = {};
+    const settings = await this.companyRepo.findSettings(
+      quotation.companyId,
+      tx,
+    );
+    if (settings?.customerDiscountTier) {
+      defaultTierMap = customerDiscountTierConverter(
+        settings.customerDiscountTier,
+      );
+    }
+
+    const config = await this.companyRepo.findConfig(
+      quotation.companyId,
+      "BLENDED_DISCOUNT_THRESHOLD",
+      tx,
+    );
+    const blendedThreshold =
+      config?.configValue && !isNaN(Number(config.configValue))
+        ? Number(config.configValue)
+        : 0;
+
+    const discountInputs: DiscountLineItemInput[] = [];
+
+    for (const item of quotation.items || []) {
+      const quantity = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+      const preDiscountValue = quantity * unitPrice;
+
+      let actualDiscountPercentage = 0;
+      if (item.discountType === DiscountType.PERCENTAGE) {
+        actualDiscountPercentage = Number(item.discountValue);
+      } else {
+        const discountAmt = Number(item.discountAmount);
+        actualDiscountPercentage =
+          preDiscountValue > 0 ? (discountAmt / preDiscountValue) * 100 : 0;
+      }
+
+      let allowedDiscountPercentage = 0;
+      if (customerTier) {
+        const productTier = await this.quotationRepo.findProductDiscountTier(
+          item.productId,
+          customerTier,
+          tx,
+        );
+        if (productTier) {
+          allowedDiscountPercentage = Number(productTier.discountPercent);
+        } else if (defaultTierMap[customerTier] !== undefined) {
+          allowedDiscountPercentage = defaultTierMap[customerTier];
+        }
+      }
+
+      discountInputs.push({
+        productId: item.productId,
+        actualDiscountPercentage,
+        allowedDiscountPercentage,
+        preDiscountValue,
+      });
+    }
+
+    return calculateDiscountViolations(discountInputs, blendedThreshold);
   }
 
   public async getQuotationById(
@@ -374,7 +529,24 @@ export class QuotationService {
       throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
     }
 
-    return toQuotationDto(quotation);
+    const dto = toQuotationDto(quotation);
+    if (quotation.items && quotation.items.length > 0) {
+      dto.discountEvaluation = await this.evaluateDiscountViolations(quotationId);
+    }
+    return dto;
+  }
+
+  public async getQuotationNegotiations(
+    quotationId: string,
+  ): Promise<NegotiationResponseDto[]> {
+    const quotation = await this.quotationRepo.findById(quotationId);
+    if (!quotation) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+    }
+
+    const negotiations =
+      await this.quotationRepo.findNegotiationsByQuotationId(quotationId);
+    return negotiations.map(toNegotiationDto);
   }
 
   public async getQuotationRevisions(
@@ -762,11 +934,44 @@ export class QuotationService {
 
   public async rejectQuotation(
     quotationId: string,
+    requestingUserId?: string,
+    dto?: RejectQuotationDto,
   ): Promise<QuotationResponseDto> {
     return prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (requestingUserId) {
+        const isAssignedCustomer = quotation.customerId === requestingUserId;
+        const membership = await this.companyRepo.findCompanyUser(
+          quotation.companyId,
+          requestingUserId,
+          tx,
+        );
+
+        const isStaff =
+          membership &&
+          (membership.role === CompanyUserRole.ADMIN ||
+            membership.role === CompanyUserRole.SALES_MANAGER);
+
+        if (!isAssignedCustomer && !isStaff) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            "Only the customer assigned to this quotation can reject it",
+          );
+        }
+
+        if (
+          isAssignedCustomer &&
+          (!membership || membership.role !== CompanyUserRole.CUSTOMER)
+        ) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            "User does not have the CUSTOMER role in this company",
+          );
+        }
       }
 
       if (quotation.status === QuotationStatus.REJECTED) {
@@ -797,14 +1002,99 @@ export class QuotationService {
         );
       }
 
+      if (quotation.status === QuotationStatus.DRAFT) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot reject a draft quotation. The quotation must be sent to the customer first",
+        );
+      }
+
+      await tx.negotiation.updateMany({
+        where: { quotationId, status: NegotiationStatus.OPEN },
+        data: {
+          status: NegotiationStatus.CLOSED,
+          closedAt: new Date(),
+        },
+      });
+
+      await tx.negotiationOffer.updateMany({
+        where: {
+          negotiation: { quotationId },
+          status: OfferStatus.PENDING,
+        },
+        data: {
+          status: OfferStatus.REJECTED,
+        },
+      });
+
       if (quotation.currentRevisionId) {
         await tx.quotationRevision.update({
           where: { id: quotation.currentRevisionId },
-          data: { status: RevisionStatus.REJECTED },
+          data: {
+            status: RevisionStatus.REJECTED,
+            ...(dto?.reason ? { customerNote: dto.reason } : {}),
+          },
+        });
+      } else {
+        const lastRev = await tx.quotationRevision.findFirst({
+          where: { quotationId },
+          orderBy: { revisionNo: "desc" },
+        });
+        const nextRevNo = (lastRev?.revisionNo || 0) + 1;
+
+        let subtotal = new Prisma.Decimal(0);
+        let discountTotal = new Prisma.Decimal(0);
+        let taxTotal = new Prisma.Decimal(0);
+        let totalAmount = new Prisma.Decimal(0);
+
+        const revisionItems = (quotation.items || []).map((item) => {
+          subtotal = subtotal.add(item.unitPrice.mul(item.quantity));
+          discountTotal = discountTotal.add(item.discountAmount);
+          taxTotal = taxTotal.add(
+            item.lineTotal.sub(
+              item.unitPrice.mul(item.quantity).sub(item.discountAmount),
+            ),
+          );
+          totalAmount = totalAmount.add(item.lineTotal);
+
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            finalUnitPrice: item.finalUnitPrice,
+            lineTotal: item.lineTotal,
+          };
+        });
+
+        const revision = await tx.quotationRevision.create({
+          data: {
+            quotationId,
+            revisionNo: nextRevNo,
+            createdById: requestingUserId || quotation.salesRepId,
+            revisionType: RevisionType.INITIAL,
+            status: RevisionStatus.REJECTED,
+            subtotal,
+            discountAmount: discountTotal,
+            taxAmount: taxTotal,
+            totalAmount,
+            customerNote: dto?.reason || null,
+            items: {
+              create: revisionItems,
+            },
+          },
+        });
+
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: { currentRevisionId: revision.id },
         });
       }
 
-      const updated = await this.quotationRepo.update(
+      await this.quotationRepo.update(
         quotationId,
         {
           status: QuotationStatus.REJECTED,
@@ -812,7 +1102,400 @@ export class QuotationService {
         tx,
       );
 
-      return toQuotationDto(updated);
+      const refreshed = await this.quotationRepo.findById(quotationId, tx);
+      return toQuotationDto(refreshed!);
+    });
+  }
+
+  public async submitCounterOffer(
+    quotationId: string,
+    requestingUserId: string,
+    dto: SubmitCounterOfferDto,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (quotation.customerId !== requestingUserId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Only the customer assigned to this quotation can negotiate",
+        );
+      }
+
+      const membership = await this.companyRepo.findCompanyUser(
+        quotation.companyId,
+        requestingUserId,
+        tx,
+      );
+
+      if (!membership || membership.role !== CompanyUserRole.CUSTOMER) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "User does not have the CUSTOMER role in this company",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.DRAFT) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot negotiate a draft quotation. The quotation must be sent to the customer first",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot negotiate an accepted quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.REJECTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot negotiate a rejected quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.CANCELLED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot negotiate a cancelled quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.EXPIRED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot negotiate an expired quotation",
+        );
+      }
+
+      const baseItems = quotation.items || [];
+      const itemMap = new Map(baseItems.map((item) => [item.id, item]));
+      const productMap = new Map(
+        baseItems.map((item) => [item.productId, item]),
+      );
+
+      let calculatedSubtotal = new Prisma.Decimal(0);
+      let calculatedTotalDiscount = new Prisma.Decimal(0);
+      let calculatedTax = new Prisma.Decimal(0);
+      let calculatedTotal = new Prisma.Decimal(0);
+
+      const offerItemsData: Array<{
+        quotationItemId?: string | null;
+        productId: string;
+        requestedQuantity: Prisma.Decimal;
+        requestedUnitPrice: Prisma.Decimal;
+        requestedDiscountType: DiscountType;
+        requestedDiscountValue: Prisma.Decimal;
+        requestedLineTotal: Prisma.Decimal;
+      }> = [];
+
+      const revisionItemsData: Array<{
+        productId: string;
+        quantity: Prisma.Decimal;
+        unitPrice: Prisma.Decimal;
+        discountType: DiscountType;
+        discountValue: Prisma.Decimal;
+        discountAmount: Prisma.Decimal;
+        taxRate: Prisma.Decimal;
+        finalUnitPrice: Prisma.Decimal;
+        lineTotal: Prisma.Decimal;
+      }> = [];
+
+      if (dto.items && dto.items.length > 0) {
+        for (const itemDto of dto.items) {
+          const existing =
+            (itemDto.quotationItemId && itemMap.get(itemDto.quotationItemId)) ||
+            (itemDto.productId && productMap.get(itemDto.productId));
+
+          if (!existing) {
+            throw new ApiError(
+              StatusCodes.BAD_REQUEST,
+              "Proposed item does not match any existing item in quotation",
+            );
+          }
+
+          const quantity = new Prisma.Decimal(
+            itemDto.requestedQuantity ?? existing.quantity,
+          );
+          const unitPrice = new Prisma.Decimal(
+            itemDto.requestedUnitPrice ?? existing.unitPrice,
+          );
+          const discountType =
+            itemDto.requestedDiscountType ??
+            existing.discountType ??
+            DiscountType.PERCENTAGE;
+          const discountValue = new Prisma.Decimal(
+            itemDto.requestedDiscountValue ?? existing.discountValue ?? 0,
+          );
+          const taxRate = new Prisma.Decimal(existing.taxRate);
+
+          let discountAmount = new Prisma.Decimal(0);
+          if (discountType === DiscountType.PERCENTAGE) {
+            discountAmount = unitPrice
+              .mul(quantity)
+              .mul(discountValue)
+              .div(100);
+          } else {
+            discountAmount = discountValue;
+          }
+
+          const lineBase = unitPrice.mul(quantity).sub(discountAmount);
+          const finalUnitPrice = lineBase.div(quantity);
+          const lineTax = lineBase.mul(taxRate).div(100);
+          const lineTotal = lineBase.add(lineTax);
+
+          calculatedSubtotal = calculatedSubtotal.add(unitPrice.mul(quantity));
+          calculatedTotalDiscount = calculatedTotalDiscount.add(discountAmount);
+          calculatedTax = calculatedTax.add(lineTax);
+          calculatedTotal = calculatedTotal.add(lineTotal);
+
+          offerItemsData.push({
+            quotationItemId: existing.id,
+            productId: existing.productId,
+            requestedQuantity: quantity,
+            requestedUnitPrice: unitPrice,
+            requestedDiscountType: discountType,
+            requestedDiscountValue: discountValue,
+            requestedLineTotal: lineTotal,
+          });
+
+          revisionItemsData.push({
+            productId: existing.productId,
+            quantity,
+            unitPrice,
+            discountType,
+            discountValue,
+            discountAmount,
+            taxRate,
+            finalUnitPrice,
+            lineTotal,
+          });
+        }
+      } else {
+        for (const existing of baseItems) {
+          const quantity = new Prisma.Decimal(existing.quantity);
+          const unitPrice = new Prisma.Decimal(existing.unitPrice);
+          let discountType = existing.discountType;
+          let discountValue = new Prisma.Decimal(existing.discountValue);
+          const taxRate = new Prisma.Decimal(existing.taxRate);
+
+          if (dto.proposedDiscount !== undefined) {
+            discountType = dto.discountType ?? DiscountType.PERCENTAGE;
+            discountValue = new Prisma.Decimal(dto.proposedDiscount);
+          } else if (dto.proposedPrice !== undefined) {
+            const currentSubtotal = baseItems.reduce(
+              (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
+              0,
+            );
+            if (currentSubtotal > 0 && dto.proposedPrice < currentSubtotal) {
+              discountType = DiscountType.PERCENTAGE;
+              const discPercent =
+                ((currentSubtotal - dto.proposedPrice) / currentSubtotal) * 100;
+              discountValue = new Prisma.Decimal(discPercent.toFixed(2));
+            }
+          }
+
+          let discountAmount = new Prisma.Decimal(0);
+          if (discountType === DiscountType.PERCENTAGE) {
+            discountAmount = unitPrice
+              .mul(quantity)
+              .mul(discountValue)
+              .div(100);
+          } else {
+            discountAmount = discountValue;
+          }
+
+          const lineBase = unitPrice.mul(quantity).sub(discountAmount);
+          const finalUnitPrice = lineBase.div(quantity);
+          const lineTax = lineBase.mul(taxRate).div(100);
+          const lineTotal = lineBase.add(lineTax);
+
+          calculatedSubtotal = calculatedSubtotal.add(unitPrice.mul(quantity));
+          calculatedTotalDiscount = calculatedTotalDiscount.add(discountAmount);
+          calculatedTax = calculatedTax.add(lineTax);
+          calculatedTotal = calculatedTotal.add(lineTotal);
+
+          offerItemsData.push({
+            quotationItemId: existing.id,
+            productId: existing.productId,
+            requestedQuantity: quantity,
+            requestedUnitPrice: unitPrice,
+            requestedDiscountType: discountType,
+            requestedDiscountValue: discountValue,
+            requestedLineTotal: lineTotal,
+          });
+
+          revisionItemsData.push({
+            productId: existing.productId,
+            quantity,
+            unitPrice,
+            discountType,
+            discountValue,
+            discountAmount,
+            taxRate,
+            finalUnitPrice,
+            lineTotal,
+          });
+        }
+      }
+
+      let negotiation = await tx.negotiation.findFirst({
+        where: { quotationId, status: NegotiationStatus.OPEN },
+      });
+      if (!negotiation) {
+        negotiation = await tx.negotiation.create({
+          data: {
+            quotationId,
+            status: NegotiationStatus.OPEN,
+          },
+        });
+      }
+
+      await tx.negotiationOffer.updateMany({
+        where: {
+          negotiationId: negotiation.id,
+          status: OfferStatus.PENDING,
+        },
+        data: {
+          status: OfferStatus.SUPERSEDED,
+        },
+      });
+
+      await tx.negotiationOffer.create({
+        data: {
+          negotiationId: negotiation.id,
+          baseRevisionId: quotation.currentRevisionId,
+          offeredBy: OfferParty.CUSTOMER,
+          status: OfferStatus.PENDING,
+          message: dto.message || null,
+          items: {
+            create: offerItemsData,
+          },
+        },
+      });
+
+      const customerTier = membership.customerTier ?? null;
+
+      let defaultTierMap: Record<string, number> = {};
+      const settings = await this.companyRepo.findSettings(
+        quotation.companyId,
+        tx,
+      );
+      if (settings?.customerDiscountTier) {
+        defaultTierMap = customerDiscountTierConverter(
+          settings.customerDiscountTier,
+        );
+      }
+
+      const config = await this.companyRepo.findConfig(
+        quotation.companyId,
+        "BLENDED_DISCOUNT_THRESHOLD",
+        tx,
+      );
+      const blendedThreshold =
+        config?.configValue && !isNaN(Number(config.configValue))
+          ? Number(config.configValue)
+          : 0;
+
+      const counterDiscountInputs: DiscountLineItemInput[] = [];
+      for (const revItem of revisionItemsData) {
+        const qty = Number(revItem.quantity);
+        const unitP = Number(revItem.unitPrice);
+        const preDiscountVal = qty * unitP;
+
+        let actualDisc = 0;
+        if (revItem.discountType === DiscountType.PERCENTAGE) {
+          actualDisc = Number(revItem.discountValue);
+        } else {
+          const discAmt = Number(revItem.discountAmount);
+          actualDisc =
+            preDiscountVal > 0 ? (discAmt / preDiscountVal) * 100 : 0;
+        }
+
+        let allowedDisc = 0;
+        if (customerTier) {
+          const productTier = await this.quotationRepo.findProductDiscountTier(
+            revItem.productId,
+            customerTier,
+            tx,
+          );
+          if (productTier) {
+            allowedDisc = Number(productTier.discountPercent);
+          } else if (defaultTierMap[customerTier] !== undefined) {
+            allowedDisc = defaultTierMap[customerTier];
+          }
+        }
+
+        counterDiscountInputs.push({
+          productId: revItem.productId,
+          actualDiscountPercentage: actualDisc,
+          allowedDiscountPercentage: allowedDisc,
+          preDiscountValue: preDiscountVal,
+        });
+      }
+
+      const counterDiscountEvaluation = calculateDiscountViolations(
+        counterDiscountInputs,
+        blendedThreshold,
+      );
+      const counterEvalNote = `Counter-Offer Discount Evaluation: maxLineViolation=${counterDiscountEvaluation.maxLineViolation}%, blendedViolationScore=${counterDiscountEvaluation.blendedViolationScore}%, requiresApproval=${counterDiscountEvaluation.requiresApproval}`;
+
+      const revisionCount = await tx.quotationRevision.count({
+        where: { quotationId },
+      });
+
+      const revision = await tx.quotationRevision.create({
+        data: {
+          quotationId,
+          revisionNo: revisionCount + 1,
+          createdById: requestingUserId,
+          revisionType: RevisionType.CUSTOMER_COUNTER,
+          status: RevisionStatus.SENT,
+          subtotal: calculatedSubtotal,
+          discountAmount: calculatedTotalDiscount,
+          taxAmount: calculatedTax,
+          totalAmount: calculatedTotal,
+          customerNote: dto.message || null,
+          internalNote: counterEvalNote,
+          items: {
+            create: revisionItemsData,
+          },
+        },
+      });
+
+      await tx.quotation.update({
+        where: { id: quotationId },
+        data: {
+          status: QuotationStatus.NEGOTIATING,
+          currentRevisionId: revision.id,
+        },
+      });
+
+      const deal = await tx.deal.findUnique({
+        where: { id: quotation.dealId },
+      });
+      if (
+        deal &&
+        (deal.stage === DealStage.NEW ||
+          deal.stage === DealStage.QUALIFICATION ||
+          deal.stage === DealStage.REQUIREMENT ||
+          deal.stage === DealStage.QUOTATION)
+      ) {
+        await tx.deal.update({
+          where: { id: deal.id },
+          data: { stage: DealStage.NEGOTIATION },
+        });
+      }
+
+      const refreshed = await this.quotationRepo.findById(quotationId, tx);
+      const refreshedDto = toQuotationDto(refreshed!);
+      refreshedDto.discountEvaluation = counterDiscountEvaluation;
+      return refreshedDto;
     });
   }
 

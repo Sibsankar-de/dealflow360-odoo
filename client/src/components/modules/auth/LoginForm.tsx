@@ -110,7 +110,7 @@ export const LoginForm: React.FC = () => {
 
         <Input
           type={showPassword ? "text" : "password"}
-          placeholder="••••••••••••"
+          placeholder="••••••"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);

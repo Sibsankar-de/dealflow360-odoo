@@ -16,6 +16,7 @@ import {
   cancelQuotationSchema,
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
+  submitCounterOfferSchema,
 } from "../schemas/quotation.schema";
 import { QuotationStatus } from "@prisma/client";
 
@@ -332,11 +333,16 @@ export class QuotationController {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
+    let validatedDto;
     if (req.body && Object.keys(req.body).length > 0) {
-      validateBody(rejectQuotationSchema, req.body);
+      validatedDto = validateBody(rejectQuotationSchema, req.body);
     }
 
-    const rejected = await this.quotationService.rejectQuotation(quotationId);
+    const rejected = await this.quotationService.rejectQuotation(
+      quotationId,
+      req.user?.id,
+      validatedDto,
+    );
 
     return res
       .status(StatusCodes.OK)
@@ -348,6 +354,77 @@ export class QuotationController {
         ),
       );
   });
+
+  public counterOffer = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const validated = validateBody(submitCounterOfferSchema, req.body);
+    const quotation = await this.quotationService.submitCounterOffer(
+      quotationId,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation },
+          "Counter-offer submitted successfully",
+        ),
+      );
+  });
+
+  public getNegotiations = asyncHandler(async (req: Request, res: Response) => {
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const negotiations =
+      await this.quotationService.getQuotationNegotiations(quotationId);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { negotiations },
+          "Quotation negotiations fetched successfully",
+        ),
+      );
+  });
+
+  public getDiscountEvaluation = asyncHandler(
+    async (req: Request, res: Response) => {
+      const quotationId = req.params.quotationId || req.params.id;
+      if (!quotationId || typeof quotationId !== "string") {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+      }
+
+      const evaluation =
+        await this.quotationService.evaluateDiscountViolations(quotationId);
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { evaluation },
+            "Discount violation evaluation calculated successfully",
+          ),
+        );
+    },
+  );
 }
 
 export const quotationController = new QuotationController();
