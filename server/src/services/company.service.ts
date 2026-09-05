@@ -23,6 +23,8 @@ import {
   AddCompanyUserDto,
   UpdateCompanyUserRoleDto,
   ListCompaniesDto,
+  CompanyRoleResponseDto,
+  COMPANY_ROLE_DEFINITIONS,
   toCompanyDto,
   toCompanySettingDto,
   toCompanyUserDto,
@@ -124,25 +126,30 @@ export class CompanyService {
     const sortBy = query.sortBy || "createdAt";
     const sortOrder = query.sortOrder || "desc";
 
-    const where: Prisma.CompanyWhereInput = {
-      ...(query.status ? { status: query.status } : { deletedAt: null }),
-    };
+    const andConditions: Prisma.CompanyWhereInput[] = [
+      {
+        OR: [
+          { ownerId: userId },
+          { companyUsers: { some: { userId } } },
+        ],
+      },
+      query.status ? { status: query.status } : { deletedAt: null },
+    ];
 
     if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: "insensitive" } },
-        { country: { contains: query.search, mode: "insensitive" } },
-        { postalCode: { contains: query.search, mode: "insensitive" } },
-        { addressLine: { contains: query.search, mode: "insensitive" } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: query.search, mode: "insensitive" } },
+          { country: { contains: query.search, mode: "insensitive" } },
+          { postalCode: { contains: query.search, mode: "insensitive" } },
+          { addressLine: { contains: query.search, mode: "insensitive" } },
+        ],
+      });
     }
 
-    if (query.myCompanies) {
-      where.OR = [
-        { ownerId: userId },
-        { companyUsers: { some: { userId } } },
-      ];
-    }
+    const where: Prisma.CompanyWhereInput = {
+      AND: andConditions,
+    };
 
     const orderBy: Prisma.CompanyOrderByWithRelationInput = {
       [sortBy]: sortOrder,
@@ -177,6 +184,11 @@ export class CompanyService {
       docs,
     };
   }
+
+  public getCompanyRoles(): CompanyRoleResponseDto[] {
+    return COMPANY_ROLE_DEFINITIONS;
+  }
+
 
   public async updateCompany(
     company: CompanyWithRelations,

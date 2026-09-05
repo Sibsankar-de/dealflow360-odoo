@@ -174,7 +174,8 @@ Responsibilities:
 - Store company settings (`company_settings`) created automatically on company creation, storing `customer_discount_tier` as JSONB and converted using safe Zod schemas.
 - Execute multi-step company and relation creation within database transactions via `prismaTransaction`.
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
-- Provide paginated company listing (GET /api/v1/companies) with search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
+- Provide paginated company listing (GET /api/v1/companies) scoped to the authenticated user's memberships and ownerships with assigned userRole, search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
+- Provide company role definition endpoints (GET /api/v1/companies/roles and GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context

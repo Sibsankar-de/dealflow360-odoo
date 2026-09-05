@@ -81,6 +81,40 @@ export interface ListCompaniesDto {
   myCompanies?: boolean;
 }
 
+export interface CompanyRoleResponseDto {
+  role: CompanyUserRole;
+  name: string;
+  description: string;
+}
+
+export const COMPANY_ROLE_DEFINITIONS: CompanyRoleResponseDto[] = [
+  {
+    role: CompanyUserRole.ADMIN,
+    name: "Company Admin",
+    description: "Manage company configuration, products, approval rules, collaborators, and access all company data.",
+  },
+  {
+    role: CompanyUserRole.SALES_REP,
+    name: "Sales Representative",
+    description: "Create quotations, manage customer discussions, request approvals, and track quotation progress.",
+  },
+  {
+    role: CompanyUserRole.SALES_MANAGER,
+    name: "Sales Manager",
+    description: "Review quotations requiring managerial approval, approve or reject quotations, and escalate high-risk deals.",
+  },
+  {
+    role: CompanyUserRole.FINANCE_MANAGER,
+    name: "Finance Manager",
+    description: "Review financially sensitive quotations, review fulfillment feasibility, approve fulfillment, and generate invoices.",
+  },
+  {
+    role: CompanyUserRole.CUSTOMER,
+    name: "Customer",
+    description: "Review quotations received as a customer, approve, reject, or negotiate commercial proposals.",
+  },
+];
+
 export const toCompanySettingDto = (
   setting: CompanySetting,
 ): CompanySettingResponseDto => {

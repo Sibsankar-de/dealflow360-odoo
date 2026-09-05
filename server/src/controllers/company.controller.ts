@@ -117,6 +117,23 @@ export class CompanyController {
     },
   );
 
+  public listCompanyRoles = asyncHandler(
+    async (_req: Request, res: Response) => {
+      const roles = this.companyService.getCompanyRoles();
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { roles },
+            "Company roles fetched successfully",
+          ),
+        );
+    },
+  );
+
+
   public update = asyncHandler(async (req: Request, res: Response) => {
     if (!req.company) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
