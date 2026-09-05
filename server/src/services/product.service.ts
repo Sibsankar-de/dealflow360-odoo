@@ -21,6 +21,10 @@ import {
   ProductResponseDto,
   toProductDto,
 } from "../dto/product.dto";
+import {
+  publishElasticsearchJob,
+  buildProductIndexDocument,
+} from "./elasticsearchPublisher.service";
 
 export class ProductService {
   private productRepo: ProductRepository;
@@ -42,7 +46,8 @@ export class ProductService {
     dto: CreateProductDto,
   ): Promise<ProductResponseDto> {
     return prismaTransaction(async (tx) => {
-      const stocks: Array<{ warehouseId: string; stockQty: Prisma.Decimal }> = [];
+      const stocks: Array<{ warehouseId: string; stockQty: Prisma.Decimal }> =
+        [];
 
       if (dto.stocks && dto.stocks.length > 0) {
         for (const entry of dto.stocks) {
@@ -95,6 +100,14 @@ export class ProductService {
         tx,
       );
 
+      void publishElasticsearchJob({
+        action: "index",
+        entity: "product",
+        id: product.id,
+        companyId: product.companyId,
+        data: buildProductIndexDocument(product),
+      });
+
       return toProductDto(product);
     });
   }
@@ -112,7 +125,12 @@ export class ProductService {
 
   public async listProducts(
     companyId: string,
-    filters: { type?: ProductType; search?: string; page?: number; limit?: number },
+    filters: {
+      type?: ProductType;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
   ): Promise<ProductListDto> {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
@@ -138,7 +156,11 @@ export class ProductService {
     dto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
     return prismaTransaction(async (tx) => {
-      const existing = await this.productRepo.findById(productId, companyId, tx);
+      const existing = await this.productRepo.findById(
+        productId,
+        companyId,
+        tx,
+      );
       if (!existing) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
@@ -160,14 +182,20 @@ export class ProductService {
             );
           }
         }
-        await this.productRepo.addOrRemoveCategories(productId, categoryIdList, tx);
+        await this.productRepo.addOrRemoveCategories(
+          productId,
+          categoryIdList,
+          tx,
+        );
       }
 
       await this.productRepo.update(
         productId,
         {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.description !== undefined
+            ? { description: dto.description }
+            : {}),
           ...(dto.price !== undefined
             ? { price: new Prisma.Decimal(dto.price) }
             : {}),
@@ -177,7 +205,22 @@ export class ProductService {
         tx,
       );
 
-      const refreshed = await this.productRepo.findById(productId, companyId, tx);
+      const refreshed = await this.productRepo.findById(
+        productId,
+        companyId,
+        tx,
+      );
+
+      if (refreshed) {
+        void publishElasticsearchJob({
+          action: "index",
+          entity: "product",
+          id: refreshed.id,
+          companyId: refreshed.companyId,
+          data: buildProductIndexDocument(refreshed),
+        });
+      }
+
       return toProductDto(refreshed!);
     });
   }
@@ -187,11 +230,22 @@ export class ProductService {
     companyId: string,
   ): Promise<void> {
     return prismaTransaction(async (tx) => {
-      const existing = await this.productRepo.findById(productId, companyId, tx);
+      const existing = await this.productRepo.findById(
+        productId,
+        companyId,
+        tx,
+      );
       if (!existing) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
       }
       await this.productRepo.delete(productId, tx);
+
+      void publishElasticsearchJob({
+        action: "delete",
+        entity: "product",
+        id: productId,
+        companyId,
+      });
     });
   }
 
@@ -276,7 +330,11 @@ export class ProductService {
         }
       }
 
-      await this.productRepo.addOrRemoveCategories(productId, categoryIdList, tx);
+      await this.productRepo.addOrRemoveCategories(
+        productId,
+        categoryIdList,
+        tx,
+      );
 
       const updated = await this.productRepo.findById(productId, companyId, tx);
       return toProductDto(updated!);

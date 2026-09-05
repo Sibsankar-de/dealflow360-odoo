@@ -35,4 +35,14 @@ export const env = {
   REFRESH_TOKEN_COOKIE_EXPIRY: Number(
     process.env.REFRESH_TOKEN_COOKIE_EXPIRY || 10,
   ),
+
+  RABBITMQ_CONNECTION_URI:
+    process.env.RABBITMQ_CONNECTION_URI || "amqp://admin:admin@localhost:5672",
+
+  ELASTICSEARCH_URL:
+    process.env.ELASTICSEARCH_URL || "http://localhost:9200",
+  ELASTICSEARCH_PRODUCTS_INDEX:
+    process.env.ELASTICSEARCH_PRODUCTS_INDEX || "dealflow_products",
+  ELASTICSEARCH_USERS_INDEX:
+    process.env.ELASTICSEARCH_USERS_INDEX || "dealflow_users",
 } as const;

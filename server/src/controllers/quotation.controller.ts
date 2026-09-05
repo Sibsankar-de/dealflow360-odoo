@@ -38,7 +38,7 @@ export class QuotationController {
     const validated = validateBody(createQuotationSchema, req.body);
     const quotation = await this.quotationService.createQuotation(userId, {
       ...validated,
-      companyId: req.company?.id || validated.companyId,
+      companyId: req.company?.id || req.params.companyId || validated.companyId,
     });
 
     return res
@@ -155,9 +155,14 @@ export class QuotationController {
       );
     }
 
+    const companyId = req.params.companyId || filterResult.data.companyId;
+
     const result = await this.quotationService.listQuotations(
       userId,
-      filterResult.data,
+      {
+        ...filterResult.data,
+        ...(companyId ? { companyId } : {}),
+      },
     );
 
     return res
@@ -189,7 +194,7 @@ export class QuotationController {
     const result = await this.quotationService.listQuotationsByDeal(
       dealId,
       filterResult.data,
-      req.company?.id,
+      req.company?.id || req.params.companyId,
     );
 
     return res

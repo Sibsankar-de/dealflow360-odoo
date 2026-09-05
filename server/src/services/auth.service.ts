@@ -22,6 +22,10 @@ import {
   UpdatePasswordDto,
   toUserDto,
 } from "../dto/user.dto";
+import {
+  publishElasticsearchJob,
+  buildUserIndexDocument,
+} from "./elasticsearchPublisher.service";
 
 export class AuthService {
   private userRepo: UserRepository;
@@ -76,6 +80,13 @@ export class AuthService {
       password: hashedPassword,
       authBy: AuthProvider.LOCAL,
       isEmailVerified: false,
+    });
+
+    void publishElasticsearchJob({
+      action: "index",
+      entity: "user",
+      id: user.id,
+      data: buildUserIndexDocument(user),
     });
 
     const tokens = await this.generateTokenPair(user);
@@ -190,6 +201,13 @@ export class AuthService {
     const updated = await this.userRepo.update(userId, {
       ...(dto.userName ? { userName: dto.userName } : {}),
       ...(dto.avatar !== undefined ? { avatar: dto.avatar } : {}),
+    });
+
+    void publishElasticsearchJob({
+      action: "index",
+      entity: "user",
+      id: updated.id,
+      data: buildUserIndexDocument(updated),
     });
 
     return toUserDto(updated);

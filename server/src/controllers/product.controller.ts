@@ -15,6 +15,7 @@ import {
   upsertStockSchema,
   addOrRemoveCategorySchema,
 } from "../schemas/product.schema";
+import { searchProductsInElasticsearch } from "../services/elasticsearch.service";
 
 export class ProductController {
   private productService: ProductService;
@@ -93,6 +94,32 @@ export class ProductController {
           StatusCodes.OK,
           result,
           "Products fetched successfully",
+        ),
+      );
+  });
+
+  public search = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const query =
+      (req.query.query as string) || (req.query.search as string) || "";
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+
+    const products = await searchProductsInElasticsearch(
+      req.company.id,
+      query,
+      isNaN(limit) || limit <= 0 ? 10 : limit,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          products,
+          "Products searched successfully",
         ),
       );
   });
