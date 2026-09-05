@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback, useId } from "react";
 import { clsx } from "clsx";
+import { X } from "lucide-react";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -72,16 +73,7 @@ export const ModalHeader: React.FC<{
           aria-label="Close modal"
           className="rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-border cursor-pointer"
         >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="h-5 w-5" />
         </button>
       )}
     </div>

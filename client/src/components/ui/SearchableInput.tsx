@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { clsx } from "clsx";
+import { Search, Loader2 } from "lucide-react";
 import { Input, InputProps } from "./Input";
 import { Dropdown } from "./Dropdown";
 
@@ -129,21 +130,7 @@ export function SearchableInput<T extends SearchableItem = SearchableItem>({
           }
         }}
         leftIcon={
-          leftIcon || (
-            <svg
-              className="w-4 h-4 text-text-muted"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          )
+          leftIcon || <Search className="w-4 h-4 text-text-muted" />
         }
         className={className}
         {...props}
@@ -156,25 +143,7 @@ export function SearchableInput<T extends SearchableItem = SearchableItem>({
       >
         {isLoading ? (
           <div className="p-4 text-center text-sm text-text-secondary flex items-center justify-center gap-2">
-            <svg
-              className="animate-spin h-4 w-4 text-brand-600"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
+            <Loader2 className="animate-spin h-4 w-4 text-brand-600" />
             Loading suggestions...
           </div>
         ) : items.length === 0 ? (

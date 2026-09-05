@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { clsx } from "clsx";
+import { ChevronDown } from "lucide-react";
 import { Button, ButtonProps } from "./Button";
 import { Dropdown } from "./Dropdown";
 
@@ -89,18 +90,12 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
         )}
         aria-label="More options"
       >
-        <svg
+        <ChevronDown
           className={clsx(
             "w-4 h-4 transition-transform duration-200 shrink-0",
             open ? "rotate-180" : "rotate-0"
           )}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        />
       </Button>
 
       <Dropdown
