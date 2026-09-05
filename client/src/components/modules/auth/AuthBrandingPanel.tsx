@@ -25,7 +25,11 @@ export const AuthBrandingPanel: React.FC<{ className?: string }> = ({
       <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10">
-        <AppLogo size={40} subtitle="Sales Operations Platform" />
+        <AppLogo
+          size={40}
+          subtitle="Sales Operations Platform"
+          textColor="white"
+        />
       </div>
 
       <div className="relative z-10 my-auto space-y-6 max-w-xl">

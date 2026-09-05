@@ -48,25 +48,17 @@ The project follows a modular, feature-oriented structure under `src/`:
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 ├── components/           # Reusable shared UI and layout components
-<<<<<<< HEAD
-│   ├── ui/               # Base primitives (Avatar, CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
-│   └── shared/           # Shared compound components (navbar, sidebar, tables)
-├── modules/              # Feature modules containing domain-specific logic
-│   ├── auth/             # Login, registration, company onboarding
-=======
-│   ├── ui/               # Base primitives (buttons, inputs, modals, cards)
+│   ├── ui/               # Base primitives (Avatar, AppLogo, Select, CurrencySelector, FilterSelector, SearchableInput, Button, Input, Modal, Card, Badge, Tabs)
 │   ├── shared/           # Shared compound components (navbar, sidebar, tables)
 │   └── modules/          # Feature module UI components
-│       └── auth/         # LoginForm, SignupForm, AuthBrandingPanel
->>>>>>> 59ce6cd (login and sign up page added)
-│   ├── dashboard/        # Metrics, deal health, recent activities
-│   ├── quotations/       # Quotation creator, evaluation, approval workflows
-│   ├── fulfillment/      # Delivery tracking, backorders
-│   ├── finance/          # Invoices, financial approvals
-│   ├── customers/        # Customer directory and interaction history
-│   ├── layout/           # App navigation (Navbar: profile vs company view, UserAvatarMenu)
-│   ├── profile/          # User profile, credentials, and company affiliations
-│   └── company/          # Team, roles, product management
+│       ├── auth/         # LoginForm, SignupForm, AuthBrandingPanel
+│       ├── layout/       # Collapsible Sidebar, Navbar: profile vs company view, StoreInfo, UserAvatarMenu
+│       ├── profile/      # ProfileInfoCard, CompanyCard, CompanyList, EditProfileModal, ChangePasswordModal, CreateCompanyModal
+│       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard
+│       ├── fulfillment/  # Delivery tracking, backorders
+│       ├── finance/      # Invoices, financial approvals
+│       ├── customers/    # Customer directory and interaction history
+│       └── company/      # Team, roles, product management
 ├── services/             # Centralized API clients and endpoint definitions
 │   └── api/              # Base API configuration and domain services
 ├── hooks/                # Reusable custom React hooks
@@ -108,13 +100,18 @@ State is strictly divided into two categories:
 Routes are structured around user roles and core platform workflows:
 
 * `/(auth)`: Authentication routes (Login, Register).
-* `/dashboard`: Main dashboard with deal health and high-level KPIs.
-* `/profile`: User profile, credentials, and company memberships.
-* `/quotations`: Quotation list, creation wizard, approval review, and customer negotiation interface.
-* `/fulfillment`: Delivery tracking, batch fulfillment, and backorder lists.
-* `/invoices`: Invoice listing and invoice generation based on delivered quantities.
-* `/products`: Product catalog, pricing rules, discount thresholds, and risk constraints.
-* `/settings`: Company management, role permissions, and collaborator management.
+* `/profile`: User profile, credentials, and company memberships (Profile Navbar layout).
+* `/company/[company-id]/(dashboard)`: Company tenant dashboard workspace (Company Navbar layout).
+  * `/company/[company-id]/dashboard`: Company metrics and KPIs.
+  * `/company/[company-id]/quotations`: Quotation Kanban pipeline board and table views.
+  * `/company/[company-id]/approvals`: Managerial and finance approval workflows.
+  * `/company/[company-id]/fulfillment`: Delivery and backorder fulfillment tracking.
+  * `/company/[company-id]/subscriptions`: Recurring billing and subscription contracts.
+  * `/company/[company-id]/invoices`: Invoice management based on delivered items.
+  * `/company/[company-id]/deal-health`: Deal health alerts and stalled quotation indicators.
+  * `/company/[company-id]/reports`: Analytics and exportable business reports.
+  * `/company/[company-id]/products`: Product catalog, pricing constraints, and risk limits.
+* `/company/[company-id]/(customer)`: Customer quotation review, negotiation, and sign-off portal.
 
 ---
 

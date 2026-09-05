@@ -10,6 +10,10 @@ export interface CompanyAffiliation {
   name: string;
   role: CompanyRole;
   code?: string;
+  country?: string;
+  postalCode?: string;
+  addressLine?: string;
+  currency?: string;
   joinedAt?: string;
   status?: "Active" | "Pending" | "Inactive";
 }
