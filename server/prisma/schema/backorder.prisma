@@ -1,0 +1,58 @@
+enum BackorderStatus {
+  PENDING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+model Backorder {
+  id                String          @id @default(uuid()) @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  backorderNo       String          @unique @map("backorder_no")
+  salesOrderId      String          @map("sales_order_id") @db.Uuid
+  parentBackorderId String?         @map("parent_backorder_id") @db.Uuid
+  status            BackorderStatus @default(PENDING)
+  expectedDate      DateTime?       @map("expected_date")
+  totalQuantity     Decimal         @map("total_quantity") @db.Decimal(12, 2)
+  fulfilledQuantity Decimal         @default(0) @map("fulfilled_quantity") @db.Decimal(12, 2)
+  remainingQuantity Decimal         @map("remaining_quantity") @db.Decimal(12, 2)
+  notes             String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrder      SalesOrder      @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  parentBackorder Backorder?      @relation("BackorderHierarchy", fields: [parentBackorderId], references: [id], onDelete: SetNull)
+  childBackorders Backorder[]     @relation("BackorderHierarchy")
+  items           BackorderItem[]
+  deliveries      Delivery[]
+
+  @@index([companyId])
+  @@index([salesOrderId])
+  @@index([parentBackorderId])
+  @@index([status])
+  @@map("backorders")
+}
+
+model BackorderItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  backorderId       String   @map("backorder_id") @db.Uuid
+  salesOrderItemId  String   @map("sales_order_item_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  orderedQuantity   Decimal  @map("ordered_quantity") @db.Decimal(12, 2)
+  fulfilledQuantity Decimal  @default(0) @map("fulfilled_quantity") @db.Decimal(12, 2)
+  remainingQuantity Decimal  @map("remaining_quantity") @db.Decimal(12, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  backorder      Backorder      @relation(fields: [backorderId], references: [id], onDelete: Cascade)
+  salesOrderItem SalesOrderItem @relation(fields: [salesOrderItemId], references: [id], onDelete: Restrict)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([backorderId])
+  @@index([salesOrderItemId])
+  @@index([productId])
+  @@map("backorder_items")
+}

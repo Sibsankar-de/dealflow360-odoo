@@ -22,6 +22,10 @@ model Product {
   negotiationOfferItems  NegotiationOfferItem[]
   discountTiers          ProductDiscountTier[]
   categories             CategoryProduct[]
+  salesOrderItems        SalesOrderItem[]
+  deliveryItems          DeliveryItem[]
+  backorderItems         BackorderItem[]
+  invoiceItems           InvoiceItem[]
 
   @@index([companyId])
   @@index([type])
