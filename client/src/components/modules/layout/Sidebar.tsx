@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   FileText,
   Columns,
+  Users,
   Package,
   RefreshCw,
   Receipt,
@@ -69,6 +70,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: "Quotations",
           href: `/company/${companyId}/quotations`,
           icon: <FileText className="w-4 h-4" />,
+        },
+        {
+          label: "Customers",
+          href: `/customers`,
+          icon: <Users className="w-4 h-4" />,
         },
         {
           label: "Pipeline",
