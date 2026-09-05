@@ -78,3 +78,10 @@ export interface UpdateCompanyUserRoleRequest {
   role: BackendCompanyRole;
 }
 
+export interface CompanyRoleDefinition {
+  role: BackendCompanyRole;
+  name: string;
+  description: string;
+}
+
+

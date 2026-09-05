@@ -2,59 +2,77 @@
 
 import React, { useState } from "react";
 import { clsx } from "clsx";
-import { Mail, ChevronDown, AlertCircle } from "lucide-react";
+import { ChevronDown, AlertCircle, ShieldAlert } from "lucide-react";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import {
   INVITABLE_COMPANY_ROLE_DEFINITIONS,
   BackendCompanyRole,
+  CompanyMemberType,
 } from "@/types/accesscontrol";
-import { useAddCompanyMemberMutation } from "@/store/features/company/companyApi";
+import { useUpdateCompanyMemberRoleMutation } from "@/store/features/company/companyApi";
 
-interface InviteTeamMemberModalProps {
+interface EditTeamMemberRoleModalProps {
   isOpen: boolean;
   onClose: () => void;
   companyId: string;
+  member: CompanyMemberType | null;
+  isOwner?: boolean;
 }
 
-export function InviteTeamMemberModal({
+export function EditTeamMemberRoleModal({
   isOpen,
   onClose,
   companyId,
-}: InviteTeamMemberModalProps) {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<BackendCompanyRole | "">("");
-  const [emailError, setEmailError] = useState("");
+  member,
+  isOwner = false,
+}: EditTeamMemberRoleModalProps) {
+  const [role, setRole] = useState<BackendCompanyRole | "">(member?.role || "");
+  const [prevMemberId, setPrevMemberId] = useState<string | null>(member?.id || null);
   const [roleError, setRoleError] = useState("");
   const [serverError, setServerError] = useState("");
 
-  const [addCompanyMember, { isLoading }] = useAddCompanyMemberMutation();
+  const [updateMemberRole, { isLoading }] =
+    useUpdateCompanyMemberRoleMutation();
 
-  const validateEmail = (value: string) => {
-    if (!value.trim()) return "Email address is required.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-      return "Please enter a valid email address.";
-    return "";
-  };
+  if (member && member.id !== prevMemberId) {
+    setPrevMemberId(member.id);
+    setRole(member.role);
+    setRoleError("");
+    setServerError("");
+  }
+
+  if (!isOpen || !member) return null;
+
+  const targetEmail = member.user?.email || "";
+  const targetName = member.user?.userName || targetEmail || "Team Member";
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    const emailErr = validateEmail(email);
-    const roleErr = role ? "" : "Please select a role for the member.";
+    if (isOwner) {
+      setServerError("Cannot change the role of the company owner.");
+      return;
+    }
 
-    setEmailError(emailErr);
-    setRoleError(roleErr);
+    if (!role) {
+      setRoleError("Please select a role.");
+      return;
+    }
+
+    if (role === member.role) {
+      onClose();
+      return;
+    }
+
+    setRoleError("");
     setServerError("");
 
-    if (emailErr || roleErr) return;
-
     try {
-      await addCompanyMember({
+      await updateMemberRole({
         companyId,
         data: {
-          userEmail: email.trim().toLowerCase(),
+          userEmail: targetEmail,
           role: role as BackendCompanyRole,
         },
       }).unwrap();
@@ -63,15 +81,12 @@ export function InviteTeamMemberModal({
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
-        "Failed to add team member to company.";
+        "Failed to update team member role.";
       setServerError(errorMsg);
     }
   };
 
   const handleClose = () => {
-    setEmail("");
-    setRole("");
-    setEmailError("");
     setRoleError("");
     setServerError("");
     onClose();
@@ -85,8 +100,8 @@ export function InviteTeamMemberModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Add Team Member"
-      description="Grant platform users access to this company workspace by specifying their registered email and role."
+      title="Edit Member Role"
+      description={`Update access level and responsibilities for ${targetName}.`}
       size="md"
     >
       <form onSubmit={handleSubmit}>
@@ -99,20 +114,27 @@ export function InviteTeamMemberModal({
               </div>
             )}
 
-            <Input
-              label="User Email Address"
-              type="email"
-              placeholder="colleague@company.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError(validateEmail(e.target.value));
-                if (serverError) setServerError("");
-              }}
-              leftIcon={<Mail className="w-4 h-4" />}
-              error={emailError}
-              required
-            />
+            {isOwner && (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-warning text-sm rounded-lg flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-text-primary">Company Owner</p>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    This member owns the company organization. Their role must remain Company Admin.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3.5 bg-surface border border-border rounded-lg space-y-1">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                Member Information
+              </p>
+              <p className="text-sm font-semibold text-text-primary">
+                {targetName}
+              </p>
+              <p className="text-xs text-text-secondary">{targetEmail}</p>
+            </div>
 
             <div className="flex flex-col gap-1.5 w-full">
               <label className="text-sm font-medium text-text-primary flex items-center gap-1 select-none">
@@ -120,24 +142,22 @@ export function InviteTeamMemberModal({
               </label>
               <div className="relative">
                 <select
+                  disabled={isOwner || isLoading}
                   value={role}
                   onChange={(e) => {
-                    setRole(e.target.value as BackendCompanyRole | "");
+                    setRole(e.target.value as BackendCompanyRole);
                     if (roleError) setRoleError("");
                     if (serverError) setServerError("");
                   }}
                   className={clsx(
                     "w-full appearance-none rounded-lg border bg-card px-3 py-2 pr-10 text-sm text-text-primary transition-colors duration-150 shadow-xs",
                     "focus:outline-none focus:ring-2 focus:ring-offset-0",
+                    "disabled:bg-surface disabled:text-text-muted disabled:cursor-not-allowed",
                     roleError
                       ? "border-danger focus:border-danger focus:ring-danger/20"
-                      : "border-border hover:border-text-secondary focus:border-brand-600 focus:ring-brand-600/20",
-                    !role && "text-text-muted"
+                      : "border-border hover:border-text-secondary focus:border-brand-600 focus:ring-brand-600/20"
                   )}
                 >
-                  <option value="" disabled>
-                    Select an operational role
-                  </option>
                   {INVITABLE_COMPANY_ROLE_DEFINITIONS.map((r) => (
                     <option key={r.role} value={r.role}>
                       {r.name}
@@ -168,10 +188,11 @@ export function InviteTeamMemberModal({
             type="submit"
             variant="primary"
             size="md"
+            disabled={isOwner}
             isLoading={isLoading}
-            loadingText="Adding..."
+            loadingText="Saving..."
           >
-            Add Member
+            Update Role
           </Button>
         </ModalFooter>
       </form>
@@ -179,5 +200,4 @@ export function InviteTeamMemberModal({
   );
 }
 
-export default InviteTeamMemberModal;
-
+export default EditTeamMemberRoleModal;

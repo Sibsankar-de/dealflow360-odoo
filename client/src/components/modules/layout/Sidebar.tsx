@@ -131,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Access Control",
-          href: `/access-control`,
+          href: `/company/${companyId}/app/access-control`,
           icon: <ShieldCheck className="w-4 h-4" />,
         },
       ],
