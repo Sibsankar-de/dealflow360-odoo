@@ -37,15 +37,22 @@ Users exist independently of companies.
 
 Any registered user can:
 
-* Log in.
-* View quotations sent to them.
-* Create companies.
-* Join companies.
-* Access companies where they have an assigned role.
+- Log in.
+- View quotations sent to them.
+- Create companies.
+- Join companies.
+- Access companies where they have an assigned role.
 
 By default every registered account receives:
 
 Role: User
+
+A registered user may act as both:
+
+- Customer receiving quotations.
+- Company member operating within one or more companies.
+
+The same account can simultaneously be a customer for one company and an employee or collaborator in another company.
 
 ---
 
@@ -170,14 +177,20 @@ Additional product attributes may be added later.
 
 Sales Representative creates quotation.
 
+Quotations can only be created for registered DealFlow360 users.
+
+The intended customer must already have an account on the platform.
+
+Sales Representatives cannot create quotations for arbitrary email addresses or external recipients.
+
 Quotation contains:
 
-* Customer
-* Products
-* Quantities
-* Pricing
-* Discounts
-* Notes
+- Customer User
+- Products
+- Quantities
+- Pricing
+- Discounts
+- Notes
 
 ---
 
