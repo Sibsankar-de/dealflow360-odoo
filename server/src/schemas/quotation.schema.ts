@@ -122,6 +122,49 @@ export const rejectQuotationSchema = z.object({
     .optional(),
 });
 
+export const counterOfferItemSchema = z.object({
+  quotationItemId: z.string().uuid("Invalid quotation item ID").optional(),
+  productId: z.string().uuid("Invalid product ID").optional(),
+  requestedQuantity: z
+    .number()
+    .positive("Quantity must be greater than 0")
+    .optional(),
+  requestedUnitPrice: z
+    .number()
+    .nonnegative("Unit price cannot be negative")
+    .optional(),
+  requestedDiscountType: z
+    .nativeEnum(DiscountType)
+    .default(DiscountType.PERCENTAGE)
+    .optional(),
+  requestedDiscountValue: z
+    .number()
+    .nonnegative("Discount value cannot be negative")
+    .default(0)
+    .optional(),
+});
+
+export const submitCounterOfferSchema = z.object({
+  message: z
+    .string()
+    .max(2000, "Message cannot exceed 2000 characters")
+    .optional()
+    .nullable(),
+  proposedPrice: z
+    .number()
+    .nonnegative("Proposed price cannot be negative")
+    .optional(),
+  proposedDiscount: z
+    .number()
+    .nonnegative("Proposed discount cannot be negative")
+    .optional(),
+  discountType: z
+    .nativeEnum(DiscountType)
+    .default(DiscountType.PERCENTAGE)
+    .optional(),
+  items: z.array(counterOfferItemSchema).optional(),
+});
+
 export const dealQuotationsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
@@ -139,3 +182,5 @@ export type QuotationFilterInput = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationInput = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryInput = z.infer<typeof dealQuotationsQuerySchema>;
+export type CounterOfferItemInput = z.infer<typeof counterOfferItemSchema>;
+export type SubmitCounterOfferInput = z.infer<typeof submitCounterOfferSchema>;
