@@ -1,0 +1,27 @@
+enum CompanyStatus {
+  ACTIVE
+  DELETED
+  SUSPENDED
+}
+
+model Company {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  ownerId     String        @db.Uuid
+  currency    String        @default("USD")
+  status      CompanyStatus @default(ACTIVE)
+  country     String
+  postalCode  String        @map("postal_code")
+  addressLine String        @map("address_line")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  owner        User          @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  companyUsers CompanyUser[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("companies")
+}
