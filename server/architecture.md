@@ -176,6 +176,7 @@ Responsibilities:
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
 - Provide paginated company listing (GET /api/v1/companies) scoped to the authenticated user's memberships and ownerships with assigned userRole, search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
 - Provide company role definition endpoint (GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
+- Provide paginated customer listing endpoint (GET /api/v1/customers/:companyId and GET /api/v1/companies/:id/customers) returning all customers associated with the company, supporting search by name or email, filtering by customer tier, and pagination.
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context
