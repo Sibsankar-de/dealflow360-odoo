@@ -58,6 +58,7 @@ src/
 │       ├── fulfillment/  # Delivery tracking, backorders
 │       ├── finance/      # Invoices, financial approvals
 │       ├── customers/    # Customer directory and interaction history
+│       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
 │       └── company/      # Team, roles, product management
 ├── context/              # React Context Providers (AuthContext.tsx, AuthProvider)
 ├── hooks/                # Reusable custom React hooks
