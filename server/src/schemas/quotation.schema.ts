@@ -172,6 +172,13 @@ export const dealQuotationsQuerySchema = z.object({
   search: z.string().optional(),
 });
 
+export const acceptQuotationSchema = z.object({
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+});
+
 export const approveQuotationSchema = z.object({
   offerId: z.string().uuid("Invalid offer ID").optional(),
   notes: z
@@ -215,5 +222,6 @@ export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryInput = z.infer<typeof dealQuotationsQuerySchema>;
 export type CounterOfferItemInput = z.infer<typeof counterOfferItemSchema>;
 export type SubmitCounterOfferInput = z.infer<typeof submitCounterOfferSchema>;
+export type AcceptQuotationInput = z.infer<typeof acceptQuotationSchema>;
 export type ApproveQuotationInput = z.infer<typeof approveQuotationSchema>;
 export type FulfillQuotationInput = z.infer<typeof fulfillQuotationSchema>;

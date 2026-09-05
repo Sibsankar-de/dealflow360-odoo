@@ -38,6 +38,7 @@ import {
   dealQuotationsQuerySchema,
   counterOfferItemSchema,
   submitCounterOfferSchema,
+  acceptQuotationSchema,
   approveQuotationSchema,
   fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
@@ -52,6 +53,7 @@ export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryDto = z.infer<typeof dealQuotationsQuerySchema>;
 export type CounterOfferItemDto = z.infer<typeof counterOfferItemSchema>;
 export type SubmitCounterOfferDto = z.infer<typeof submitCounterOfferSchema>;
+export type AcceptQuotationDto = z.infer<typeof acceptQuotationSchema>;
 export type ApproveQuotationDto = z.infer<typeof approveQuotationSchema>;
 export type FulfillQuotationDto = z.infer<typeof fulfillQuotationSchema>;
 

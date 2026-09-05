@@ -68,6 +68,10 @@ router.post(
 // Customer status updates (accept, reject, negotiate).
 router.patch("/:companyId/:id/status", quotationController.updateStatus);
 
+// Customer quotation acceptance / approval.
+router.post("/:companyId/:id/accept", quotationController.customerApprove);
+router.post("/:companyId/:id/customer-approve", quotationController.customerApprove);
+
 // Cancel quotation.
 router.post(
   "/:companyId/:id/cancel",

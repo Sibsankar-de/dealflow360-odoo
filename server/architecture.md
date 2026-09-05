@@ -474,7 +474,7 @@ Based on the evaluated blended violation score and maximum line violation, quota
 #### Internal Quotation Approval (POST /api/v1/quotations/:companyId/:id/approve):
 - Allows company reviewers (ADMIN, SALES_MANAGER, FINANCE_MANAGER) to approve a pending negotiation counter-offer.
 - Validates that the reviewer holds the necessary role for the evaluated risk tier (SALES_MANAGER or ADMIN for Mid Risk, FINANCE_MANAGER or ADMIN for High Risk).
-- Upon approval, the pending offer is marked ACCEPTED, the quotation items are updated to reflect the accepted offer lines, the quotation status transitions to ACCEPTED, and the parent Deal stage advances to CLOSING.
+- Upon approval, the pending offer is marked ACCEPTED, the quotation items are updated to reflect the accepted offer lines, and the quotation status transitions to ACCEPTED.
 
 ### Step 6: Customer Review, Negotiation, Re-Negotiation, and Acceptance
 
@@ -498,8 +498,11 @@ The customer reviews the quotation through authenticated endpoints:
 - The server verifies customer authorization and company membership.
 - Rejection closes open negotiations, marks pending offers as REJECTED, updates the current revision with the rejection reason in customerNote, and transitions quotation status to REJECTED.
 
-#### Customer Acceptance:
-- Customer accepts the quotation (PATCH /api/v1/quotations/:companyId/:id/status with status ACCEPTED).
+#### Customer Acceptance / Approval (POST /api/v1/quotations/:companyId/:id/accept or POST /api/v1/quotations/:companyId/:id/customer-approve):
+- Customer accepts the proposal (or PATCH /api/v1/quotations/:companyId/:id/status with status ACCEPTED).
+- Invariant: A quotation currently under negotiation (status NEGOTIATING) cannot be approved by the customer. The customer must wait for internal review or proposal resolution.
+- Acceptance requires the quotation to be in SENT status and within its validity period (validUntil).
+- Upon acceptance, quotation status transitions to ACCEPTED, and the current revision is marked ACCEPTED with optional customer notes.
 - Accepted quotations progress into fulfillment review and sales order confirmation.
 - Only an accepted quotation should progress into a confirmed sales order.
 

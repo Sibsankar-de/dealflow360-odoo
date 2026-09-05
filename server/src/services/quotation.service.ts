@@ -940,6 +940,34 @@ export class QuotationService {
       }
 
       if (status === QuotationStatus.ACCEPTED) {
+        if (quotation.status === QuotationStatus.ACCEPTED) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            "Quotation has already been accepted",
+          );
+        }
+
+        if (quotation.status === QuotationStatus.NEGOTIATING) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            "Cannot approve quotation while it is under negotiation. Please wait for internal review or conclusion of the negotiation.",
+          );
+        }
+
+        if (quotation.status !== QuotationStatus.SENT) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Cannot approve a quotation with status ${quotation.status}. Quotation must be in SENT status to be accepted by customer.`,
+          );
+        }
+
+        if (quotation.validUntil && new Date(quotation.validUntil) < new Date()) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            "Quotation has expired and can no longer be accepted",
+          );
+        }
+
         if (quotation.currentRevisionId) {
           await tx.quotationRevision.update({
             where: { id: quotation.currentRevisionId },
@@ -971,6 +999,76 @@ export class QuotationService {
         status,
         tx,
       );
+      return toQuotationDto(updated);
+    });
+  }
+
+  public async customerApproveQuotation(
+    companyId: string,
+    quotationId: string,
+    requestingUserId: string,
+    notes?: string,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation || quotation.companyId !== companyId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (quotation.customerId !== requestingUserId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Only the designated customer can approve this quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Quotation has already been accepted",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.NEGOTIATING) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot approve quotation while it is under negotiation. Please wait for the negotiation review to conclude or submit a counter proposal.",
+        );
+      }
+
+      if (quotation.status !== QuotationStatus.SENT) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Cannot approve a quotation with status ${quotation.status}. Quotation must be in SENT status to be accepted by the customer.`,
+        );
+      }
+
+      if (quotation.validUntil && new Date(quotation.validUntil) < new Date()) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Quotation has expired and can no longer be accepted",
+        );
+      }
+
+      if (quotation.currentRevisionId) {
+        await tx.quotationRevision.update({
+          where: { id: quotation.currentRevisionId },
+          data: {
+            status: RevisionStatus.ACCEPTED,
+            customerNote:
+              notes || quotation.currentRevision?.customerNote || null,
+          },
+        });
+      }
+
+      const updated = await this.quotationRepo.update(
+        quotationId,
+        {
+          status: QuotationStatus.ACCEPTED,
+        },
+        tx,
+      );
+
       return toQuotationDto(updated);
     });
   }

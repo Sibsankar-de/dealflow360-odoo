@@ -17,6 +17,7 @@ import {
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
   submitCounterOfferSchema,
+  acceptQuotationSchema,
   approveQuotationSchema,
   fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
@@ -324,6 +325,52 @@ export class QuotationController {
         ),
       );
   });
+
+  public customerApprove = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const companyId =
+      req.company?.id ||
+      (typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined);
+
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const validated =
+      req.body && Object.keys(req.body).length > 0
+        ? validateBody(acceptQuotationSchema, req.body)
+        : {};
+
+    const quotation = await this.quotationService.customerApproveQuotation(
+      companyId,
+      quotationId,
+      userId,
+      validated.notes,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation },
+          "Quotation approved and accepted successfully by customer",
+        ),
+      );
+  });
+
+  public accept = this.customerApprove;
 
   public cancel = asyncHandler(async (req: Request, res: Response) => {
     const quotationId = req.params.quotationId || req.params.id;
