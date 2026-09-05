@@ -2,20 +2,29 @@
 
 import React, { useState } from "react";
 import { clsx } from "clsx";
-import { Mail, ChevronDown, AlertCircle } from "lucide-react";
+import { ChevronDown, AlertCircle, User, Check } from "lucide-react";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { SearchableInput } from "@/components/ui/SearchableInput";
 import {
   INVITABLE_COMPANY_ROLE_DEFINITIONS,
   BackendCompanyRole,
 } from "@/types/accesscontrol";
-import { useAddCompanyMemberMutation } from "@/store/features/company/companyApi";
+import { useAddCompanyMemberMutation, useGetCompanyMembersQuery } from "@/store/features/company/companyApi";
+import { useGetCustomersQuery } from "@/store/features/customer/customerApi";
 
 interface InviteTeamMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
   companyId: string;
+}
+
+interface MemberSearchItem {
+  id: string;
+  label: string;
+  value: string;
+  name: string;
+  role?: string;
 }
 
 export function InviteTeamMemberModal({
@@ -30,6 +39,47 @@ export function InviteTeamMemberModal({
   const [serverError, setServerError] = useState("");
 
   const [addCompanyMember, { isLoading }] = useAddCompanyMemberMutation();
+
+  const { data: memberData } = useGetCompanyMembersQuery(companyId, {
+    skip: !isOpen || !companyId,
+  });
+
+  const { data: customerData, isFetching: isSearching } = useGetCustomersQuery(
+    {
+      companyId,
+      params: { search: email.trim(), limit: 5 },
+    },
+    { skip: !isOpen || !companyId || email.trim().length < 2 }
+  );
+
+  const existingMembers = memberData?.data?.members ?? [];
+  const customerMatches = customerData?.data?.docs ?? [];
+
+  // Filter matched candidates from both customers and members
+  const matchedUsers: MemberSearchItem[] = [
+    ...customerMatches.map((c) => ({
+      id: c.id,
+      label: c.email,
+      value: c.email,
+      name: c.name || "Customer",
+      role: c.role || "Customer",
+    })),
+    ...existingMembers
+      .filter((m) => {
+        const query = email.toLowerCase().trim();
+        if (!query) return false;
+        const matchesEmail = m.user?.email?.toLowerCase().includes(query);
+        const matchesName = m.user?.userName?.toLowerCase().includes(query);
+        return matchesEmail || matchesName;
+      })
+      .map((m) => ({
+        id: m.userId,
+        label: m.user?.email || "",
+        value: m.user?.email || "",
+        name: m.user?.userName || m.user?.email?.split("@")[0] || "User",
+        role: m.role,
+      })),
+  ].filter((user, index, self) => index === self.findIndex((u) => u.value.toLowerCase() === user.value.toLowerCase()));
 
   const validateEmail = (value: string) => {
     if (!value.trim()) return "Email address is required.";
@@ -99,19 +149,54 @@ export function InviteTeamMemberModal({
               </div>
             )}
 
-            <Input
+            <SearchableInput<MemberSearchItem>
               label="User Email Address"
               type="email"
               placeholder="colleague@company.com"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError(validateEmail(e.target.value));
+              onChange={(val) => {
+                setEmail(val);
+                if (emailError) setEmailError(validateEmail(val));
                 if (serverError) setServerError("");
               }}
-              leftIcon={<Mail className="w-4 h-4" />}
+              onSelect={(item) => {
+                setEmail(item.value);
+                if (emailError) setEmailError(validateEmail(item.value));
+                if (serverError) setServerError("");
+              }}
+              items={matchedUsers}
+              isLoading={isSearching}
+              emptyMessage="No matching accounts found"
               error={emailError}
               required
+              renderItem={(item) => (
+                <div className="flex items-center justify-between gap-3 text-xs w-full py-0.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 font-bold text-[11px] shrink-0">
+                      {item.name ? item.name.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-text-primary truncate">
+                        {item.name}
+                      </p>
+                      <p className="text-text-muted truncate text-[11px]">
+                        {item.value}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.role && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-text-secondary font-medium">
+                        {item.role}
+                      </span>
+                    )}
+                    {email.toLowerCase() === item.value.toLowerCase() && (
+                      <Check className="w-4 h-4 text-brand-600" />
+                    )}
+                  </div>
+                </div>
+              )}
             />
 
             <div className="flex flex-col gap-1.5 w-full">
@@ -180,4 +265,5 @@ export function InviteTeamMemberModal({
 }
 
 export default InviteTeamMemberModal;
+
 

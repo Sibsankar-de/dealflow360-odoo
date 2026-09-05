@@ -5,6 +5,7 @@ import {
   CreateDealRequest,
   UpdateDealRequest,
   ListDealsQuery,
+  ListCustomerDealsQuery,
   ListDealQuotationsQuery,
   DealListData,
 } from "@/types/deal";
@@ -27,6 +28,22 @@ export const dealApi = baseApi.injectEndpoints({
       providesTags: ["Deal"],
     }),
 
+    getCustomerDeals: builder.query<
+      ApiResponse<DealListData>,
+      { companyId?: string; params?: ListCustomerDealsQuery } | void
+    >({
+      query: (arg) => {
+        const companyId = arg && typeof arg === "object" ? arg.companyId : undefined;
+        const params = arg && typeof arg === "object" ? arg.params : undefined;
+        return {
+          url: companyId ? `/deals/customer/${companyId}` : "/deals/customer",
+          method: "GET",
+          params,
+        };
+      },
+      providesTags: ["Deal"],
+    }),
+
     getDealById: builder.query<
       ApiResponse<{ deal: DealResponseType }>,
       { companyId: string; id: string }
@@ -38,12 +55,38 @@ export const dealApi = baseApi.injectEndpoints({
       providesTags: (_result, _error, { id }) => [{ type: "Deal", id }],
     }),
 
+    getCustomerDealById: builder.query<
+      ApiResponse<{ deal: DealResponseType }>,
+      { companyId: string; id: string }
+    >({
+      query: ({ companyId, id }) => ({
+        url: `/deals/customer/${companyId}/${id}`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, { id }) => [{ type: "Deal", id }],
+    }),
+
     getDealQuotations: builder.query<
       ApiResponse<{ docs: QuotationResponse[]; total: number; page: number; limit: number; totalPages: number }>,
       { companyId: string; dealId: string; params?: ListDealQuotationsQuery }
     >({
       query: ({ companyId, dealId, params }) => ({
         url: `/deals/${companyId}/${dealId}/quotations`,
+        method: "GET",
+        params,
+      }),
+      providesTags: (_result, _error, { dealId }) => [
+        "Quotation",
+        { type: "Deal", id: dealId },
+      ],
+    }),
+
+    getCustomerDealQuotations: builder.query<
+      ApiResponse<{ docs: QuotationResponse[]; total: number; page: number; limit: number; totalPages: number }>,
+      { companyId: string; dealId: string; params?: ListDealQuotationsQuery }
+    >({
+      query: ({ companyId, dealId, params }) => ({
+        url: `/deals/customer/${companyId}/${dealId}/quotations`,
         method: "GET",
         params,
       }),
@@ -119,9 +162,9 @@ export const dealApi = baseApi.injectEndpoints({
         data: Record<string, unknown>;
       }
     >({
-      query: ({ quotationId, data }) => ({
-        url: `/quotations/${quotationId}/revisions`,
-        method: "POST",
+      query: ({ companyId, quotationId, data }) => ({
+        url: `/quotations/${companyId}/${quotationId}`,
+        method: "PATCH",
         body: data,
       }),
       invalidatesTags: (_result, _error, { dealId, quotationId }) => [
@@ -137,8 +180,17 @@ export const dealApi = baseApi.injectEndpoints({
 
 export const {
   useGetDealsQuery,
+  useLazyGetDealsQuery,
+  useGetCustomerDealsQuery,
+  useLazyGetCustomerDealsQuery,
   useGetDealByIdQuery,
+  useLazyGetDealByIdQuery,
+  useGetCustomerDealByIdQuery,
+  useLazyGetCustomerDealByIdQuery,
   useGetDealQuotationsQuery,
+  useLazyGetDealQuotationsQuery,
+  useGetCustomerDealQuotationsQuery,
+  useLazyGetCustomerDealQuotationsQuery,
   useCreateDealMutation,
   useUpdateDealMutation,
   useDeleteDealMutation,

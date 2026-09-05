@@ -47,9 +47,7 @@ export default function AccessControlPage() {
   });
 
   const company = companyData?.data?.company;
-  const rawMembers: CompanyMemberType[] = useMemo(() => {
-    return membersData?.data?.members || [];
-  }, [membersData]);
+  const rawMembers: CompanyMemberType[] = membersData?.data?.members ?? [];
 
   // Modal States
   const [isInviteOpen, setIsInviteOpen] = useState(false);

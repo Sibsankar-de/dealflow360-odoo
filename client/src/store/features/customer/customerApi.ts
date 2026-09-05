@@ -55,6 +55,7 @@ export const customerApi = baseApi.injectEndpoints({
 
 export const {
   useGetCustomersQuery,
+  useLazyGetCustomersQuery,
   useGetCustomerByIdQuery,
   useAddCustomerMutation,
 } = customerApi;

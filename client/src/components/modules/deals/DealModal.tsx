@@ -50,14 +50,7 @@ export const DealModal: React.FC<DealModalProps> = ({
     { companyId },
     { skip: !isOpen || !companyId }
   );
-  const customers = React.useMemo(() => {
-    if (!customerData?.data) return [];
-    const raw = customerData.data;
-    if (Array.isArray(raw)) return raw;
-    if ("docs" in raw && Array.isArray(raw.docs)) return raw.docs;
-    if ("customers" in raw && Array.isArray(raw.customers)) return raw.customers;
-    return [];
-  }, [customerData]);
+  const customers = customerData?.data?.docs ?? [];
 
 
   const [name, setName] = useState(deal?.name || "");

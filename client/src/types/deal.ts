@@ -45,10 +45,7 @@ export interface PaginatedDealsResponse {
   totalPages: number;
 }
 
-export type DealListData =
-  | PaginatedDealsResponse
-  | { deals: DealResponseType[] }
-  | DealResponseType[];
+export type DealListData = PaginatedDealsResponse;
 
 export interface CreateDealRequest {
   customerId: string;
@@ -74,6 +71,15 @@ export interface UpdateDealRequest {
 export interface ListDealsQuery {
   customerId?: string;
   salesRepId?: string;
+  stage?: DealStage;
+  status?: DealStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListCustomerDealsQuery {
+  companyId?: string;
   stage?: DealStage;
   status?: DealStatus;
   search?: string;

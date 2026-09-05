@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import { WarehouseList } from "@/components/modules/warehouses";
 import { useGetWarehousesQuery } from "@/store/features/warehouse/warehouseApi";
@@ -12,20 +12,16 @@ export default function WarehousesPage() {
       ? params["company-id"]
       : "";
 
+  const [page, setPage] = useState(1);
+
   const { data, isLoading } = useGetWarehousesQuery(
-    { companyId },
+    { companyId, params: { page, limit: 10 } },
     { skip: !companyId }
   );
 
-  const warehouses = React.useMemo(() => {
-    if (!data?.data) return [];
-    const rawData = data.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("warehouses" in rawData && Array.isArray(rawData.warehouses)) {
-      return rawData.warehouses;
-    }
-    return [];
-  }, [data]);
+  const warehouses = data?.data?.warehouses ?? [];
+  const total = data?.data?.total ?? 0;
+  const totalPages = Math.ceil(total / 10) || 1;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -33,7 +29,11 @@ export default function WarehousesPage() {
         warehouses={warehouses}
         companyId={companyId}
         isLoading={isLoading}
+        currentPage={page}
+        totalPage={totalPages}
+        onPageChange={setPage}
       />
     </div>
   );
 }
+

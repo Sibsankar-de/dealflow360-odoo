@@ -5,10 +5,14 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Building2, Plus } from "lucide-react";
 import { CompanyCard } from "./CompanyCard";
+import { Pagination } from "@/components/ui/Pagination";
 
 export interface CompanyListProps {
   companies: CompanyAffiliation[];
   isLoading?: boolean;
+  currentPage?: number;
+  totalPage?: number;
+  onPageChange?: (page: number) => void;
   onViewCompany?: (company: CompanyAffiliation) => void;
   onCreateCompany?: () => void;
 }
@@ -16,6 +20,9 @@ export interface CompanyListProps {
 export const CompanyList: React.FC<CompanyListProps> = ({
   companies,
   isLoading = false,
+  currentPage = 1,
+  totalPage = 1,
+  onPageChange,
   onViewCompany,
   onCreateCompany,
 }) => {
@@ -76,10 +83,22 @@ export const CompanyList: React.FC<CompanyListProps> = ({
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 mt-6">
-          {companies.map((company) => (
-            <CompanyCard key={company.id} company={company} onView={onViewCompany} />
-          ))}
+        <div className="space-y-5 mt-6">
+          <div className="flex flex-col gap-3">
+            {companies.map((company) => (
+              <CompanyCard key={company.id} company={company} onView={onViewCompany} />
+            ))}
+          </div>
+
+          {totalPage > 1 && (
+            <div className="pt-2 border-t border-border flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPage={totalPage}
+                onPageChange={onPageChange}
+              />
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -87,3 +106,4 @@ export const CompanyList: React.FC<CompanyListProps> = ({
 };
 
 export default CompanyList;
+

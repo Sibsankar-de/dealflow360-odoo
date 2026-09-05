@@ -7,6 +7,7 @@ import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
 import { DealModal } from "./DealModal";
 import { DeleteDealModal } from "./DeleteDealModal";
 import {
@@ -25,6 +26,9 @@ interface DealListProps {
   deals: DealResponseType[];
   companyId: string;
   isLoading?: boolean;
+  currentPage?: number;
+  totalPage?: number;
+  onPageChange?: (page: number) => void;
 }
 
 const STAGE_COLORS: Record<DealStage, BadgeVariant> = {
@@ -41,6 +45,9 @@ export const DealList: React.FC<DealListProps> = ({
   deals,
   companyId,
   isLoading = false,
+  currentPage = 1,
+  totalPage = 1,
+  onPageChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("ALL");
@@ -171,7 +178,7 @@ export const DealList: React.FC<DealListProps> = ({
                   <th className="py-3.5 px-4">Customer</th>
                   <th className="py-3.5 px-4">Stage</th>
                   <th className="py-3.5 px-4">Expected Value</th>
-                  <th className="py-3.5 px-4">Quotations</th>
+                  {/* <th className="py-3.5 px-4">Quotations</th> */}
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -183,7 +190,7 @@ export const DealList: React.FC<DealListProps> = ({
                   >
                     <td className="py-3.5 px-4">
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}`}
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
                         className="font-semibold text-text-primary hover:text-brand-600 transition-colors flex items-center gap-1.5"
                       >
                         {deal.name}
@@ -224,14 +231,14 @@ export const DealList: React.FC<DealListProps> = ({
                         <span>{deal.probability}% win probability</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4">
+                    {/* <td className="py-3.5 px-4">
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}`}
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
                       >
                         <span>{deal.quotationsCount ?? deal.quotations?.length ?? 0} Quotes</span>
                       </Link>
-                    </td>
+                    </td> */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5 opacity-90 group-hover:opacity-100">
                         <Button
@@ -261,6 +268,17 @@ export const DealList: React.FC<DealListProps> = ({
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPage > 1 && (
+        <div className="pt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPage={totalPage}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
 
       {/* Modals */}
       <DealModal

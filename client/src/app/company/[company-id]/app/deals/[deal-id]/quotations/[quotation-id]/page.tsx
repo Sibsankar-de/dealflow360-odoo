@@ -64,6 +64,12 @@ export default function QuotationEditorPage() {
 
   const isNew = quotationId === "new";
 
+  const [createQuotation, { isLoading: isCreating }] =
+    useCreateQuotationMutation();
+  const [updateQuotation, { isLoading: isUpdating }] =
+    useUpdateQuotationMutation();
+  const [sendQuotation, { isLoading: isSending }] = useSendQuotationMutation();
+
   const { data: dealData, isLoading: isLoadingDeal } = useGetDealByIdQuery(
     { companyId, id: dealId },
     { skip: !companyId || !dealId }
@@ -73,29 +79,18 @@ export default function QuotationEditorPage() {
   const {
     data: quoteData,
     isLoading: isLoadingQuote,
-  } = useGetQuotationByIdQuery(quotationId, {
-    skip: isNew || !quotationId,
-  });
+  } = useGetQuotationByIdQuery(
+    { companyId, id: quotationId },
+    {
+      skip: isNew || !quotationId || !companyId,
+    }
+  );
   const existingQuotation = quoteData?.data?.quotation;
 
   const { data: productData, isLoading: isLoadingProducts } =
     useGetProductsQuery({ companyId }, { skip: !companyId });
 
-  const products = React.useMemo(() => {
-    if (!productData?.data) return [];
-    const rawData = productData.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("products" in rawData && Array.isArray(rawData.products)) {
-      return rawData.products;
-    }
-    return [];
-  }, [productData]);
-
-  const [createQuotation, { isLoading: isCreating }] =
-    useCreateQuotationMutation();
-  const [updateQuotation, { isLoading: isUpdating }] =
-    useUpdateQuotationMutation();
-  const [sendQuotation, { isLoading: isSending }] = useSendQuotationMutation();
+  const products = productData?.data?.products ?? [];
 
   const [items, setItems] = useState<LineItemState[]>([]);
   const [currency, setCurrency] = useState("USD");
@@ -273,11 +268,25 @@ export default function QuotationEditorPage() {
 
         const createdQuotation = response.data?.quotation;
 
-        if (action === "send" && createdQuotation?.id) {
-          await sendQuotation(createdQuotation.id).unwrap();
-          setNotification("Quotation created and sent successfully!");
-        } else {
-          setNotification("Quotation draft saved successfully!");
+        if (createdQuotation?.id) {
+          await updateQuotation({
+            companyId,
+            id: createdQuotation.id,
+            data: {
+              currency,
+              validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+              customerNote: customerNote.trim() || null,
+              internalNote: internalNote.trim() || null,
+              items: lineItemPayload,
+            },
+          }).unwrap();
+
+          if (action === "send") {
+            await sendQuotation({ companyId, id: createdQuotation.id }).unwrap();
+            setNotification("Quotation created and sent successfully!");
+          } else {
+            setNotification("Quotation draft saved successfully!");
+          }
         }
       } else {
         const updatePayload = {
@@ -289,12 +298,13 @@ export default function QuotationEditorPage() {
         };
 
         await updateQuotation({
+          companyId,
           id: quotationId,
           data: updatePayload,
         }).unwrap();
 
         if (action === "send") {
-          await sendQuotation(quotationId).unwrap();
+          await sendQuotation({ companyId, id: quotationId }).unwrap();
           setNotification("Quotation updated and sent successfully!");
         } else {
           setNotification("Quotation changes saved successfully!");
@@ -313,6 +323,8 @@ export default function QuotationEditorPage() {
       setError(errorMsg);
     }
   };
+
+
 
   if (isLoadingDeal || isLoadingProducts || (!isNew && isLoadingQuote)) {
     return (
@@ -344,6 +356,7 @@ export default function QuotationEditorPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+
       {/* Notifications and Alerts */}
       {notification && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">

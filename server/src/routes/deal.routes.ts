@@ -19,6 +19,11 @@ router.use(verifyAuth);
 // Customer deal listing routes (scoped by authenticated user as customerId)
 router.get("/customer", dealController.listCustomerDeals);
 router.get("/customer/:companyId", dealController.listCustomerDeals);
+router.get("/customer/:companyId/:id", dealController.getCustomerDealById);
+router.get(
+  "/customer/:companyId/:dealId/quotations",
+  dealController.listCustomerDealQuotations,
+);
 
 // Company-scoped deal management routes
 router.use("/:companyId", verifyCompanyAccess);

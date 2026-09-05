@@ -39,10 +39,9 @@ export interface PaginatedCompaniesResponse {
   totalPages: number;
 }
 
-export type UserCompaniesData =
-  | { companies: CompanyResponseType[] }
-  | PaginatedCompaniesResponse
-  | CompanyResponseType[];
+export interface UserCompaniesData {
+  companies: CompanyResponseType[];
+}
 
 export interface CompanyMemberType {
   id: string;
@@ -68,6 +67,23 @@ export interface CreateCompanyRequest {
   currency?: string;
 }
 
+export interface UpdateCompanyRequest {
+  name?: string;
+  country?: string;
+  postalCode?: string;
+  addressLine?: string;
+  currency?: string;
+  status?: CompanyStatusType;
+}
+
+export interface UpdateCompanySettingRequest {
+  customerDiscountTier?: {
+    BRONZE?: number;
+    SILVER?: number;
+    GOLD?: number;
+  };
+}
+
 export interface AddCompanyUserRequest {
   userEmail: string;
   role: BackendCompanyRole;
@@ -83,5 +99,6 @@ export interface CompanyRoleDefinition {
   name: string;
   description: string;
 }
+
 
 

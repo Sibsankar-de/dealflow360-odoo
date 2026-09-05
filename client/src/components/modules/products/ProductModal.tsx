@@ -34,15 +34,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     { skip: !isOpen || !companyId }
   );
 
-  const warehouses = React.useMemo(() => {
-    if (!warehouseData?.data) return [];
-    const rawData = warehouseData.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("warehouses" in rawData && Array.isArray(rawData.warehouses)) {
-      return rawData.warehouses;
-    }
-    return [];
-  }, [warehouseData]);
+  const warehouses = warehouseData?.data?.warehouses ?? [];
 
   const [name, setName] = useState(product?.name || "");
   const [description, setDescription] = useState(product?.description || "");

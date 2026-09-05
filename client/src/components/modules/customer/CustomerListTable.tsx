@@ -4,6 +4,7 @@ import { Eye, Search, Plus, User, Shield } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Pagination } from "@/components/ui/Pagination";
 import { CustomerResponseType, CustomerTier } from "@/types/customer";
 
 export interface CustomerListTableProps {
@@ -11,6 +12,9 @@ export interface CustomerListTableProps {
   isLoading?: boolean;
   onViewCustomer: (customer: CustomerResponseType) => void;
   onCreateCustomer: () => void;
+  currentPage?: number;
+  totalPage?: number;
+  onPageChange?: (page: number) => void;
   onSearchChange?: (search: string) => void;
   onTierChange?: (tier: CustomerTier | undefined) => void;
   className?: string;
@@ -21,6 +25,9 @@ export const CustomerListTable: React.FC<CustomerListTableProps> = ({
   isLoading,
   onViewCustomer,
   onCreateCustomer,
+  currentPage = 1,
+  totalPage = 1,
+  onPageChange,
   onSearchChange,
   className,
 }) => {
@@ -157,8 +164,20 @@ export const CustomerListTable: React.FC<CustomerListTableProps> = ({
           </tbody>
         </table>
       </CardContent>
+
+      {/* Pagination Footer */}
+      {totalPage > 1 && (
+        <div className="px-6 py-4 border-t border-border bg-card flex justify-center">
+          <Pagination
+            currentPage={currentPage}
+            totalPage={totalPage}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
     </Card>
   );
 };
 
 export default CustomerListTable;
+

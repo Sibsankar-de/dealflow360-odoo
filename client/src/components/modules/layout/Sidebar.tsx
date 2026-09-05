@@ -164,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <>
               <Link
-                href={`/company/${companyId}/app/quotations`}
+                href={`/company/${companyId}/app/dashboard`}
                 className="flex items-center min-w-0 hover:opacity-90 transition-opacity"
               >
                 <AppLogo

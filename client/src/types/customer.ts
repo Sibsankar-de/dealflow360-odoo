@@ -23,10 +23,7 @@ export interface PaginatedCustomersResponse {
   totalPages: number;
 }
 
-export type CustomerListData =
-  | PaginatedCustomersResponse
-  | { customers: CustomerResponseType[] }
-  | CustomerResponseType[];
+export type CustomerListData = PaginatedCustomersResponse;
 
 export interface ListCustomersQuery {
   page?: number;

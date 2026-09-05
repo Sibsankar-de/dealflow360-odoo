@@ -62,6 +62,41 @@ export interface QuotationRevisionDetail {
   items?: QuotationRevisionItemDetail[];
 }
 
+export interface NegotiationOfferItemDetail {
+  id: string;
+  negotiationOfferId: string;
+  quotationItemId: string | null;
+  productId: string;
+  productName?: string;
+  requestedQuantity: number;
+  requestedUnitPrice: number;
+  requestedDiscountType: DiscountType;
+  requestedDiscountValue: number;
+  requestedLineTotal: number;
+}
+
+export interface NegotiationOfferDetail {
+  id: string;
+  negotiationId: string;
+  baseRevisionId: string | null;
+  offeredBy: "CUSTOMER" | "SALES";
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "SUPERSEDED";
+  message: string | null;
+  createdAt: string;
+  items?: NegotiationOfferItemDetail[];
+}
+
+export interface NegotiationDetail {
+  id: string;
+  quotationId: string;
+  status: "OPEN" | "CLOSED";
+  startedAt: string;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  offers?: NegotiationOfferDetail[];
+}
+
 export interface QuotationResponse {
   id: string;
   companyId: string;
@@ -82,6 +117,7 @@ export interface QuotationResponse {
   items?: QuotationItemDetail[];
   currentRevision?: QuotationRevisionDetail;
   revisions?: QuotationRevisionDetail[];
+  negotiations?: NegotiationDetail[];
   customer?: UserResponseType;
   salesRep?: UserResponseType;
 }
@@ -117,6 +153,14 @@ export interface UpdateQuotationRequest {
   internalNote?: string | null;
   discountAmount?: number;
   status?: QuotationStatus;
+}
+
+export interface PaginatedQuotationsResponse {
+  docs: QuotationResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface QuotationItem {

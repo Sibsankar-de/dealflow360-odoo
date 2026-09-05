@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { useGetProductsQuery } from "@/store/features/product/productApi";
 import { useCreateDealQuotationMutation } from "@/store/features/deal/dealApi";
+import { useUpdateQuotationMutation } from "@/store/features/quotation/quotationApi";
 import { Plus, Trash2 } from "lucide-react";
 
 interface CreateQuotationModalProps {
@@ -34,20 +35,15 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
   dealId,
   customerId,
 }) => {
-  const [createQuotation, { isLoading }] = useCreateDealQuotationMutation();
+  const [createQuotation, { isLoading: isCreating }] =
+    useCreateDealQuotationMutation();
+  const [updateQuotation, { isLoading: isUpdating }] =
+    useUpdateQuotationMutation();
   const { data: productData } = useGetProductsQuery(
     { companyId },
     { skip: !isOpen || !companyId }
   );
-  const products = React.useMemo(() => {
-    if (!productData?.data) return [];
-    const rawData = productData.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("products" in rawData && Array.isArray(rawData.products)) {
-      return rawData.products;
-    }
-    return [];
-  }, [productData]);
+  const products = productData?.data?.products ?? [];
 
   const [items, setItems] = useState<ItemState[]>([]);
   const [currency, setCurrency] = useState("USD");
@@ -140,7 +136,16 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
     }
 
     try {
-      await createQuotation({
+      const lineItemPayload = items.map((it) => ({
+        productId: it.productId,
+        quantity: Number(it.quantity) || 1,
+        unitPrice: Number(it.unitPrice) || 0,
+        discountType: it.discountType,
+        discountValue: Number(it.discountValue) || 0,
+        taxRate: Number(it.taxRate) || 0,
+      }));
+
+      const res = await createQuotation({
         companyId,
         dealId,
         data: {
@@ -151,16 +156,25 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
           validUntil: validUntil ? new Date(validUntil).toISOString() : null,
           customerNote: customerNote.trim() || null,
           internalNote: internalNote.trim() || null,
-          items: items.map((it) => ({
-            productId: it.productId,
-            quantity: Number(it.quantity) || 1,
-            unitPrice: Number(it.unitPrice) || 0,
-            discountType: it.discountType,
-            discountValue: Number(it.discountValue) || 0,
-            taxRate: Number(it.taxRate) || 0,
-          })),
+          items: lineItemPayload,
         },
       }).unwrap();
+
+      const created = res.data?.quotation;
+      if (created?.id) {
+        await updateQuotation({
+          companyId,
+          id: created.id,
+          data: {
+            currency,
+            validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+            customerNote: customerNote.trim() || null,
+            internalNote: internalNote.trim() || null,
+            items: lineItemPayload,
+          },
+        }).unwrap();
+      }
+
       onClose();
     } catch (err: unknown) {
       const errorMsg =
@@ -395,9 +409,9 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
           </Button>
           <Button
             type="submit"
-            isLoading={isLoading}
+            isLoading={isCreating || isUpdating}
             loadingText="Generating..."
-            disabled={items.length === 0}
+            disabled={isCreating || isUpdating || items.length === 0}
           >
             Create Quotation
           </Button>

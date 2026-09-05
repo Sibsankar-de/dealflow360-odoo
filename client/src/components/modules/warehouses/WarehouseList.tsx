@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { WarehouseModal } from "./WarehouseModal";
 import { DeleteWarehouseModal } from "./DeleteWarehouseModal";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   Warehouse as WarehouseIcon,
   Plus,
@@ -20,12 +21,18 @@ interface WarehouseListProps {
   warehouses: WarehouseResponseType[];
   companyId: string;
   isLoading?: boolean;
+  currentPage?: number;
+  totalPage?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export const WarehouseList: React.FC<WarehouseListProps> = ({
   warehouses,
   companyId,
   isLoading = false,
+  currentPage = 1,
+  totalPage = 1,
+  onPageChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] =
@@ -178,6 +185,17 @@ export const WarehouseList: React.FC<WarehouseListProps> = ({
         </div>
       )}
 
+      {/* Pagination */}
+      {totalPage > 1 && (
+        <div className="pt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPage={totalPage}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
+
       {/* Modals */}
       <WarehouseModal
         isOpen={isModalOpen}
@@ -197,3 +215,4 @@ export const WarehouseList: React.FC<WarehouseListProps> = ({
 };
 
 export default WarehouseList;
+
