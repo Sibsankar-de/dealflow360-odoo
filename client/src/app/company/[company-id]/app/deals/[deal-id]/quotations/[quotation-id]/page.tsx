@@ -73,9 +73,12 @@ export default function QuotationEditorPage() {
   const {
     data: quoteData,
     isLoading: isLoadingQuote,
-  } = useGetQuotationByIdQuery(quotationId, {
-    skip: isNew || !quotationId,
-  });
+  } = useGetQuotationByIdQuery(
+    { companyId, id: quotationId },
+    {
+      skip: isNew || !quotationId || !companyId,
+    }
+  );
   const existingQuotation = quoteData?.data?.quotation;
 
   const { data: productData, isLoading: isLoadingProducts } =
@@ -273,11 +276,25 @@ export default function QuotationEditorPage() {
 
         const createdQuotation = response.data?.quotation;
 
-        if (action === "send" && createdQuotation?.id) {
-          await sendQuotation(createdQuotation.id).unwrap();
-          setNotification("Quotation created and sent successfully!");
-        } else {
-          setNotification("Quotation draft saved successfully!");
+        if (createdQuotation?.id) {
+          await updateQuotation({
+            companyId,
+            id: createdQuotation.id,
+            data: {
+              currency,
+              validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+              customerNote: customerNote.trim() || null,
+              internalNote: internalNote.trim() || null,
+              items: lineItemPayload,
+            },
+          }).unwrap();
+
+          if (action === "send") {
+            await sendQuotation({ companyId, id: createdQuotation.id }).unwrap();
+            setNotification("Quotation created and sent successfully!");
+          } else {
+            setNotification("Quotation draft saved successfully!");
+          }
         }
       } else {
         const updatePayload = {
@@ -289,12 +306,13 @@ export default function QuotationEditorPage() {
         };
 
         await updateQuotation({
+          companyId,
           id: quotationId,
           data: updatePayload,
         }).unwrap();
 
         if (action === "send") {
-          await sendQuotation(quotationId).unwrap();
+          await sendQuotation({ companyId, id: quotationId }).unwrap();
           setNotification("Quotation updated and sent successfully!");
         } else {
           setNotification("Quotation changes saved successfully!");

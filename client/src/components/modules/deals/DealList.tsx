@@ -183,7 +183,7 @@ export const DealList: React.FC<DealListProps> = ({
                   >
                     <td className="py-3.5 px-4">
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}`}
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
                         className="font-semibold text-text-primary hover:text-brand-600 transition-colors flex items-center gap-1.5"
                       >
                         {deal.name}
@@ -226,7 +226,7 @@ export const DealList: React.FC<DealListProps> = ({
                     </td>
                     <td className="py-3.5 px-4">
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}`}
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
                       >
                         <span>{deal.quotationsCount ?? deal.quotations?.length ?? 0} Quotes</span>

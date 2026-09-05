@@ -162,7 +162,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
               {customerDeals.map((deal) => (
                 <Link
                   key={deal.id}
-                  href={`/company/${companyId}/app/deals/${deal.id}`}
+                  href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
                   className="block p-4 rounded-xl bg-surface border border-border hover:border-brand-500 hover:shadow-xs transition-all"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">

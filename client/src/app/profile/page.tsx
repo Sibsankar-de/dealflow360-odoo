@@ -84,7 +84,7 @@ export default function ProfilePage() {
   };
 
   const handleViewCompany = (company: CompanyAffiliation) => {
-    router.push(`/company/${company.id}/app/quotations`);
+    router.push(`/company/${company.id}/app/dashboard`);
   };
 
   return (

@@ -119,9 +119,9 @@ export const dealApi = baseApi.injectEndpoints({
         data: Record<string, unknown>;
       }
     >({
-      query: ({ quotationId, data }) => ({
-        url: `/quotations/${quotationId}/revisions`,
-        method: "POST",
+      query: ({ companyId, quotationId, data }) => ({
+        url: `/quotations/${companyId}/${quotationId}`,
+        method: "PATCH",
         body: data,
       }),
       invalidatesTags: (_result, _error, { dealId, quotationId }) => [

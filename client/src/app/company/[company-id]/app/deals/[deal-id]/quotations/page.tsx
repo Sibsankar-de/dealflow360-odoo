@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { ReQuotationModal } from "@/components/modules/quotations/ReQuotationModal";
+import { DealModal } from "@/components/modules/deals/DealModal";
 import { QuotationResponse } from "@/types/quotation";
+import { DealStage } from "@/types/deal";
 import {
   ArrowLeft,
   Plus,
@@ -21,11 +23,24 @@ import {
   Clock,
   RotateCcw,
   Edit3,
+  Edit2,
   ExternalLink,
   TrendingUp,
   DollarSign,
   AlertCircle,
+  Calendar,
+  User,
 } from "lucide-react";
+
+const STAGE_COLORS: Record<DealStage, BadgeVariant> = {
+  NEW: "info",
+  QUALIFICATION: "secondary",
+  REQUIREMENT: "purple",
+  QUOTATION: "warning",
+  NEGOTIATION: "primary",
+  WON: "success",
+  LOST: "danger",
+};
 
 const STATUS_BADGES: Record<string, BadgeVariant> = {
   DRAFT: "secondary",
@@ -50,6 +65,7 @@ export default function DealQuotationsListPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [isEditDealOpen, setIsEditDealOpen] = useState(false);
   const [reQuotationTarget, setReQuotationTarget] =
     useState<QuotationResponse | null>(null);
 
@@ -116,27 +132,40 @@ export default function DealQuotationsListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div className="flex items-center gap-3">
           <Link
-            href={`/company/${companyId}/app/deals/${deal.id}`}
+            href={`/company/${companyId}/app/deals`}
             className="p-2 rounded-xl bg-card border border-border text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+            title="Back to Deals"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-text-primary tracking-tight">
-                Deal Quotations
+                {deal.name}
               </h1>
               <Badge variant="primary">Deal #{deal.dealNo}</Badge>
+              <Badge variant={STAGE_COLORS[deal.stage] || "secondary"}>
+                {deal.stage}
+              </Badge>
+              <Badge variant="outline">{deal.status}</Badge>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Quotations & commercial proposals for deal:{" "}
-              <span className="font-semibold text-text-primary">{deal.name}</span>{" "}
-              ({deal.customer?.userName || "Customer"})
+              Customer:{" "}
+              <span className="font-semibold text-text-primary">{deal.customer?.userName || "Customer"}</span>{" "}
+              ({deal.customer?.email})
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="md"
+            leftIcon={<Edit2 className="w-4 h-4" />}
+            onClick={() => setIsEditDealOpen(true)}
+          >
+            Edit Deal
+          </Button>
           <Link
             href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}
           >
@@ -415,6 +444,14 @@ export default function DealQuotationsListPage() {
           quotation={reQuotationTarget}
         />
       )}
+
+      {/* Edit Deal Modal */}
+      <DealModal
+        isOpen={isEditDealOpen}
+        onClose={() => setIsEditDealOpen(false)}
+        companyId={companyId}
+        deal={deal}
+      />
     </div>
   );
 }
