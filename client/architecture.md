@@ -53,6 +53,7 @@ src/
 │       └── [company-id]/
 │           ├── (customer)/ # Customer quotation signoff portal
 │           └── app/        # Company member authenticated application layout
+│               ├── access-control/
 │               ├── dashboard/
 │               ├── deals/ & deals/[deal-id]/
 │               ├── quotations/
@@ -77,16 +78,20 @@ src/
 │       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard, CreateQuotationModal, ReQuotationModal
 │       ├── fulfillment/  # Delivery tracking, backorders
 │       ├── finance/      # Invoices, financial approvals
-│       ├── customer/     # Customer directory and interaction history
-│       └── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
-├── context/              # React Context Providers (AuthContext.tsx, AuthProvider)
+│       ├── customers/    # Customer directory and interaction history
+│       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
+│       ├── settings/     # Store name, currency, discount tiers & address configuration
+│       ├── accesscontrol/ # TeamMembersTable, InviteTeamMemberModal, EditTeamMemberRoleModal, DeleteTeamMemberModal, ViewTeamMemberModal
+│       └── company/      # Team, roles, product management
+├── services/             # Centralized API clients and endpoint definitions
+│   └── api/              # Base API configuration and domain services
 ├── hooks/                # Reusable custom React hooks
 ├── schemas/              # Zod validation schemas (auth.schema.ts, company.schema.ts, product.schema.ts, warehouse.schema.ts, deal.schema.ts)
 ├── store/                # Global state management (Redux Toolkit store, StoreProvider)
 │   ├── baseApi.ts        # Base RTK Query API configuration with re-auth interceptor & tags
 │   ├── features/         # Feature slices & injected endpoints
 │   │   ├── user/         # userSlice.ts, userApi.ts
-│   │   ├── company/      # companySlice.ts, companyApi.ts (user company affiliations, members, lookup)
+│   │   ├── company/      # companySlice.ts, companyApi.ts (user company affiliations, member list/invite/role update/removal, company roles, lookup)
 │   │   ├── product/      # productApi.ts (product catalog & stock allocation)
 │   │   ├── warehouse/    # warehouseApi.ts (warehouses and distribution hubs)
 │   │   └── deal/         # dealApi.ts (deals lifecycle, quotations generation & revisions)

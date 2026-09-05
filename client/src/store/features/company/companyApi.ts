@@ -5,8 +5,10 @@ import {
   CompanyMemberType,
   CreateCompanyRequest,
   UserCompaniesData,
+  AddCompanyUserRequest,
+  UpdateCompanyUserRoleRequest,
+  CompanyRoleDefinition,
 } from "@/types/company";
-
 
 export const companyApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -40,7 +42,22 @@ export const companyApi = baseApi.injectEndpoints({
         url: `/companies/${companyId}/users`,
         method: "GET",
       }),
-      providesTags: (_result, _error, id) => [{ type: "Company", id: `members-${id}` }],
+      providesTags: (_result, _error, id) => [
+        { type: "Company", id: `members-${id}` },
+      ],
+    }),
+
+    getCompanyRoles: builder.query<
+      ApiResponse<{ roles: CompanyRoleDefinition[] }>,
+      string
+    >({
+      query: (companyId) => ({
+        url: `/companies/${companyId}/roles`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, id) => [
+        { type: "Company", id: `roles-${id}` },
+      ],
     }),
 
     createCompany: builder.mutation<
@@ -54,6 +71,47 @@ export const companyApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Company"],
     }),
+
+    addCompanyMember: builder.mutation<
+      ApiResponse<{ member: CompanyMemberType }>,
+      { companyId: string; data: AddCompanyUserRequest }
+    >({
+      query: ({ companyId, data }) => ({
+        url: `/companies/${companyId}/users`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        { type: "Company", id: `members-${companyId}` },
+      ],
+    }),
+
+    updateCompanyMemberRole: builder.mutation<
+      ApiResponse<{ member: CompanyMemberType }>,
+      { companyId: string; data: UpdateCompanyUserRoleRequest }
+    >({
+      query: ({ companyId, data }) => ({
+        url: `/companies/${companyId}/users`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        { type: "Company", id: `members-${companyId}` },
+      ],
+    }),
+
+    removeCompanyMember: builder.mutation<
+      ApiResponse<null>,
+      { companyId: string; userId: string }
+    >({
+      query: ({ companyId, userId }) => ({
+        url: `/companies/${companyId}/users/${userId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        { type: "Company", id: `members-${companyId}` },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
@@ -62,6 +120,11 @@ export const {
   useGetUserCompaniesQuery,
   useGetCompanyByIdQuery,
   useGetCompanyMembersQuery,
+  useGetCompanyRolesQuery,
   useCreateCompanyMutation,
+  useAddCompanyMemberMutation,
+  useUpdateCompanyMemberRoleMutation,
+  useRemoveCompanyMemberMutation,
 } = companyApi;
+
 
