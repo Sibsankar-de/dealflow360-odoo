@@ -48,10 +48,17 @@ The project follows a modular, feature-oriented structure under `src/`:
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 ├── components/           # Reusable shared UI and layout components
+<<<<<<< HEAD
 │   ├── ui/               # Base primitives (Avatar, CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
 │   └── shared/           # Shared compound components (navbar, sidebar, tables)
 ├── modules/              # Feature modules containing domain-specific logic
 │   ├── auth/             # Login, registration, company onboarding
+=======
+│   ├── ui/               # Base primitives (buttons, inputs, modals, cards)
+│   ├── shared/           # Shared compound components (navbar, sidebar, tables)
+│   └── modules/          # Feature module UI components
+│       └── auth/         # LoginForm, SignupForm, AuthBrandingPanel
+>>>>>>> 59ce6cd (login and sign up page added)
 │   ├── dashboard/        # Metrics, deal health, recent activities
 │   ├── quotations/       # Quotation creator, evaluation, approval workflows
 │   ├── fulfillment/      # Delivery tracking, backorders
