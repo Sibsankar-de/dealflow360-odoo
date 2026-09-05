@@ -78,22 +78,31 @@ The API layer must remain thin. It must not contain complex pricing, discount, f
 
 Responsibilities:
 
-- Authenticate users.
-- Resolve the current user and company or tenant context.
-- Enforce role and permission checks.
-- Verify resource ownership and scope.
-- Prevent unauthorized access to commercial and financial data.
+- Authenticate users via bearer tokens or session cookies (`verifyAuth` middleware).
+- Resolve the current user (`req.user`) and validate active session tokens.
+- Resolve company context via `verifyCompanyAccess` middleware:
+  - Extracts company ID from route parameters (`:companyId`, `:id`), `x-company-id` header, request body, or query parameters.
+  - Validates company existence and active state.
+  - Verifies the user is either the company owner or an active member of `company_users`.
+  - Attaches `req.company`, `req.companyUser`, and `req.companyRole` to the request object.
+  - Eliminates redundant company database queries across downstream controllers and application services.
+- Enforce Role-Based Access Control (RBAC) via `rbac.middleware.ts`:
+  - `requireRole` / `requireCompanyRole`: Validates that `req.companyRole` matches required company roles (`ADMIN`, `SALES_REP`, `SALES_MANAGER`, `FINANCE_MANAGER`, `CUSTOMER`). Company owners and users with the `ADMIN` role are always permitted through company-level RBAC checks.
+  - `requirePlatformRole`: Validates platform-level user roles (`USER`, `ADMIN`). Platform administrators are always permitted through platform-level RBAC checks.
+- Prevent unauthorized access to commercial, catalog, configuration, and financial data.
 
-Typical roles can include:
+Typical roles include:
 
-- Customer.
-- Sales representative.
-- Sales manager.
-- Operations or warehouse user.
-- Finance user.
-- Administrator.
+- Platform roles:
+  - User (`USER`)
+  - Platform Admin (`ADMIN`)
+- Company roles:
+  - Company Admin (`ADMIN`)
+  - Sales Representative (`SALES_REP`)
+  - Sales Manager (`SALES_MANAGER`)
+  - Finance Manager (`FINANCE_MANAGER`)
+  - Customer (`CUSTOMER`)
 
-Actual roles and permissions must be defined by the implemented authorization model.
 
 ### 4.3 Application Services
 
