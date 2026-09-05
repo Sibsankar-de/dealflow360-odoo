@@ -2,7 +2,7 @@ import React from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Mail, Phone, Edit3, KeyRound } from "lucide-react";
+import { Mail, Edit3, KeyRound } from "lucide-react";
 import { UserProfile } from "@/types/profile";
 
 export interface ProfileInfoCardProps {
@@ -31,12 +31,6 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
               <Mail className="w-3.5 h-3.5 text-text-muted" />
               <span>{user.email}</span>
             </div>
-            {user.phone && (
-              <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
-                <Phone className="w-3 h-3 text-text-muted" />
-                <span>{user.phone}</span>
-              </div>
-            )}
           </div>
         </div>
 

@@ -4,12 +4,13 @@ import React from "react";
 import Link from "next/link";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { UserAvatarMenu } from "./UserAvatarMenu";
+import { useAuth } from "@/context/AuthContext";
 
 export type NavbarVariant = "profile" | "company";
 
 export interface NavbarProps {
   variant?: NavbarVariant;
-  user: {
+  user?: {
     fullName: string;
     email: string;
     platformRole?: string;
@@ -20,10 +21,23 @@ export interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   variant = "company",
-  user,
-  onLogout,
+  user: propUser,
+  onLogout: propOnLogout,
   className = "",
 }) => {
+  const { user: authUser, logout: authLogout } = useAuth();
+
+  const user = propUser || (authUser ? {
+    fullName: authUser.userName,
+    email: authUser.email,
+    platformRole: authUser.role,
+  } : {
+    fullName: "User",
+    email: "user@example.com",
+    platformRole: "User",
+  });
+
+  const onLogout = propOnLogout || authLogout;
   return (
     <header
       className={`w-full bg-card border-b border-border sticky top-0 z-40 ${className}`}

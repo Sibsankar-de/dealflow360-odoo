@@ -2,12 +2,19 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useAuth } from "@/context/AuthContext";
+
+import { signupSchema } from "@/schemas/auth.schema";
 
 export const SignupForm: React.FC = () => {
+  const router = useRouter();
+  const { register } = useAuth();
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,45 +23,68 @@ export const SignupForm: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    fullName?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    agreeTerms?: string;
+  }>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setGeneralError(null);
+    setFieldErrors({});
 
-    if (!fullName.trim()) {
-      setError("Please enter your full name.");
-      return;
-    }
+    const result = signupSchema.safeParse({
+      fullName: fullName.trim(),
+      email: email.trim(),
+      password,
+      confirmPassword,
+      agreeTerms,
+    });
 
-    if (!email.trim()) {
-      setError("Please enter your work email.");
-      return;
-    }
-
-    if (!password) {
-      setError("Please enter a password.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    if (!agreeTerms) {
-      setError("You must agree to the terms and privacy policy.");
+    if (!result.success) {
+      const formattedErrors: {
+        fullName?: string;
+        email?: string;
+        password?: string;
+        confirmPassword?: string;
+        agreeTerms?: string;
+      } = {};
+      result.error.issues.forEach((err) => {
+        const field = err.path[0] as keyof typeof formattedErrors;
+        if (field && !formattedErrors[field]) {
+          formattedErrors[field] = err.message;
+        }
+      });
+      setFieldErrors(formattedErrors);
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await register({
+        userName: result.data.fullName,
+        email: result.data.email,
+        password: result.data.password,
+      });
+      router.push("/profile");
+    } catch (err: unknown) {
+      const errorObj = err as { data?: { message?: string }; message?: string };
+      setGeneralError(
+        errorObj.data?.message ||
+          errorObj.message ||
+          "Failed to create account. Please try again."
+      );
+    } finally {
       setIsLoading(false);
-    }, 1200);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full">
+    <form onSubmit={handleSubmit} className="space-y-4 w-full" noValidate>
       <div className="space-y-1 text-left">
         <h3 className="text-2xl font-bold text-text-primary tracking-tight">
           Create your account
@@ -64,9 +94,9 @@ export const SignupForm: React.FC = () => {
         </p>
       </div>
 
-      {error && (
+      {generalError && (
         <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
-          {error}
+          {generalError}
         </div>
       )}
 
@@ -75,7 +105,12 @@ export const SignupForm: React.FC = () => {
         type="text"
         placeholder="Rahul Sharma"
         value={fullName}
-        onChange={(e) => setFullName(e.target.value)}
+        onChange={(e) => {
+          setFullName(e.target.value);
+          if (fieldErrors.fullName)
+            setFieldErrors((prev) => ({ ...prev, fullName: undefined }));
+        }}
+        error={fieldErrors.fullName}
         required
         autoComplete="name"
       />
@@ -85,7 +120,12 @@ export const SignupForm: React.FC = () => {
         type="email"
         placeholder="rahul.sharma@acmecorp.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (fieldErrors.email)
+            setFieldErrors((prev) => ({ ...prev, email: undefined }));
+        }}
+        error={fieldErrors.email}
         required
         autoComplete="email"
       />
@@ -96,7 +136,12 @@ export const SignupForm: React.FC = () => {
           type={showPassword ? "text" : "password"}
           placeholder="••••••••••••"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (fieldErrors.password)
+              setFieldErrors((prev) => ({ ...prev, password: undefined }));
+          }}
+          error={fieldErrors.password}
           required
           autoComplete="new-password"
           rightIcon={
@@ -120,7 +165,15 @@ export const SignupForm: React.FC = () => {
           type={showConfirmPassword ? "text" : "password"}
           placeholder="••••••••••••"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={(e) => {
+            setConfirmPassword(e.target.value);
+            if (fieldErrors.confirmPassword)
+              setFieldErrors((prev) => ({
+                ...prev,
+                confirmPassword: undefined,
+              }));
+          }}
+          error={fieldErrors.confirmPassword}
           required
           autoComplete="new-password"
           rightIcon={
