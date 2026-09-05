@@ -48,7 +48,7 @@ The project follows a modular, feature-oriented structure under `src/`:
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 ├── components/           # Reusable shared UI and layout components
-│   ├── ui/               # Base primitives (buttons, inputs, modals, cards)
+│   ├── ui/               # Base primitives (Avatar, CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
 │   └── shared/           # Shared compound components (navbar, sidebar, tables)
 ├── modules/              # Feature modules containing domain-specific logic
 │   ├── auth/             # Login, registration, company onboarding
@@ -57,6 +57,8 @@ src/
 │   ├── fulfillment/      # Delivery tracking, backorders
 │   ├── finance/          # Invoices, financial approvals
 │   ├── customers/        # Customer directory and interaction history
+│   ├── layout/           # App navigation (Navbar: profile vs company view, UserAvatarMenu)
+│   ├── profile/          # User profile, credentials, and company affiliations
 │   └── company/          # Team, roles, product management
 ├── services/             # Centralized API clients and endpoint definitions
 │   └── api/              # Base API configuration and domain services
@@ -100,6 +102,7 @@ Routes are structured around user roles and core platform workflows:
 
 * `/(auth)`: Authentication routes (Login, Register).
 * `/dashboard`: Main dashboard with deal health and high-level KPIs.
+* `/profile`: User profile, credentials, and company memberships.
 * `/quotations`: Quotation list, creation wizard, approval review, and customer negotiation interface.
 * `/fulfillment`: Delivery tracking, batch fulfillment, and backorder lists.
 * `/invoices`: Invoice listing and invoice generation based on delivered quantities.

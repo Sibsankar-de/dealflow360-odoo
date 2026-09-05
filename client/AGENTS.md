@@ -37,6 +37,7 @@ Agents must:
 * Follow existing project structure
 * Maintain type safety
 * Keep API integrations consistent
+* Refer to AGENTS.md in the root directory for platform concepts, quotation lifecycles, and business rules
 * Update architecture.md whenever required within the same task
 * Update documentation when new modules are added
 * Preserve backward compatibility unless explicitly instructed otherwise
@@ -260,6 +261,8 @@ The UI must:
 * Support desktop-first workflows
 * Maintain accessibility standards
 * Preserve visual consistency
+* Always use theme colors defined in globals.css
+* Whenever a new color is needed, define it in globals.css and notify the user
 
 Avoid introducing new patterns when an existing pattern already exists.
 
