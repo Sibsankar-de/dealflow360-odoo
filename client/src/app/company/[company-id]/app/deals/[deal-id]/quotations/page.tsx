@@ -31,6 +31,8 @@ import {
   AlertCircle,
   Calendar,
   User,
+  MessageSquareQuote,
+  Truck,
 } from "lucide-react";
 
 const STAGE_COLORS: Record<DealStage, BadgeVariant> = {
@@ -283,19 +285,34 @@ export default function DealQuotationsListPage() {
             const currentRev = quote.currentRevision;
             const lineItems = currentRev?.items || quote.items || [];
             const revisionsList = quote.revisions || [];
-            const isEditable =
-              quote.status === "DRAFT" || quote.status === "NEGOTIATING";
+            const isNegotiating = quote.status === "NEGOTIATING";
+            const isDraft = quote.status === "DRAFT";
+            const isAccepted = quote.status === "ACCEPTED";
 
             return (
               <div
                 key={quote.id}
-                className="bg-card rounded-2xl border border-border p-5 space-y-4 shadow-2xs hover:border-brand-500/40 transition-colors"
+                className={`bg-card rounded-2xl border p-5 space-y-4 shadow-2xs transition-colors ${
+                  isNegotiating
+                    ? "border-amber-300 bg-amber-50/10 hover:border-amber-400"
+                    : "border-border hover:border-brand-500/40"
+                }`}
               >
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
-                      <FileText className="w-5 h-5" />
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                        isNegotiating
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-brand-50 text-brand-600"
+                      }`}
+                    >
+                      {isNegotiating ? (
+                        <MessageSquareQuote className="w-5 h-5" />
+                      ) : (
+                        <FileText className="w-5 h-5" />
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -329,8 +346,21 @@ export default function DealQuotationsListPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {isEditable ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isNegotiating ? (
+                      <Link
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                      >
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          className="bg-amber-600 hover:bg-amber-700 text-white"
+                          leftIcon={<MessageSquareQuote className="w-3.5 h-3.5" />}
+                        >
+                          Review Negotiation
+                        </Button>
+                      </Link>
+                    ) : isDraft ? (
                       <Link
                         href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
                       >
@@ -356,6 +386,36 @@ export default function DealQuotationsListPage() {
                       </Link>
                     )}
 
+                    {(isNegotiating || quote.status === "SENT") && (
+                      <Link
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}?mode=counter`}
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                          leftIcon={<Edit3 className="w-3.5 h-3.5" />}
+                        >
+                          Counter Offer
+                        </Button>
+                      </Link>
+                    )}
+
+                    {isAccepted && (
+                      <Link
+                        href={`/company/${companyId}/app/fulfillment/${quote.id}`}
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-success border-success/30 hover:bg-success/10"
+                          leftIcon={<Truck className="w-3.5 h-3.5" />}
+                        >
+                          Fulfill
+                        </Button>
+                      </Link>
+                    )}
+
                     <Button
                       size="sm"
                       variant="outline"
@@ -366,6 +426,24 @@ export default function DealQuotationsListPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Negotiation Notice Banner */}
+                {isNegotiating && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquareQuote className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        <strong>Customer counter-offer submitted.</strong> Review proposed pricing and approve, reject, or propose alternative terms.
+                      </span>
+                    </div>
+                    <Link
+                      href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                      className="font-bold text-amber-800 hover:text-amber-950 underline shrink-0 cursor-pointer"
+                    >
+                      Review Terms &rarr;
+                    </Link>
+                  </div>
+                )}
 
                 {/* Line Items Table */}
                 {lineItems.length > 0 && (

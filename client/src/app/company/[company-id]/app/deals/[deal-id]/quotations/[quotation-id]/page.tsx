@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useGetDealByIdQuery } from "@/store/features/deal/dealApi";
 import { useGetProductsQuery } from "@/store/features/product/productApi";
+import { useGetCompanyByIdQuery } from "@/store/features/company/companyApi";
 import {
   useGetQuotationByIdQuery,
   useCreateQuotationMutation,
@@ -41,6 +42,7 @@ import {
   ExternalLink,
   Hourglass,
   Truck,
+  Edit3,
 } from "lucide-react";
 import { NegotiationDetail } from "@/types/quotation";
 
@@ -76,6 +78,7 @@ const NEGOTIATION_STATUS_BADGES: Record<string, BadgeVariant> = {
 export default function QuotationEditorPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const companyId =
     typeof params?.["company-id"] === "string" ? params["company-id"] : "";
   const dealId =
@@ -84,6 +87,7 @@ export default function QuotationEditorPage() {
     typeof params?.["quotation-id"] === "string" ? params["quotation-id"] : "";
 
   const isNew = quotationId === "new";
+  const mode = searchParams?.get("mode");
 
   const [createQuotation, { isLoading: isCreating }] =
     useCreateQuotationMutation();
@@ -94,6 +98,12 @@ export default function QuotationEditorPage() {
     useApproveNegotiationMutation();
   const [rejectNegotiation, { isLoading: isRejectingNeg }] =
     useRejectNegotiationMutation();
+
+  const { data: companyData } = useGetCompanyByIdQuery(companyId, {
+    skip: !companyId,
+  });
+  const currentCompany = companyData?.data?.company;
+  const userRole = currentCompany?.userRole;
 
   const { data: dealData, isLoading: isLoadingDeal } = useGetDealByIdQuery(
     { companyId, id: dealId },
@@ -140,6 +150,15 @@ export default function QuotationEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Counter Editing Mode (for Sales Manager / Sales Rep / Finance)
+  const [isCounterEditing, setIsCounterEditing] = useState(mode === "counter");
+
+  useEffect(() => {
+    if (mode === "counter") {
+      setIsCounterEditing(true);
+    }
+  }, [mode]);
+
   // Modals for Negotiation Review
   const [isApproveNegModalOpen, setIsApproveNegModalOpen] = useState(false);
   const [approveNotes, setApproveNotes] = useState("");
@@ -150,7 +169,21 @@ export default function QuotationEditorPage() {
   const isReadOnly =
     !isNew &&
     existingQuotation &&
-    existingQuotation.status !== "DRAFT";
+    existingQuotation.status !== "DRAFT" &&
+    !isCounterEditing;
+
+  const requiredRole = pendingNegotiation?.requiredRole;
+  const isAdmin = userRole === "ADMIN";
+  const isFinanceManager = userRole === "FINANCE_MANAGER";
+  const isSalesManager = userRole === "SALES_MANAGER";
+
+  const canApprove =
+    isAdmin ||
+    (requiredRole === "FINANCE_MANAGER" && isFinanceManager) ||
+    (requiredRole === "SALES_MANAGER" && (isSalesManager || isFinanceManager)) ||
+    (!requiredRole && (isSalesManager || isFinanceManager));
+
+  const canReject = isAdmin || isSalesManager || isFinanceManager;
 
   useEffect(() => {
     if (isNew && deal) {
@@ -350,8 +383,12 @@ export default function QuotationEditorPage() {
         }).unwrap();
 
         if (action === "send") {
-          await sendQuotation({ companyId, id: quotationId }).unwrap();
-          setNotification("Quotation updated and sent successfully!");
+          if (existingQuotation?.status === "DRAFT") {
+            await sendQuotation({ companyId, id: quotationId }).unwrap();
+            setNotification("Quotation updated and sent successfully!");
+          } else {
+            setNotification("Counter-proposal submitted to customer successfully!");
+          }
         } else {
           setNotification("Quotation changes saved successfully!");
         }
@@ -495,7 +532,28 @@ export default function QuotationEditorPage() {
         </div>
 
         {/* Action buttons */}
-        {!isReadOnly && (
+        {isCounterEditing ? (
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setIsCounterEditing(false)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => handleSaveQuotation("send")}
+              isLoading={isUpdating}
+              disabled={isUpdating || items.length === 0}
+              leftIcon={<Send className="w-4 h-4" />}
+            >
+              Send Counter-Proposal
+            </Button>
+          </div>
+        ) : !isReadOnly ? (
           <div className="flex items-center gap-2.5">
             <Button
               variant="outline"
@@ -518,6 +576,21 @@ export default function QuotationEditorPage() {
               Send Quotation
             </Button>
           </div>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            {(existingQuotation?.status === "SENT" ||
+              existingQuotation?.status === "NEGOTIATING") && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsCounterEditing(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                leftIcon={<Edit3 className="w-4 h-4" />}
+              >
+                Add Counter-Offer
+              </Button>
+            )}
+          </div>
         )}
 
         {existingQuotation?.status === "ACCEPTED" && (
@@ -528,6 +601,29 @@ export default function QuotationEditorPage() {
           </Link>
         )}
       </div>
+
+      {/* Counter Editing Banner */}
+      {isCounterEditing && (
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl text-xs text-purple-900 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Edit3 className="w-5 h-5 text-purple-600 shrink-0" />
+            <div>
+              <p className="font-bold text-sm">Drafting Sales Counter-Proposal</p>
+              <p className="text-purple-800 mt-0.5">
+                Adjust the product quantities, pricing, or discounts below and click "Send Counter-Proposal" to submit revised terms to the customer.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsCounterEditing(false)}
+            className="shrink-0"
+          >
+            Cancel Counter
+          </Button>
+        </div>
+      )}
 
       {/* Pending Negotiation Review Section (Manager Review) */}
       {existingQuotation?.status === "NEGOTIATING" && pendingNegotiation && (
@@ -547,7 +643,7 @@ export default function QuotationEditorPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={pendingNegotiation.riskLevel === "HIGH" ? "danger" : "warning"}>
                 Risk Level: {pendingNegotiation.riskLevel || "MID"}
               </Badge>
@@ -612,25 +708,49 @@ export default function QuotationEditorPage() {
           )}
 
           {/* Reviewer Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsRejectNegModalOpen(true)}
-              className="text-danger border-danger/30 hover:bg-danger/10"
-              leftIcon={<X className="w-4 h-4" />}
-            >
-              Reject Counter-Offer
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsApproveNegModalOpen(true)}
-              className="bg-success text-white hover:bg-emerald-700"
-              leftIcon={<Check className="w-4 h-4" />}
-            >
-              Approve Counter-Offer
-            </Button>
+          <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+            <div className="text-xs text-amber-900 flex items-center gap-1.5">
+              {!canApprove && (
+                <span className="text-amber-800 text-[11px] italic flex items-center gap-1">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                  Approval requires {requiredRole === "FINANCE_MANAGER" ? "Finance Manager" : "Sales Manager or Finance Manager"} role.
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCounterEditing(true)}
+                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                leftIcon={<Edit3 className="w-4 h-4" />}
+              >
+                Counter / Propose Alternative
+              </Button>
+              {canReject && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsRejectNegModalOpen(true)}
+                  className="text-danger border-danger/30 hover:bg-danger/10"
+                  leftIcon={<X className="w-4 h-4" />}
+                >
+                  Reject Counter-Offer
+                </Button>
+              )}
+              {canApprove && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsApproveNegModalOpen(true)}
+                  className="bg-success text-white hover:bg-emerald-700"
+                  leftIcon={<Check className="w-4 h-4" />}
+                >
+                  Approve Counter-Offer
+                </Button>
+              )}
+            </div>
           </div>
         </Card>
       )}
@@ -1064,7 +1184,19 @@ export default function QuotationEditorPage() {
             {isReadOnly ? "Back to Quotations" : "Cancel"}
           </Button>
         </Link>
-        {!isReadOnly && (
+        {isCounterEditing ? (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => handleSaveQuotation("send")}
+            isLoading={isUpdating}
+            disabled={isUpdating || items.length === 0}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+            leftIcon={<Send className="w-4 h-4" />}
+          >
+            Send Counter-Proposal
+          </Button>
+        ) : !isReadOnly ? (
           <>
             <Button
               variant="outline"
@@ -1087,6 +1219,19 @@ export default function QuotationEditorPage() {
               Send Quotation
             </Button>
           </>
+        ) : (
+          (existingQuotation?.status === "SENT" ||
+            existingQuotation?.status === "NEGOTIATING") && (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsCounterEditing(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              leftIcon={<Edit3 className="w-4 h-4" />}
+            >
+              Add Counter-Offer
+            </Button>
+          )
         )}
       </div>
 
