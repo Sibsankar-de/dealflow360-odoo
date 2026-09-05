@@ -35,6 +35,16 @@ Keep the server independent from client presentation concerns.
 13. Preserve backward compatibility for existing API contracts unless a deliberate breaking change is documented.
 14. Add or update tests whenever business behavior changes.
 
+## Architecture and Layering
+
+1. Organize the codebase using a modular structure with clear domain boundaries.
+2. Use classes for all components in `services/`, `controllers/`, and `repositories/`.
+3. Repositories handle database operations, queries, and data mapping using Prisma.
+4. Services encapsulate business workflows, commercial rules, state transitions, and transactions.
+5. Controllers handle HTTP requests, invoke services, and return standard API responses without implementing business logic.
+6. Maintain clean separation between transport (controllers), business logic (services), and persistence (repositories).
+
+
 ## DealFlow360 Business Rules
 
 1. A customer requirement is the starting point of the sales flow.
