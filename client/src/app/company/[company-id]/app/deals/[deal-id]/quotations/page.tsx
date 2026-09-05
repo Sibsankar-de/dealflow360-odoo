@@ -11,6 +11,7 @@ import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
 import { ReQuotationModal } from "@/components/modules/quotations/ReQuotationModal";
 import { DealModal } from "@/components/modules/deals/DealModal";
 import { QuotationResponse } from "@/types/quotation";
@@ -65,6 +66,7 @@ export default function DealQuotationsListPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
   const [isEditDealOpen, setIsEditDealOpen] = useState(false);
   const [reQuotationTarget, setReQuotationTarget] =
     useState<QuotationResponse | null>(null);
@@ -83,6 +85,8 @@ export default function DealQuotationsListPage() {
       companyId,
       dealId,
       params: {
+        page,
+        limit: 10,
         search: search.trim() || undefined,
         status: statusFilter !== "ALL" ? statusFilter : undefined,
       },
@@ -92,6 +96,7 @@ export default function DealQuotationsListPage() {
 
   const quotations: QuotationResponse[] =
     quotationsData?.data?.docs || deal?.quotations || [];
+  const totalPages = quotationsData?.data?.totalPages ?? 1;
 
   const totalValue = quotations.reduce((acc, q) => {
     const revTotal = q.currentRevision?.totalAmount ?? q.totalAmount ?? 0;
@@ -431,6 +436,16 @@ export default function DealQuotationsListPage() {
               </div>
             );
           })}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pt-2 flex justify-center">
+              <Pagination
+                currentPage={page}
+                totalPage={totalPages}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -455,3 +470,4 @@ export default function DealQuotationsListPage() {
     </div>
   );
 }
+

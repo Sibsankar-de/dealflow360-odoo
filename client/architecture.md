@@ -152,7 +152,10 @@ Routes are structured around user roles and core platform workflows:
   * `/company/[company-id]/app/invoices`: Invoice management based on delivered items.
   * `/company/[company-id]/app/deal-health`: Deal health alerts and stalled quotation indicators.
   * `/company/[company-id]/app/settings`: Company settings, base currency, and billing rules.
-* `/company/[company-id]/customer` (under route group `(customer)`): Customer portal showing active deals header, proposal metrics, and deals list.
+* `/company/[company-id]/(customer)`: Customer portal workspace (URL: `/company/[company-id]/customer`).
+  * `/company/[company-id]/customer`: List of deals associated with the customer in the company, with options to view quotations or request deal cancellation.
+  * `/company/[company-id]/customer/deals/[deal-id]/quotations`: List of quotations for the selected deal filtered to active/customer-visible statuses.
+  * `/company/[company-id]/customer/deals/[deal-id]/quotations/[quotation-id]`: Customer quotation review and negotiation interface featuring transparent-by-default inputs, gray-bordered editable state upon clicking Negotiate, revision history timeline, counter-offer dispatch, and approval/rejection workflows.
 
 ---
 

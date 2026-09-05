@@ -6,6 +6,7 @@ import {
   UpdateQuotationRequest,
   QuotationItemDetail,
   QuotationRevisionDetail,
+  NegotiationDetail,
 } from "@/types/quotation";
 
 export interface ListQuotationsQuery {
@@ -164,6 +165,89 @@ export const quotationApi = baseApi.injectEndpoints({
       ],
     }),
 
+    submitCounterOffer: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      {
+        companyId?: string;
+        id: string;
+        data: {
+          message?: string;
+          proposedPrice?: number;
+          proposedDiscount?: number;
+          discountType?: "PERCENTAGE" | "FIXED";
+          items?: {
+            quotationItemId?: string;
+            productId?: string;
+            requestedQuantity?: number;
+            requestedUnitPrice?: number;
+            requestedDiscountType?: "PERCENTAGE" | "FIXED";
+            requestedDiscountValue?: number;
+          }[];
+        };
+      }
+    >({
+      query: ({ companyId, id, data }) => ({
+        url: companyId
+          ? `/quotations/${companyId}/${id}/counter-offer`
+          : `/quotations/${id}/counter-offer`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Quotation",
+        { type: "Quotation", id },
+        "Deal",
+      ],
+    }),
+
+    updateQuotationStatus: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      { companyId?: string; id: string; status: string }
+    >({
+      query: ({ companyId, id, status }) => ({
+        url: companyId
+          ? `/quotations/${companyId}/${id}/status`
+          : `/quotations/${id}/status`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Quotation",
+        { type: "Quotation", id },
+        "Deal",
+      ],
+    }),
+
+    getNegotiations: builder.query<
+      ApiResponse<{ negotiations: NegotiationDetail[] }>,
+      { companyId?: string; id: string }
+    >({
+      query: ({ companyId, id }) => ({
+        url: companyId
+          ? `/quotations/${companyId}/${id}/negotiations`
+          : `/quotations/${id}/negotiations`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, { id }) => [
+        { type: "Quotation", id },
+      ],
+    }),
+
+    getRevisions: builder.query<
+      ApiResponse<{ revisions: QuotationRevisionDetail[] }>,
+      { companyId?: string; id: string }
+    >({
+      query: ({ companyId, id }) => ({
+        url: companyId
+          ? `/quotations/${companyId}/${id}/revisions`
+          : `/quotations/${id}/revisions`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, { id }) => [
+        { type: "Quotation", id },
+      ],
+    }),
+
     createRevision: builder.mutation<
       ApiResponse<{ quotation: QuotationResponse }>,
       { companyId?: string; quotationId: string; data: Record<string, unknown> }
@@ -188,6 +272,8 @@ export const quotationApi = baseApi.injectEndpoints({
 export const {
   useGetQuotationsQuery,
   useGetQuotationByIdQuery,
+  useGetNegotiationsQuery,
+  useGetRevisionsQuery,
   useCreateQuotationMutation,
   useUpdateQuotationMutation,
   useSendQuotationMutation,
@@ -195,5 +281,9 @@ export const {
   useRemoveQuotationItemMutation,
   useCancelQuotationMutation,
   useRejectQuotationMutation,
+  useSubmitCounterOfferMutation,
+  useUpdateQuotationStatusMutation,
   useCreateRevisionMutation,
 } = quotationApi;
+
+

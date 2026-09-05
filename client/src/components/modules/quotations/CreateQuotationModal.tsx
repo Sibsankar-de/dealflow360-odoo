@@ -43,15 +43,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
     { companyId },
     { skip: !isOpen || !companyId }
   );
-  const products = React.useMemo(() => {
-    if (!productData?.data) return [];
-    const rawData = productData.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("products" in rawData && Array.isArray(rawData.products)) {
-      return rawData.products;
-    }
-    return [];
-  }, [productData]);
+  const products = productData?.data?.products ?? [];
 
   const [items, setItems] = useState<ItemState[]>([]);
   const [currency, setCurrency] = useState("USD");

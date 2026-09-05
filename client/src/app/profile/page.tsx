@@ -19,7 +19,9 @@ import {
 export default function ProfilePage() {
   const { user: authUser, updateProfile, updatePassword } = useAuth();
 
-  const { data: companiesData, isLoading: isCompaniesLoading } = useGetUserCompaniesQuery();
+  const [page, setPage] = useState(1);
+  const { data: companiesData, isLoading: isCompaniesLoading } =
+    useGetUserCompaniesQuery({ page, limit: 10 });
   const [createCompanyMutation] = useCreateCompanyMutation();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -29,21 +31,12 @@ export default function ProfilePage() {
 
   const router = useRouter();
 
-  const companies: CompanyAffiliation[] = React.useMemo(() => {
-    if (!companiesData?.data) return [];
-    const rawData = companiesData.data;
+  const rawCompanies =
+    companiesData?.data?.docs ?? [];
+  const totalPages = companiesData?.data?.totalPages ?? 1;
 
-    let companyList: CompanyResponseType[] = [];
-    if (Array.isArray(rawData)) {
-      companyList = rawData;
-    } else if ("docs" in rawData && Array.isArray(rawData.docs)) {
-      companyList = rawData.docs;
-    } else if ("companies" in rawData && Array.isArray(rawData.companies)) {
-      companyList = rawData.companies;
-    }
-
-    return companyList.map(mapCompanyResponseToAffiliation);
-  }, [companiesData]);
+  const companies: CompanyAffiliation[] =
+    rawCompanies.map(mapCompanyResponseToAffiliation);
 
   const displayUser: UserProfile = {
     id: authUser?.id || "",
@@ -84,7 +77,11 @@ export default function ProfilePage() {
   };
 
   const handleViewCompany = (company: CompanyAffiliation) => {
-    router.push(`/company/${company.id}/app/dashboard`);
+    if (company.role === "Customer") {
+      router.push(`/company/${company.id}/customer`);
+    } else {
+      router.push(`/company/${company.id}/app/dashboard`);
+    }
   };
 
   return (
@@ -113,6 +110,9 @@ export default function ProfilePage() {
         <CompanyList
           companies={displayUser.companies}
           isLoading={isCompaniesLoading}
+          currentPage={page}
+          totalPage={totalPages}
+          onPageChange={setPage}
           onViewCompany={handleViewCompany}
           onCreateCompany={() => setIsCreateCompanyOpen(true)}
         />

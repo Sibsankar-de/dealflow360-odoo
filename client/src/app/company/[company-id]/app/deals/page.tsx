@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import { DealList } from "@/components/modules/deals";
 import { useGetDealsQuery } from "@/store/features/deal/dealApi";
@@ -12,23 +12,15 @@ export default function DealsPage() {
       ? params["company-id"]
       : "";
 
+  const [page, setPage] = useState(1);
+
   const { data, isLoading } = useGetDealsQuery(
-    { companyId },
+    { companyId, params: { page, limit: 10 } },
     { skip: !companyId }
   );
 
-  const deals = React.useMemo(() => {
-    if (!data?.data) return [];
-    const rawData = data.data;
-    if (Array.isArray(rawData)) return rawData;
-    if ("docs" in rawData && Array.isArray(rawData.docs)) {
-      return rawData.docs;
-    }
-    if ("deals" in rawData && Array.isArray(rawData.deals)) {
-      return rawData.deals;
-    }
-    return [];
-  }, [data]);
+  const deals = data?.data?.docs ?? [];
+  const totalPages = data?.data?.totalPages ?? 1;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -36,7 +28,11 @@ export default function DealsPage() {
         deals={deals}
         companyId={companyId}
         isLoading={isLoading}
+        currentPage={page}
+        totalPage={totalPages}
+        onPageChange={setPage}
       />
     </div>
   );
 }
+

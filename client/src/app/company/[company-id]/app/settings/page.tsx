@@ -5,28 +5,46 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
-import { useGetCompanyByIdQuery } from "@/store/features/company/companyApi";
-import { Building2, Save, CheckCircle2, ShieldCheck, DollarSign } from "lucide-react";
+import {
+  useGetCompanyByIdQuery,
+  useGetCompanySettingsQuery,
+  useUpdateCompanyMutation,
+  useUpdateCompanySettingsMutation,
+} from "@/store/features/company/companyApi";
+import { Building2, Save, CheckCircle2, ShieldCheck, DollarSign, Percent, AlertCircle } from "lucide-react";
 
 export default function CompanySettingsPage() {
   const params = useParams();
   const companyId =
     typeof params?.["company-id"] === "string" ? params["company-id"] : "";
 
-  const { data: companyData, isLoading } = useGetCompanyByIdQuery(companyId, {
+  const { data: companyData, isLoading: isCompanyLoading } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
   });
 
+  const { data: settingsData, isLoading: isSettingsLoading } = useGetCompanySettingsQuery(companyId, {
+    skip: !companyId,
+  });
+
+  const [updateCompany, { isLoading: isUpdatingCompany }] = useUpdateCompanyMutation();
+  const [updateCompanySettings, { isLoading: isUpdatingSettings }] = useUpdateCompanySettingsMutation();
+
   const company = companyData?.data?.company;
+  const settings = settingsData?.data?.settings;
 
   const [companyName, setCompanyName] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [country, setCountry] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [postalCode, setPostalCode] = useState("");
+
+  const [bronzeDiscount, setBronzeDiscount] = useState<number | string>("");
+  const [silverDiscount, setSilverDiscount] = useState<number | string>("");
+  const [goldDiscount, setGoldDiscount] = useState<number | string>("");
+
   const [notification, setNotification] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (company) {
@@ -38,11 +56,60 @@ export default function CompanySettingsPage() {
     }
   }, [company]);
 
-  const handleSave = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (settings?.customerDiscountTier) {
+      setBronzeDiscount(settings.customerDiscountTier.BRONZE ?? "");
+      setSilverDiscount(settings.customerDiscountTier.SILVER ?? "");
+      setGoldDiscount(settings.customerDiscountTier.GOLD ?? "");
+    }
+  }, [settings]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNotification("Company settings updated successfully.");
-    setTimeout(() => setNotification(null), 3500);
+    setErrorMessage(null);
+    setNotification(null);
+
+    try {
+      await updateCompany({
+        companyId,
+        data: {
+          name: companyName.trim(),
+          currency,
+          country: country.trim() || undefined,
+          postalCode: postalCode.trim() || undefined,
+          addressLine: addressLine.trim() || undefined,
+        },
+      }).unwrap();
+
+      const discountTierPayload: {
+        BRONZE?: number;
+        SILVER?: number;
+        GOLD?: number;
+      } = {};
+
+      if (bronzeDiscount !== "") discountTierPayload.BRONZE = Number(bronzeDiscount);
+      if (silverDiscount !== "") discountTierPayload.SILVER = Number(silverDiscount);
+      if (goldDiscount !== "") discountTierPayload.GOLD = Number(goldDiscount);
+
+      await updateCompanySettings({
+        companyId,
+        data: {
+          customerDiscountTier: discountTierPayload,
+        },
+      }).unwrap();
+
+      setNotification("Company profile and discount tier settings updated successfully.");
+      setTimeout(() => setNotification(null), 3500);
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to update company settings";
+      setErrorMessage(msg);
+    }
   };
+
+  const isLoading = isCompanyLoading || isSettingsLoading;
+  const isSaving = isUpdatingCompany || isUpdatingSettings;
 
   if (isLoading) {
     return (
@@ -61,7 +128,7 @@ export default function CompanySettingsPage() {
           Company Settings
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          Manage company profile, base currency, and billing configuration.
+          Manage company profile, base currency, and customer tier discount configurations.
         </p>
       </div>
 
@@ -69,6 +136,13 @@ export default function CompanySettingsPage() {
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
           <span>{notification}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-danger flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-danger shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
@@ -81,7 +155,7 @@ export default function CompanySettingsPage() {
               <CardTitle>Organization Profile</CardTitle>
             </div>
             <CardDescription>
-              Basic legal and public operational details for this company.
+              Basic legal and public operational details for this company workspace.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -123,6 +197,85 @@ export default function CompanySettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Customer Discount Tiers Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Percent className="w-5 h-5 text-brand-600" />
+              <CardTitle>Customer Discount Tiers</CardTitle>
+            </div>
+            <CardDescription>
+              Set default percentage discounts for Bronze, Silver, and Gold customer classifications.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-surface rounded-xl border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                    Bronze Tier
+                  </span>
+                  <span className="text-[10px] font-semibold text-text-muted bg-card px-2 py-0.5 rounded border border-border">
+                    Standard
+                  </span>
+                </div>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="0"
+                  value={bronzeDiscount}
+                  onChange={(e) => setBronzeDiscount(e.target.value)}
+                  rightIcon={<Percent className="w-3.5 h-3.5 text-text-muted" />}
+                />
+              </div>
+
+              <div className="p-4 bg-surface rounded-xl border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                    Silver Tier
+                  </span>
+                  <span className="text-[10px] font-semibold text-info bg-card px-2 py-0.5 rounded border border-border">
+                    Intermediate
+                  </span>
+                </div>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="0"
+                  value={silverDiscount}
+                  onChange={(e) => setSilverDiscount(e.target.value)}
+                  rightIcon={<Percent className="w-3.5 h-3.5 text-text-muted" />}
+                />
+              </div>
+
+              <div className="p-4 bg-surface rounded-xl border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                    Gold Tier
+                  </span>
+                  <span className="text-[10px] font-semibold text-warning bg-card px-2 py-0.5 rounded border border-border">
+                    Premium
+                  </span>
+                </div>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="0"
+                  value={goldDiscount}
+                  onChange={(e) => setGoldDiscount(e.target.value)}
+                  rightIcon={<Percent className="w-3.5 h-3.5 text-text-muted" />}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Commercial Policies & Rules */}
         <Card>
           <CardHeader>
@@ -159,6 +312,8 @@ export default function CompanySettingsPage() {
         <div className="flex justify-end">
           <Button
             type="submit"
+            isLoading={isSaving}
+            loadingText="Saving Settings..."
             leftIcon={<Save className="w-4 h-4" />}
           >
             Save Settings
@@ -168,3 +323,4 @@ export default function CompanySettingsPage() {
     </div>
   );
 }
+

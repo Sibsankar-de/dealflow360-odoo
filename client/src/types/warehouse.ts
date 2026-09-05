@@ -18,10 +18,7 @@ export interface PaginatedWarehousesResponse {
   limit: number;
 }
 
-export type WarehouseListData =
-  | PaginatedWarehousesResponse
-  | { warehouses: WarehouseResponseType[] }
-  | WarehouseResponseType[];
+export type WarehouseListData = PaginatedWarehousesResponse;
 
 export interface CreateWarehouseRequest {
   name: string;

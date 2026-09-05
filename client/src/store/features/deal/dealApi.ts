@@ -137,8 +137,10 @@ export const dealApi = baseApi.injectEndpoints({
 
 export const {
   useGetDealsQuery,
+  useLazyGetDealsQuery,
   useGetDealByIdQuery,
   useGetDealQuotationsQuery,
+  useLazyGetDealQuotationsQuery,
   useCreateDealMutation,
   useUpdateDealMutation,
   useDeleteDealMutation,

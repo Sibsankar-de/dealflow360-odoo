@@ -21,7 +21,7 @@ export default function CustomersPage() {
 
   const [queryParams, setQueryParams] = useState<ListCustomersQuery>({
     page: 1,
-    limit: 50,
+    limit: 10,
   });
 
   const { data, isLoading } = useGetCustomersQuery(
@@ -36,14 +36,8 @@ export default function CustomersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  const customers = React.useMemo(() => {
-    if (!data?.data) return [];
-    const raw = data.data;
-    if (Array.isArray(raw)) return raw;
-    if ("docs" in raw && Array.isArray(raw.docs)) return raw.docs;
-    if ("customers" in raw && Array.isArray(raw.customers)) return raw.customers;
-    return [];
-  }, [data]);
+  const customers = data?.data?.docs ?? [];
+  const totalPages = data?.data?.totalPages ?? 1;
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -102,8 +96,13 @@ export default function CustomersPage() {
           isLoading={isLoading}
           onViewCustomer={handleViewCustomer}
           onCreateCustomer={() => setIsCreateModalOpen(true)}
+          currentPage={queryParams.page || 1}
+          totalPage={totalPages}
+          onPageChange={(p) =>
+            setQueryParams((prev) => ({ ...prev, page: p }))
+          }
           onSearchChange={(search) =>
-            setQueryParams((prev) => ({ ...prev, search: search || undefined }))
+            setQueryParams((prev) => ({ ...prev, page: 1, search: search || undefined }))
           }
         />
       ) : (
@@ -123,9 +122,11 @@ export default function CustomersPage() {
       <CreateCustomerModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
+        companyId={companyId}
         onCreateCustomer={handleCreateCustomer}
         isLoading={isAdding}
       />
     </div>
   );
 }
+

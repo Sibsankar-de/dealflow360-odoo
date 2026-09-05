@@ -79,6 +79,7 @@ export const warehouseApi = baseApi.injectEndpoints({
 
 export const {
   useGetWarehousesQuery,
+  useLazyGetWarehousesQuery,
   useGetWarehouseByIdQuery,
   useCreateWarehouseMutation,
   useUpdateWarehouseMutation,

@@ -1,12 +1,27 @@
-import React from "react";
-import { ChevronLeft, Mail, Calendar, User, Shield, Layers, FileText, ArrowRight } from "lucide-react";
+import React, { useState } from "react";
+import {
+  ChevronLeft,
+  Mail,
+  Calendar,
+  User,
+  Shield,
+  Layers,
+  FileText,
+  ArrowRight,
+  Building2,
+  Clock,
+  XCircle,
+  Eye,
+} from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CustomerResponseType } from "@/types/customer";
+import { DealResponseType } from "@/types/deal";
 import { useGetDealsQuery } from "@/store/features/deal/dealApi";
+import { DeleteDealModal } from "@/components/modules/deals/DeleteDealModal";
 
 export interface CustomerDetailViewProps {
   customer: CustomerResponseType;
@@ -21,6 +36,8 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
   onBack,
   className,
 }) => {
+  const [dealToClose, setDealToClose] = useState<DealResponseType | null>(null);
+
   const { data: dealsData, isLoading: isLoadingDeals } = useGetDealsQuery(
     {
       companyId,
@@ -29,14 +46,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
     { skip: !companyId || !customer.id }
   );
 
-  const customerDeals = React.useMemo(() => {
-    if (!dealsData?.data) return [];
-    const raw = dealsData.data;
-    if (Array.isArray(raw)) return raw;
-    if ("docs" in raw && Array.isArray(raw.docs)) return raw.docs;
-    if ("deals" in raw && Array.isArray(raw.deals)) return raw.deals;
-    return [];
-  }, [dealsData]);
+  const customerDeals = dealsData?.data?.docs ?? [];
 
   const totalDealValue = customerDeals.reduce(
     (sum, d) => sum + (Number(d.expectedValue) || 0),
@@ -159,35 +169,98 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customerDeals.map((deal) => (
-                <Link
-                  key={deal.id}
-                  href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
-                  className="block p-4 rounded-xl bg-surface border border-border hover:border-brand-500 hover:shadow-xs transition-all"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-xs font-mono font-semibold text-text-muted">
-                      {deal.dealNo}
-                    </span>
-                    <Badge variant="purple" className="text-[10px] px-1.5 py-0">
-                      {deal.stage}
-                    </Badge>
+              {customerDeals.map((deal) => {
+                const expiryDate = deal.expectedCloseDate
+                  ? new Date(deal.expectedCloseDate).toLocaleDateString()
+                  : new Date(new Date(deal.createdAt).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString();
+
+                return (
+                  <div
+                    key={deal.id}
+                    className="p-5 rounded-xl bg-surface border border-border hover:border-brand-500/60 hover:shadow-sm transition-all flex flex-col justify-between gap-4"
+                  >
+                    <div>
+                      {/* Top Meta info: Deal No & Stage */}
+                      <div className="flex items-start justify-between gap-2 mb-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-mono font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
+                            {deal.dealNo}
+                          </span>
+                        </div>
+                        <Badge variant="purple" className="text-[10px] px-2 py-0">
+                          {deal.stage}
+                        </Badge>
+                      </div>
+
+                      {/* Deal Name */}
+                      <h4 className="text-sm font-bold text-text-primary mb-2 line-clamp-1">
+                        {deal.name}
+                      </h4>
+
+                      {/* Company & Expiry Metadata */}
+                      <div className="space-y-1.5 text-xs text-text-secondary">
+                        <div className="flex items-center gap-1.5 text-text-muted">
+                          <Building2 className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">
+                            {deal.company?.name || "DealFlow360 Workspace"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-text-muted">
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Valid / Expiry: {expiryDate}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Value & Actions Footer */}
+                    <div className="pt-3 border-t border-border/70 flex flex-col gap-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-muted">Expected Value:</span>
+                        <span className="font-bold text-sm text-text-primary">
+                          ${Number(deal.expectedValue).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
+                          className="flex-1"
+                        >
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="w-full text-xs font-semibold"
+                            leftIcon={<Eye className="w-3.5 h-3.5" />}
+                          >
+                            View Quotations
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDealToClose(deal)}
+                          className="text-xs text-danger hover:bg-red-50 hover:border-red-200"
+                          title="Reject or Close Deal"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-bold text-text-primary truncate mb-1">
-                    {deal.name}
-                  </h4>
-                  <div className="flex items-center justify-between text-xs text-text-secondary mt-3 pt-2 border-t border-border/60">
-                    <span>Probability: {deal.probability}%</span>
-                    <span className="font-semibold text-brand-600">
-                      ${Number(deal.expectedValue).toLocaleString()}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Delete / Close Deal Modal */}
+      <DeleteDealModal
+        isOpen={Boolean(dealToClose)}
+        onClose={() => setDealToClose(null)}
+        companyId={companyId}
+        deal={dealToClose}
+      />
     </div>
   );
 };

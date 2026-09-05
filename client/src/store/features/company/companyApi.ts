@@ -3,8 +3,11 @@ import { ApiResponse } from "@/types/auth";
 import {
   CompanyResponseType,
   CompanyMemberType,
+  CompanySettingType,
   CreateCompanyRequest,
-  UserCompaniesData,
+  UpdateCompanyRequest,
+  UpdateCompanySettingRequest,
+  PaginatedCompaniesResponse,
   AddCompanyUserRequest,
   UpdateCompanyUserRoleRequest,
   CompanyRoleDefinition,
@@ -13,12 +16,17 @@ import {
 export const companyApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getUserCompanies: builder.query<
-      ApiResponse<UserCompaniesData>,
-      void
+      ApiResponse<PaginatedCompaniesResponse>,
+      { page?: number; limit?: number } | void
     >({
-      query: () => ({
+      query: (params) => ({
         url: "/companies",
         method: "GET",
+        params: {
+          myCompanies: true,
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 10,
+        },
       }),
       providesTags: ["Company"],
     }),
@@ -32,6 +40,17 @@ export const companyApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: (_result, _error, id) => [{ type: "Company", id }],
+    }),
+
+    getCompanySettings: builder.query<
+      ApiResponse<{ settings: CompanySettingType }>,
+      string
+    >({
+      query: (companyId) => ({
+        url: `/companies/${companyId}/settings`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, id) => [{ type: "Company", id: `settings-${id}` }],
     }),
 
     getCompanyMembers: builder.query<
@@ -70,6 +89,36 @@ export const companyApi = baseApi.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Company"],
+    }),
+
+    updateCompany: builder.mutation<
+      ApiResponse<{ company: CompanyResponseType }>,
+      { companyId: string; data: UpdateCompanyRequest }
+    >({
+      query: ({ companyId, data }) => ({
+        url: `/companies/${companyId}`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        "Company",
+        { type: "Company", id: companyId },
+      ],
+    }),
+
+    updateCompanySettings: builder.mutation<
+      ApiResponse<{ settings: CompanySettingType }>,
+      { companyId: string; data: UpdateCompanySettingRequest }
+    >({
+      query: ({ companyId, data }) => ({
+        url: `/companies/${companyId}/settings`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { companyId }) => [
+        { type: "Company", id: companyId },
+        { type: "Company", id: `settings-${companyId}` },
+      ],
     }),
 
     addCompanyMember: builder.mutation<
@@ -119,12 +168,16 @@ export const companyApi = baseApi.injectEndpoints({
 export const {
   useGetUserCompaniesQuery,
   useGetCompanyByIdQuery,
+  useGetCompanySettingsQuery,
   useGetCompanyMembersQuery,
   useGetCompanyRolesQuery,
   useCreateCompanyMutation,
+  useUpdateCompanyMutation,
+  useUpdateCompanySettingsMutation,
   useAddCompanyMemberMutation,
   useUpdateCompanyMemberRoleMutation,
   useRemoveCompanyMemberMutation,
 } = companyApi;
+
 
 

@@ -38,10 +38,7 @@ export interface PaginatedProductsResponse {
   limit: number;
 }
 
-export type ProductListData =
-  | PaginatedProductsResponse
-  | { products: ProductResponseType[] }
-  | ProductResponseType[];
+export type ProductListData = PaginatedProductsResponse;
 
 export interface CreateProductRequest {
   name: string;

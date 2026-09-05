@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
 import { ProductModal } from "./ProductModal";
 import { DeleteProductModal } from "./DeleteProductModal";
 import {
@@ -21,12 +22,22 @@ interface ProductListProps {
   products: ProductResponseType[];
   companyId: string;
   isLoading?: boolean;
+  currentPage?: number;
+  totalPage?: number;
+  onPageChange?: (page: number) => void;
+  onSearchChange?: (search: string) => void;
+  onTypeChange?: (type: string) => void;
 }
 
 export const ProductList: React.FC<ProductListProps> = ({
   products,
   companyId,
   isLoading = false,
+  currentPage = 1,
+  totalPage = 1,
+  onPageChange,
+  onSearchChange,
+  onTypeChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
@@ -36,8 +47,21 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [deleteProduct, setDeleteProduct] =
     useState<ProductResponseType | null>(null);
 
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    onSearchChange?.(val);
+  };
+
+  const handleTypeChange = (val: string) => {
+    setTypeFilter(val);
+    onTypeChange?.(val);
+  };
+
   const filteredProducts = products.filter((p) => {
+    // If parent handles search, products are already server filtered;
+    // this also provides instantaneous client-side fallback.
     const matchesSearch =
+      !searchTerm ||
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.description &&
         p.description.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -82,13 +106,13 @@ export const ProductList: React.FC<ProductListProps> = ({
             leftIcon={<Search className="w-4 h-4" />}
             placeholder="Search products by name or description..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <div className="w-full sm:w-56">
           <Select
             value={typeFilter}
-            onChange={(val) => setTypeFilter(val)}
+            onChange={(val) => handleTypeChange(val)}
             options={[
               { key: "ALL", value: "All Types" },
               { key: "ONE_TIME", value: "One-Time" },
@@ -220,6 +244,17 @@ export const ProductList: React.FC<ProductListProps> = ({
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPage > 1 && (
+        <div className="pt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPage={totalPage}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
 
       {/* Modals */}
       <ProductModal
