@@ -34,13 +34,9 @@ export default function CompanyDashboardLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-surface">
-        {/* Top Navbar with Store Information & User Avatar Menu */}
+        {/* Top Navbar with User Avatar Menu */}
         <Navbar
           variant="company"
-          companyId={companyId}
-          companyName="Acme Industrial Supplies"
-          userRole="Sales Representative"
-          companyStatus="Online"
           user={CURRENT_USER}
         />
 

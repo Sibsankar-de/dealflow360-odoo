@@ -48,7 +48,7 @@ The project follows a modular, feature-oriented structure under `src/`:
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 ├── components/           # Reusable shared UI and layout components
-│   ├── ui/               # Base primitives (Avatar, AppLogo/CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
+│   ├── ui/               # Base primitives (Avatar, AppLogo, Select, CurrencySelector, FilterSelector, SearchableInput, Button, Input, Modal, Card, Badge, Tabs)
 │   ├── shared/           # Shared compound components (navbar, sidebar, tables)
 │   └── modules/          # Feature module UI components
 │       ├── auth/         # LoginForm, SignupForm, AuthBrandingPanel

@@ -96,7 +96,7 @@ export const CreateCompanyModal: React.FC<CreateCompanyModalProps> = ({
             label="Default Currency"
             required
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
+            onChange={(val) => setCurrency(val)}
           />
         </div>
 

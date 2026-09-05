@@ -1,31 +1,30 @@
+"use client";
+
 import React from "react";
-import { Select, SelectProps } from "./Select";
+import { Select } from "./Select";
 import currencies from "@/utils/currency-utils";
+import { SelectType } from "@/types/SelectType";
 
-export interface CurrencySelectorProps extends Omit<SelectProps, "options"> {
-  value?: string;
-  dropdownClass?: string;
-}
-
-export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
-  value,
-  dropdownClass,
-  id = "currency-selector",
+export const CurrencySelector: React.FC<SelectType> = ({
+  value = "USD",
+  placeholder = "Select currency",
   ...props
 }) => {
-  const options = currencies.map((e) => ({
-    value: e.code,
-    label: `${e.code}${e.symbol ? ` (${e.symbol})` : ""} - ${e.name}`,
+  const options = currencies.map((c) => ({
+    key: c.code,
+    value: c.symbol && c.symbol !== c.code 
+      ? `${c.code} (${c.symbol}) - ${c.name}` 
+      : `${c.code} - ${c.name}`,
   }));
-  const selectedValue = value || "INR";
 
   return (
     <Select
       {...props}
-      value={selectedValue}
+      value={value}
+      placeholder={placeholder}
       options={options}
-      id={id}
-      className={dropdownClass}
+      id="currency-selector"
+      dropdownClass="max-h-60"
     />
   );
 };
