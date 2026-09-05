@@ -185,6 +185,22 @@ Responsibilities:
 - Store product inventory levels per warehouse (`product_stocks`) linking products and warehouses with decimal stock quantity (`stock_qty`) and a unique constraint across product and warehouse.
 - Store product discount tiers per customer tier (`product_discount_tiers`) linking products with customer tiers (BRONZE, SILVER, GOLD) and percentage discounts stored as decimal (`discount_percent`).
 
+### 4.8 Quotation and Negotiation Persistence Context
+
+Responsibilities:
+
+- Store quotation records (`quotations`) linking company, creator (sales representative or admin), and registered customer account.
+- Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`).
+- Store line items (`quotation_items`) with decimal quantities, unit prices, discount percentages, tax percentages, and line totals.
+- Track negotiations (`quotation_negotiations`) with proposed discounts, proposed totals, customer messages, admin messages, and `NegotiationStatus` enum (`APPROVED`, `UNDER_REVIEW`, `REJECTED`).
+- Ensure atomic creation and modification of quotations and line items using database transactions.
+
+### 4.9 Company Configuration Context
+
+Responsibilities:
+
+- Store company key-value configurations (`company_configs`) with unique constraints per company and config key (`companyId`, `config_key`).
+
 
 ## 5. Core Domain Model
 

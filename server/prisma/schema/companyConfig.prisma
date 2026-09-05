@@ -1,0 +1,15 @@
+model CompanyConfig {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  configKey   String   @map("config_key")
+  configValue String   @map("config_value")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, configKey])
+  @@index([companyId])
+  @@map("company_configs")
+}

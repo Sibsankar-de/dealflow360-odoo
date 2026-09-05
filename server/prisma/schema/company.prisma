@@ -24,6 +24,7 @@ model Company {
   products     Product[]
   quotations   Quotation[]
   settings     CompanySetting?
+  configs      CompanyConfig[]
 
   @@index([ownerId])
   @@index([status])
