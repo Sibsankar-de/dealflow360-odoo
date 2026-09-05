@@ -12,6 +12,8 @@ import {
   createQuotationSchema,
   updateQuotationSchema,
   quotationFilterSchema,
+  cancelQuotationSchema,
+  rejectQuotationSchema,
 } from "../schemas/quotation.schema";
 import { QuotationStatus } from "@prisma/client";
 
@@ -160,6 +162,72 @@ export class QuotationController {
           StatusCodes.OK,
           { quotation: updated },
           "Quotation status updated successfully",
+        ),
+      );
+  });
+
+  public cancel = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const { id } = req.params;
+    if (!id || typeof id !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const validated =
+      req.body && Object.keys(req.body).length > 0
+        ? validateBody(cancelQuotationSchema, req.body)
+        : undefined;
+
+    const cancelled = await this.quotationService.cancelQuotation(
+      id,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation: cancelled },
+          "Quotation cancelled successfully",
+        ),
+      );
+  });
+
+  public reject = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const { id } = req.params;
+    if (!id || typeof id !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const validated =
+      req.body && Object.keys(req.body).length > 0
+        ? validateBody(rejectQuotationSchema, req.body)
+        : undefined;
+
+    const rejected = await this.quotationService.rejectQuotation(
+      id,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation: rejected },
+          "Quotation rejected successfully",
         ),
       );
   });

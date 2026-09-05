@@ -19,6 +19,8 @@ import {
   UpdateQuotationDto,
   QuotationResponseDto,
   QuotationFilterDto,
+  CancelQuotationDto,
+  RejectQuotationDto,
   toQuotationDto,
 } from "../dto/quotation.dto";
 
@@ -320,6 +322,115 @@ export class QuotationService {
       }
 
       const updated = await this.quotationRepo.updateStatus(quotationId, status, tx);
+      return toQuotationDto(updated);
+    });
+  }
+
+  public async cancelQuotation(
+    quotationId: string,
+    requestingUserId: string,
+    dto?: CancelQuotationDto,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (quotation.status === QuotationStatus.CANCELLED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Quotation is already cancelled",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot cancel an accepted quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.EXPIRED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot cancel an expired quotation",
+        );
+      }
+
+      const notes = dto?.reason
+        ? quotation.notes
+          ? `${quotation.notes}\nCancellation reason: ${dto.reason}`
+          : `Cancellation reason: ${dto.reason}`
+        : quotation.notes;
+
+      const updated = await this.quotationRepo.update(
+        quotationId,
+        {
+          status: QuotationStatus.CANCELLED,
+          notes,
+        },
+        tx,
+      );
+
+      return toQuotationDto(updated);
+    });
+  }
+
+  public async rejectQuotation(
+    quotationId: string,
+    requestingUserId: string,
+    dto?: RejectQuotationDto,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (quotation.status === QuotationStatus.REJECTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Quotation is already rejected",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot reject an accepted quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.CANCELLED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot reject a cancelled quotation",
+        );
+      }
+
+      if (quotation.status === QuotationStatus.EXPIRED) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot reject an expired quotation",
+        );
+      }
+
+      const notes = dto?.reason
+        ? quotation.notes
+          ? `${quotation.notes}\nRejection reason: ${dto.reason}`
+          : `Rejection reason: ${dto.reason}`
+        : quotation.notes;
+
+      const updated = await this.quotationRepo.update(
+        quotationId,
+        {
+          status: QuotationStatus.REJECTED,
+          notes,
+        },
+        tx,
+      );
+
       return toQuotationDto(updated);
     });
   }

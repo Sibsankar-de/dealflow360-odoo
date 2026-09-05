@@ -25,5 +25,9 @@ router.get("/", quotationController.list);
 router.get("/:id", quotationController.getById);
 router.patch("/:id", quotationController.update);
 router.patch("/:id/status", quotationController.updateStatus);
+router.post("/:id/cancel", quotationController.cancel);
+router.patch("/:id/cancel", quotationController.cancel);
+router.post("/:id/reject", quotationController.reject);
+router.patch("/:id/reject", quotationController.reject);
 
 export default router;

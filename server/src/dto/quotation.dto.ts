@@ -80,6 +80,14 @@ export interface QuotationFilterDto {
   limit?: number;
 }
 
+export interface CancelQuotationDto {
+  reason?: string;
+}
+
+export interface RejectQuotationDto {
+  reason?: string;
+}
+
 export const toQuotationItemDto = (
   item: QuotationItem & { product?: Product },
 ): QuotationItemResponseDto => {

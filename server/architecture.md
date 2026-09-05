@@ -192,6 +192,7 @@ Responsibilities:
 - Store quotation records (`quotations`) linking company, creator (sales representative or admin), and registered customer account.
 - Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`), allowing DRAFT or SENT at creation.
 - Protect quotation creation routes using company-level RBAC middleware (`verifyCompanyAccess`, `requireRole`) restricted to ADMIN, SALES_REP, and SALES_MANAGER roles.
+- Provide dedicated cancellation (`/:id/cancel`) and rejection (`/:id/reject`) endpoints with transactional state updates and optional reason logging.
 - Store line items (`quotation_items`) with decimal quantities, unit prices, discount percentages, tax percentages, and line totals.
 - Track negotiations (`quotation_negotiations`) with proposed discounts, proposed totals, customer messages, admin messages, and `NegotiationStatus` enum (`APPROVED`, `UNDER_REVIEW`, `REJECTED`).
 - Ensure atomic creation and modification of quotations and line items using database transactions.

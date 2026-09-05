@@ -64,7 +64,17 @@ export const quotationFilterSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
+export const cancelQuotationSchema = z.object({
+  reason: z.string().max(1000, "Reason cannot exceed 1000 characters").optional(),
+});
+
+export const rejectQuotationSchema = z.object({
+  reason: z.string().max(1000, "Reason cannot exceed 1000 characters").optional(),
+});
+
 export type CreateQuotationItemInput = z.infer<typeof createQuotationItemSchema>;
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;
 export type UpdateQuotationInput = z.infer<typeof updateQuotationSchema>;
 export type QuotationFilterInput = z.infer<typeof quotationFilterSchema>;
+export type CancelQuotationInput = z.infer<typeof cancelQuotationSchema>;
+export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
