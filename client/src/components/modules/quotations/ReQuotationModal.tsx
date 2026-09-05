@@ -26,14 +26,14 @@ export const ReQuotationModal: React.FC<ReQuotationModalProps> = ({
 
   const [customerNote, setCustomerNote] = useState("");
   const [internalNote, setInternalNote] = useState("");
-  const [discountAdjustment, setDiscountAdjustment] = useState<number | string>(0);
+  const [discountAdjustment, setDiscountAdjustment] = useState<number | string>("");
   const [error, setError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setCustomerNote("");
       setInternalNote("");
-      setDiscountAdjustment(0);
+      setDiscountAdjustment("");
       setError(null);
     }
   }, [isOpen]);

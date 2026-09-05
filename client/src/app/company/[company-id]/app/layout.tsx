@@ -34,7 +34,7 @@ export default function CompanyDashboardLayout({
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-surface flex">
+      <div className="h-screen overflow-hidden bg-surface flex">
         {/* Dark Categorized Sidebar on the left with StoreInfo at bottom */}
         <Sidebar
           companyId={companyId}
@@ -46,7 +46,7 @@ export default function CompanyDashboardLayout({
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-surface">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-surface">
           {/* Top Navbar with User Avatar Menu */}
           <Navbar
             variant="company"

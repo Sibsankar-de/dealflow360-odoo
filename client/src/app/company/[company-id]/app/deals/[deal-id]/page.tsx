@@ -136,15 +136,17 @@ export default function DealDetailPage() {
           >
             Edit Deal
           </Button>
-          <Button
-            size="sm"
-            leftIcon={<Plus className="w-3.5 h-3.5" />}
-            onClick={() => setIsCreateQuoteOpen(true)}
-          >
-            Generate Quotation
-          </Button>
+          <Link href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}>
+            <Button
+              size="sm"
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Generate Quotation
+            </Button>
+          </Link>
         </div>
       </div>
+
 
       {/* Deal Overview Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -210,14 +212,21 @@ export default function DealDetailPage() {
               Commercial proposals, customer negotiation cycles, and revision history.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<Plus className="w-3.5 h-3.5" />}
-            onClick={() => setIsCreateQuoteOpen(true)}
-          >
-            New Quotation
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href={`/company/${companyId}/app/deals/${deal.id}/quotations`}>
+              <Button size="sm" variant="outline">
+                View All Quotations
+              </Button>
+            </Link>
+            <Link href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}>
+              <Button
+                size="sm"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+              >
+                New Quotation
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {quotations.length === 0 ? (
@@ -229,16 +238,18 @@ export default function DealDetailPage() {
             <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
               Generate a formal commercial quotation for this customer to begin negotiations.
             </p>
-            <Button
-              className="mt-4"
-              size="sm"
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => setIsCreateQuoteOpen(true)}
-            >
-              Generate First Quotation
-            </Button>
+            <Link href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}>
+              <Button
+                className="mt-4"
+                size="sm"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Generate First Quotation
+              </Button>
+            </Link>
           </div>
         ) : (
+
           <div className="space-y-4">
             {quotations.map((quote) => {
               const currentRev = quote.currentRevision;
@@ -258,9 +269,12 @@ export default function DealDetailPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-text-primary text-base">
+                          <Link
+                            href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                            className="font-bold text-text-primary text-base hover:text-brand-600 transition-colors"
+                          >
                             {quote.quotationNo}
-                          </h3>
+                          </Link>
                           <Badge
                             variant={
                               STATUS_BADGES[quote.status] || "secondary"
@@ -288,13 +302,25 @@ export default function DealDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Link
+                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                        >
+                          {quote.status === "DRAFT" || quote.status === "NEGOTIATING"
+                            ? "Edit / View"
+                            : "View Details"}
+                        </Button>
+                      </Link>
                       <Button
                         size="sm"
                         variant="outline"
                         leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
                         onClick={() => setReviseQuotation(quote)}
                       >
-                        Create Revision / Re-Quote
+                        Re-Quote
                       </Button>
                     </div>
                   </div>

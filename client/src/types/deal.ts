@@ -80,3 +80,11 @@ export interface ListDealsQuery {
   page?: number;
   limit?: number;
 }
+
+export interface ListDealQuotationsQuery {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}
+

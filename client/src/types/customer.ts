@@ -1,14 +1,41 @@
-import { QuotationItem } from "./quotation";
+import { BackendCompanyRole } from "./company";
 
-export type CustomerStatus = "Active" | "Pending" | "Inactive";
+export type CustomerTier = "BRONZE" | "SILVER" | "GOLD";
 
-export interface CustomerItem {
+export interface CustomerResponseType {
   id: string;
-  fullName: string;
+  companyUserId?: string | null;
+  companyId: string;
+  name: string;
   email: string;
-  phone?: string;
-  organization?: string;
-  status: CustomerStatus;
+  avatar: string | null;
+  customerTier: CustomerTier | null;
+  role: BackendCompanyRole;
   createdAt: string;
-  associatedQuotations: QuotationItem[];
+  updatedAt: string;
+}
+
+export interface PaginatedCustomersResponse {
+  docs: CustomerResponseType[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type CustomerListData =
+  | PaginatedCustomersResponse
+  | { customers: CustomerResponseType[] }
+  | CustomerResponseType[];
+
+export interface ListCustomersQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  customerTier?: CustomerTier;
+}
+
+export interface AddCustomerRequest {
+  userEmail: string;
+  role?: BackendCompanyRole;
 }

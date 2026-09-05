@@ -75,6 +75,10 @@ export interface QuotationResponse {
   currentRevisionId: string | null;
   createdAt: string;
   updatedAt: string;
+  subtotal?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  totalAmount?: number;
   items?: QuotationItemDetail[];
   currentRevision?: QuotationRevisionDetail;
   revisions?: QuotationRevisionDetail[];

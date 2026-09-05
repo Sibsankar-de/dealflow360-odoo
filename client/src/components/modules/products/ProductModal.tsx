@@ -52,7 +52,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     product?.type || "ONE_TIME"
   );
   const [stocks, setStocks] = useState<
-    Array<{ warehouseId: string; stockQty: number }>
+    Array<{ warehouseId: string; stockQty: number | string }>
   >(
     product?.stocks?.map((s) => ({
       warehouseId: s.warehouseId,
@@ -94,10 +94,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (availableWarehouse) {
       setStocks((prev) => [
         ...prev,
-        { warehouseId: availableWarehouse.id, stockQty: 0 },
+        { warehouseId: availableWarehouse.id, stockQty: "" },
       ]);
     } else if (warehouses[0]) {
-      setStocks((prev) => [...prev, { warehouseId: warehouses[0].id, stockQty: 0 }]);
+      setStocks((prev) => [...prev, { warehouseId: warehouses[0].id, stockQty: "" }]);
     }
   };
 
@@ -111,9 +111,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     );
   };
 
-  const handleStockQtyChange = (index: number, qty: number) => {
+  const handleStockQtyChange = (index: number, qty: number | string) => {
     setStocks((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, stockQty: Math.max(0, qty) } : s))
+      prev.map((s, i) => (i === index ? { ...s, stockQty: qty } : s))
     );
   };
 
@@ -144,6 +144,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           },
         }).unwrap();
       } else {
+        const formattedStocks = stocks.map((s) => ({
+          warehouseId: s.warehouseId,
+          stockQty: Number(s.stockQty) || 0,
+        }));
+
         await createProduct({
           companyId,
           data: {
@@ -152,7 +157,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             price: Number(price),
             baseUnit,
             type,
-            stocks: stocks.length > 0 ? stocks : undefined,
+            stocks: formattedStocks.length > 0 ? formattedStocks : undefined,
           },
         }).unwrap();
       }
@@ -297,12 +302,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                           min="0"
                           value={stock.stockQty}
                           onChange={(e) =>
-                            handleStockQtyChange(
-                              idx,
-                              parseInt(e.target.value) || 0
-                            )
+                            handleStockQtyChange(idx, e.target.value)
                           }
-                          placeholder="Qty"
+                          placeholder="0"
                         />
                       </div>
                       <button

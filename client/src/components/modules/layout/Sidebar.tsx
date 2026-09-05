@@ -16,11 +16,11 @@ import {
   RefreshCw,
   Receipt,
   Activity,
-  HelpCircle,
   Settings,
   PanelLeftClose,
   ShieldCheck,
 } from "lucide-react";
+
 
 export interface SidebarProps {
   companyId: string;
@@ -74,11 +74,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: `/company/${companyId}/app/deals`,
           icon: <Briefcase className="w-4 h-4" />,
         },
-        {
-          label: "Quotations",
-          href: `/company/${companyId}/app/quotations`,
-          icon: <FileText className="w-4 h-4" />,
-        },
+        // {
+        //   label: "Quotations",
+        //   href: `/company/${companyId}/app/quotations`,
+        //   icon: <FileText className="w-4 h-4" />,
+        // },
         {
           label: "Customers",
           href: `/company/${companyId}/app/customers`,
@@ -140,15 +140,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`bg-navy-950 text-white flex flex-col justify-between border-r border-navy-800/80 shrink-0 select-none min-h-screen transition-all duration-200 ${
+      className={`bg-navy-950 text-white flex flex-col justify-between border-r border-navy-800/80 shrink-0 select-none h-screen transition-all duration-200 ${
         isCollapsed ? "w-16" : "w-64"
       } ${className}`}
     >
       {/* Top Header & Main Navigation */}
-      <div className="flex flex-col">
+      <div className="flex flex-col flex-1 min-h-0">
         {/* Header with AppLogo & Collapse Button */}
         <div
-          className={`h-16 px-4 flex items-center border-b border-navy-900 ${
+          className={`h-16 px-4 flex items-center border-b border-navy-900 shrink-0 ${
             isCollapsed ? "justify-center" : "justify-between"
           }`}
         >
@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Categorized Nav Items */}
-        <nav className="p-3 space-y-5 overflow-y-auto">
+        <nav className="p-3 space-y-5 flex-1 overflow-y-auto">
           {NAV_SECTIONS.map((section) => (
             <div key={section.title} className="space-y-1">
               {!isCollapsed && (
@@ -222,20 +222,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Bottom Footer Section: Help & Support, Settings, and StoreInfo */}
-      <div className="p-3 border-t border-navy-900 space-y-3">
+      {/* Bottom Footer Section: Settings and StoreInfo */}
+      <div className="p-3 border-t border-navy-900 space-y-3 shrink-0">
         {/* Secondary Utility Links */}
         <div className="space-y-0.5">
-          <Link
-            href={`/company/${companyId}/app/help`}
-            title={isCollapsed ? "Help & Support" : undefined}
-            className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:text-white hover:bg-navy-900 transition-colors ${
-              isCollapsed ? "justify-center px-0" : ""
-            }`}
-          >
-            <HelpCircle className="w-4 h-4 shrink-0" />
-            {!isCollapsed && <span>Help & Support</span>}
-          </Link>
           <Link
             href={`/company/${companyId}/app/settings`}
             title={isCollapsed ? "Settings" : undefined}
@@ -247,6 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && <span>Settings</span>}
           </Link>
         </div>
+
 
         {/* StoreInfo component at the bottom of the sidebar */}
         {!isCollapsed ? (
