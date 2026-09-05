@@ -64,7 +64,7 @@ src/
 │   ├── fulfillment/      # Delivery tracking, backorders
 │   ├── finance/          # Invoices, financial approvals
 │   ├── customers/        # Customer directory and interaction history
-│   ├── layout/           # App navigation (Navbar: profile vs company view, UserAvatarMenu)
+│   ├── layout/           # App navigation (Collapsible Sidebar, Navbar: profile vs company view, StoreInfo, UserAvatarMenu)
 │   ├── profile/          # User profile, credentials, and company affiliations
 │   └── company/          # Team, roles, product management
 ├── services/             # Centralized API clients and endpoint definitions
@@ -108,13 +108,18 @@ State is strictly divided into two categories:
 Routes are structured around user roles and core platform workflows:
 
 * `/(auth)`: Authentication routes (Login, Register).
-* `/dashboard`: Main dashboard with deal health and high-level KPIs.
-* `/profile`: User profile, credentials, and company memberships.
-* `/quotations`: Quotation list, creation wizard, approval review, and customer negotiation interface.
-* `/fulfillment`: Delivery tracking, batch fulfillment, and backorder lists.
-* `/invoices`: Invoice listing and invoice generation based on delivered quantities.
-* `/products`: Product catalog, pricing rules, discount thresholds, and risk constraints.
-* `/settings`: Company management, role permissions, and collaborator management.
+* `/profile`: User profile, credentials, and company memberships (Profile Navbar layout).
+* `/company/[company-id]/(dashboard)`: Company tenant dashboard workspace (Company Navbar layout).
+  * `/company/[company-id]/dashboard`: Company metrics and KPIs.
+  * `/company/[company-id]/quotations`: Quotation Kanban pipeline board and table views.
+  * `/company/[company-id]/approvals`: Managerial and finance approval workflows.
+  * `/company/[company-id]/fulfillment`: Delivery and backorder fulfillment tracking.
+  * `/company/[company-id]/subscriptions`: Recurring billing and subscription contracts.
+  * `/company/[company-id]/invoices`: Invoice management based on delivered items.
+  * `/company/[company-id]/deal-health`: Deal health alerts and stalled quotation indicators.
+  * `/company/[company-id]/reports`: Analytics and exportable business reports.
+  * `/company/[company-id]/products`: Product catalog, pricing constraints, and risk limits.
+* `/company/[company-id]/(customer)`: Customer quotation review, negotiation, and sign-off portal.
 
 ---
 

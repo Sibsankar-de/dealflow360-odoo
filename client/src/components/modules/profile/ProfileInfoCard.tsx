@@ -1,9 +1,8 @@
 import React from "react";
 import { Avatar } from "@/components/ui/Avatar";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Mail, Phone, Shield, Edit3, KeyRound } from "lucide-react";
+import { Mail, Phone, Edit3, KeyRound } from "lucide-react";
 import { UserProfile } from "@/types/profile";
 
 export interface ProfileInfoCardProps {
@@ -27,15 +26,7 @@ export const ProfileInfoCard: React.FC<ProfileInfoCardProps> = ({
             className="ring-4 ring-border shadow-xs"
           />
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl font-bold text-text-primary">{user.fullName}</h1>
-              <Badge
-                variant="secondary"
-                icon={<Shield className="w-3 h-3 text-text-muted" />}
-              >
-                Platform: {user.platformRole}
-              </Badge>
-            </div>
+            <h1 className="text-xl font-bold text-text-primary">{user.fullName}</h1>
             <div className="flex items-center gap-2 text-sm text-text-secondary mt-1">
               <Mail className="w-3.5 h-3.5 text-text-muted" />
               <span>{user.email}</span>

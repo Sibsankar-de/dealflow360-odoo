@@ -4,8 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { Badge } from "@/components/ui/Badge";
-import { User, LogOut, ChevronDown } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 
 export interface UserAvatarMenuProps {
   user: {
@@ -26,27 +25,15 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
 
   return (
     <div className={`relative inline-flex items-center ${className}`}>
+      {/* Trigger: Avatar only */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-surface transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 cursor-pointer"
+        className="flex items-center justify-center p-0.5 rounded-full hover:ring-2 hover:ring-brand-500/40 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
         aria-label="User navigation menu"
         aria-expanded={isOpen}
       >
         <Avatar name={user.fullName} size="sm" className="ring-1 ring-border" />
-        <div className="hidden sm:flex flex-col items-start text-left">
-          <span className="text-xs font-semibold text-text-primary leading-tight">
-            {user.fullName}
-          </span>
-          <span className="text-[10px] text-text-muted leading-tight">
-            {user.email}
-          </span>
-        </div>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${
-            isOpen ? "rotate-180" : "rotate-0"
-          }`}
-        />
       </button>
 
       <Dropdown
@@ -55,6 +42,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
         placement="bottom"
         className="right-0 left-auto w-56 p-1.5 mt-2"
       >
+        {/* User Details in Dropdown (without role tag) */}
         <div className="px-3 py-2 border-b border-border mb-1">
           <p className="text-xs font-semibold text-text-primary truncate">
             {user.fullName}
@@ -62,13 +50,6 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
           <p className="text-[11px] text-text-secondary truncate mt-0.5">
             {user.email}
           </p>
-          {user.platformRole && (
-            <div className="mt-1.5">
-              <Badge variant="secondary" className="text-[10px] px-2 py-0">
-                {user.platformRole}
-              </Badge>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col gap-0.5">
