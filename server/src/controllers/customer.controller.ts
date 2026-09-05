@@ -8,6 +8,7 @@ import {
   customerService as defaultCustomerService,
 } from "../services/customer.service";
 import { customerListQuerySchema } from "../schemas/customer.schema";
+import { searchCustomersInElasticsearch } from "../services/elasticsearch.service";
 
 export class CustomerController {
   private customerService: CustomerService;
@@ -38,6 +39,32 @@ export class CustomerController {
           StatusCodes.OK,
           result,
           "Customers fetched successfully",
+        ),
+      );
+  });
+
+  public search = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const query =
+      (req.query.query as string) || (req.query.search as string) || "";
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+
+    const customers = await searchCustomersInElasticsearch(
+      req.company.id,
+      query,
+      isNaN(limit) || limit <= 0 ? 10 : limit,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          customers,
+          "Customers searched successfully",
         ),
       );
   });

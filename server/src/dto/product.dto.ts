@@ -115,3 +115,29 @@ export const toProductDto = (
   discountTiers: p.discountTiers?.map(toProductDiscountTierDto),
   categories: p.categories?.map((cp) => toCategoryDto(cp.category)),
 });
+
+export interface ProductSummaryResponseDto {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  baseUnit: string;
+  type: ProductType;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const toProductSummaryDto = (
+  p: Product,
+): ProductSummaryResponseDto => ({
+  id: p.id,
+  companyId: p.companyId,
+  name: p.name,
+  description: p.description ?? null,
+  price: Number(p.price),
+  baseUnit: p.baseUnit,
+  type: p.type,
+  createdAt: p.createdAt,
+  updatedAt: p.updatedAt,
+});

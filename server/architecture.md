@@ -201,9 +201,8 @@ Responsibilities:
   - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
 - Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
-  - Maintain link to the active commercial revision (`current_revision_id`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
-  - Provide paginated quotation listing for deals via GET /api/v1/deals/:companyId/:id/quotations and GET /api/v1/quotations/deal/:dealId.
+  - Provide paginated quotation listing for deals via GET /api/v1/deals/:companyId/:id/quotations and GET /api/v1/quotations/:companyId/deal/:dealId.
 - Store active quotation line items (`quotation_items`) representing current products, quantities, unit prices, discount types (`PERCENTAGE`, `FIXED`), discount values, discount amounts, tax rates, final unit prices, and line totals.
 - Store immutable, versioned quotation revisions (`quotation_revisions`) capturing the proposal state at every commercial iteration.
   - Track revision metadata: `revision_no`, author (`created_by`), `revision_type` (`INITIAL`, `SALES_COUNTER`, `CUSTOMER_COUNTER`, `FINAL`), and `status` (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`).
@@ -345,26 +344,26 @@ Client supplied prices must not override server side pricing rules.
 A quotation is created from the selected products and applicable commercial rules, linked to a parent Deal.
 
 Quotation Creation and Item Management Flow:
-1. Create Quotation in DRAFT state (POST /api/v1/quotations):
+1. Create Quotation in DRAFT state (POST /api/v1/quotations/:companyId):
    - Created with initial status DRAFT determined by the backend.
    - Initial quotation contains no items.
    - Requires deal_id, customer_id, optional sales_rep_id, currency, and valid_until.
    - Protected by company RBAC (ADMIN, SALES_REP, SALES_MANAGER).
-2. Add Quotation Item (POST /api/v1/quotations/:id/items or /api/v1/quotations/:quotationId/items):
+2. Add Quotation Item (POST /api/v1/quotations/:companyId/:id/items):
    - Adds a single product line item to a DRAFT quotation.
    - Determines product base price and customer tier discount:
      a. Checks product specific tier discount in product_discount_tiers.
      b. Falls back to company setting customer_discount_tier.
      c. Calculates unit price, discount amount, final unit price, and line total.
    - Adding items is rejected if quotation is not in DRAFT status.
-3. Remove Quotation Item (DELETE /api/v1/quotations/:id/items/:itemId):
+3. Remove Quotation Item (DELETE /api/v1/quotations/:companyId/:id/items/:itemId):
    - Removes a line item from a DRAFT quotation.
    - Removing items is rejected if quotation is not in DRAFT status.
-4. List Quotation Items (GET /api/v1/quotations/:id/items):
+4. List Quotation Items (GET /api/v1/quotations/:companyId/:id/items):
    - Lists all active items with product information and calculated commercial values.
-5. Get Quotation Details (GET /api/v1/quotations/:id):
+5. Get Quotation Details (GET /api/v1/quotations/:companyId/:id):
    - Returns quotation header, linked deal, customer, sales rep, company, items, and calculated totals (subtotal, discountAmount, taxAmount, totalAmount).
-6. Send Quotation (POST /api/v1/quotations/:id/send):
+6. Send Quotation (POST /api/v1/quotations/:companyId/:id/send):
    - Validates that the quotation contains at least 1 item.
    - Validates that validity date (validUntil) is not expired.
    - Transitions quotation status from DRAFT to SENT.
@@ -387,7 +386,7 @@ Quotation
 
 Revisions capture versioned history:
 - When a draft or negotiating quotation is updated with revised proposal lines or pricing, previous items are replaced on the active quotation and a versioned QuotationRevision (revision_type = SALES_COUNTER) is recorded.
-- Revisions can be retrieved via GET /api/v1/quotations/:id/revisions.
+- Revisions can be retrieved via GET /api/v1/quotations/:companyId/:id/revisions.
 
 ### Step 5: Discount Violation Evaluation and Commercial Approval
 
@@ -415,26 +414,26 @@ Where:
 
 Quotation discount evaluations:
 - The evaluation checks if any line exceeds allowed limits (maxLineViolation > 0) or if the blended score exceeds the company threshold (BLENDED_DISCOUNT_THRESHOLD).
-- Automated evaluation is executed on quotation send (POST /api/v1/quotations/:id/send), customer counter-offer (POST /api/v1/quotations/:id/counter-offer), and retrieval (GET /api/v1/quotations/:id/discount-evaluation).
+- Automated evaluation is executed on quotation send (POST /api/v1/quotations/:companyId/:id/send), customer counter-offer (POST /api/v1/quotations/:companyId/:id/counter-offer), and retrieval (GET /api/v1/quotations/:companyId/:id/discount-evaluation).
 
 ### Step 6: Customer Review, Negotiation, and Acceptance
 
 The customer reviews the quotation through authenticated endpoints:
 
 #### Customer Negotiation (Counter-Offer):
-- Customer submits counter-offer (POST /api/v1/quotations/:id/counter-offer or POST /api/v1/quotations/:id/negotiate) with proposed discount, price, line item adjustments, and an optional message.
+- Customer submits counter-offer (POST /api/v1/quotations/:companyId/:id/counter-offer or POST /api/v1/quotations/:companyId/:id/negotiate) with proposed discount, price, line item adjustments, and an optional message.
 - The server verifies that the requesting user is the assigned customer with the CUSTOMER role in that company.
 - Active negotiation session is tracked in `negotiations`, `negotiation_offers`, and `negotiation_offer_items`.
 - Quotation transitions to NEGOTIATING status, Deal stage advances to NEGOTIATION, and a new revision of type CUSTOMER_COUNTER is recorded.
-- Open negotiations and offer history can be retrieved via GET /api/v1/quotations/:id/negotiations.
+- Open negotiations and offer history can be retrieved via GET /api/v1/quotations/:companyId/:id/negotiations.
 
 #### Customer Rejection:
-- Customer rejects quotation (POST /api/v1/quotations/:id/reject) with an optional rejection reason.
+- Customer rejects quotation (POST /api/v1/quotations/:companyId/:id/reject) with an optional rejection reason.
 - The server verifies customer authorization and company membership.
 - Rejection closes any open negotiations, marks pending offers as REJECTED, updates the current revision with the rejection reason in customerNote, and transitions quotation status to REJECTED.
 
 #### Customer Acceptance:
-- Customer accepts the quotation (PATCH /api/v1/quotations/:id/status with status ACCEPTED).
+- Customer accepts the quotation (PATCH /api/v1/quotations/:companyId/:id/status with status ACCEPTED).
 - Accepted quotations progress into fulfillment review and sales order confirmation.
 - Only an accepted quotation should progress into a confirmed sales order.
 
@@ -824,15 +823,41 @@ PaymentReceived
 
 Do not introduce a message broker only for architectural appearance. A synchronous application service is preferable when the operation is simple and does not require asynchronous behavior.
 
-If a queue or event bus is introduced, document:
+### 16.1 Elasticsearch and RabbitMQ Event Pipeline
 
-- Event ownership.
-- Event schema.
-- Delivery guarantees.
-- Retry behavior.
-- Idempotency strategy.
-- Failure handling.
-- Dead letter behavior.
+The platform uses RabbitMQ as an event buffer and Elasticsearch as a search index for products and users.
+
+1. Event Ownership and Queues:
+   - Base queue: elasticsearch_queue_v1
+   - Retry queue: elasticsearch_queue_v1_retry (5-second message TTL with dead-letter exchange routing back to base queue)
+   - Dead letter queue: elasticsearch_queue_v1_dlq
+
+2. Event Schema:
+   - action: index or delete
+   - entity: product or user
+   - id: Unique record identifier (UUID string)
+   - companyId: Tenant identifier for company-scoped entities (optional)
+   - data: Entity document payload (optional)
+
+3. Indexed Fields:
+   - Product index: id, name, description, companyId
+   - User index: id, email, name
+
+4. Delivery and Retry Behavior:
+   - Messages are published with persistent delivery mode.
+   - The worker prefetch is set to 5 concurrent messages.
+   - Failures are retried up to 3 times using RabbitMQ x-death header tracking.
+   - Exceeded retries are routed to elasticsearch_queue_v1_dlq for inspection.
+
+5. Search Resilience and Fallback:
+   - Product and user search operations query Elasticsearch first.
+   - If Elasticsearch is unavailable or returns an error, search operations fall back to direct PostgreSQL queries via Prisma.
+
+6. Search APIs:
+   - Product Search: GET /api/v1/products/:companyId/search?query=...&limit=...
+     Queries Elasticsearch product index, extracts ranked product IDs, queries PostgreSQL for matching company products, sorts them according to the Elasticsearch rank order, and returns a list of ProductSummaryResponseDto.
+   - Customer Search: GET /api/v1/customers/:companyId/search?query=...&limit=...
+     Queries Elasticsearch user index, extracts ranked user IDs, queries PostgreSQL for matching users with company membership, sorts them according to the Elasticsearch rank order, and returns a list of CustomerSummaryResponseDto.
 
 ## 17. External Integrations
 

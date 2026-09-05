@@ -5,7 +5,7 @@ import { verifyAuth } from "../middlewares/auth.middleware";
 import { verifyCompanyAccess } from "../middlewares/company.middleware";
 import { requireRole } from "../middlewares/rbac.middleware";
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 const salesRoles = [
   CompanyUserRole.ADMIN,
@@ -16,13 +16,7 @@ const salesRoles = [
 // All routes require authentication.
 router.use(verifyAuth);
 
-// Company-member-only: create quotation.
-router.post(
-  "/",
-  verifyCompanyAccess,
-  requireRole(...salesRoles),
-  quotationController.create,
-);
+// Create quotation within company context.
 router.post(
   "/:companyId",
   verifyCompanyAccess,
@@ -30,82 +24,72 @@ router.post(
   quotationController.create,
 );
 
-// Open to any authenticated user (company members and customers both need to list/read).
-router.get("/", quotationController.list);
-router.get("/deal/:dealId", quotationController.listByDeal);
-router.get("/:id", quotationController.getById);
-router.get("/:id/items", quotationController.getItems);
-router.get("/:id/revisions", quotationController.getRevisions);
+// List quotations within company context.
+router.get("/:companyId", quotationController.list);
 
-// Company-member-only: item management.
+// List quotations by deal.
+router.get("/:companyId/deal/:dealId", quotationController.listByDeal);
+
+// Quotation details and revisions.
+router.get("/:companyId/:id", quotationController.getById);
+router.get("/:companyId/:id/items", quotationController.getItems);
+router.get("/:companyId/:id/revisions", quotationController.getRevisions);
+
+// Item management.
 router.post(
-  "/:id/items",
+  "/:companyId/:id/items",
   verifyCompanyAccess,
   requireRole(...salesRoles),
   quotationController.addItem,
 );
 router.delete(
-  "/:id/items/:itemId",
+  "/:companyId/:id/items/:itemId",
   verifyCompanyAccess,
   requireRole(...salesRoles),
   quotationController.removeItem,
 );
 
-// Company-member-only: update quotation fields.
+// Update quotation fields.
 router.patch(
-  "/:id",
+  "/:companyId/:id",
   verifyCompanyAccess,
   requireRole(...salesRoles),
   quotationController.update,
 );
 
-// Company-member-only: send quotation to customer.
+// Send quotation to customer.
 router.post(
-  "/:id/send",
-  verifyCompanyAccess,
-  requireRole(...salesRoles),
-  quotationController.send,
-);
-router.patch(
-  "/:id/send",
+  "/:companyId/:id/send",
   verifyCompanyAccess,
   requireRole(...salesRoles),
   quotationController.send,
 );
 
-// Customer-only: accept, reject, or initiate negotiation (service enforces customer identity).
-router.patch("/:id/status", quotationController.updateStatus);
+// Customer status updates (accept, reject, negotiate).
+router.patch("/:companyId/:id/status", quotationController.updateStatus);
 
-// Company-member-only: cancel quotation.
+// Cancel quotation.
 router.post(
-  "/:id/cancel",
-  verifyCompanyAccess,
-  requireRole(...salesRoles),
-  quotationController.cancel,
-);
-router.patch(
-  "/:id/cancel",
+  "/:companyId/:id/cancel",
   verifyCompanyAccess,
   requireRole(...salesRoles),
   quotationController.cancel,
 );
 
-// Customer-facing: reject quotation (customer declines).
-router.post("/:id/reject", quotationController.reject);
-router.patch("/:id/reject", quotationController.reject);
+// Customer rejection.
+router.post("/:companyId/:id/reject", quotationController.reject);
 
-// Customer-facing: submit counter-offer / negotiation.
-router.post("/:id/counter-offer", quotationController.counterOffer);
-router.patch("/:id/counter-offer", quotationController.counterOffer);
-router.post("/:id/negotiate", quotationController.counterOffer);
-router.patch("/:id/negotiate", quotationController.counterOffer);
+// Customer counter-offer and negotiation.
+router.post("/:companyId/:id/counter-offer", quotationController.counterOffer);
+router.post("/:companyId/:id/negotiate", quotationController.counterOffer);
 
-// Negotiation history and offers.
-router.get("/:id/negotiations", quotationController.getNegotiations);
-router.get("/:id/offers", quotationController.getNegotiations);
+// Negotiation history.
+router.get("/:companyId/:id/negotiations", quotationController.getNegotiations);
 
 // Discount violation evaluation.
-router.get("/:id/discount-evaluation", quotationController.getDiscountEvaluation);
-router.get("/:id/evaluation", quotationController.getDiscountEvaluation);
+router.get(
+  "/:companyId/:id/discount-evaluation",
+  quotationController.getDiscountEvaluation,
+);
 
 export default router;

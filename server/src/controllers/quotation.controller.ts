@@ -36,9 +36,16 @@ export class QuotationController {
     }
 
     const validated = validateBody(createQuotationSchema, req.body);
+    const companyId =
+      req.company?.id ||
+      (typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined) ||
+      validated.companyId;
+
     const quotation = await this.quotationService.createQuotation(userId, {
       ...validated,
-      companyId: req.company?.id || validated.companyId,
+      companyId,
     });
 
     return res
@@ -155,10 +162,16 @@ export class QuotationController {
       );
     }
 
-    const result = await this.quotationService.listQuotations(
-      userId,
-      filterResult.data,
-    );
+    const companyIdParam =
+      typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined;
+    const companyId = companyIdParam || filterResult.data.companyId;
+
+    const result = await this.quotationService.listQuotations(userId, {
+      ...filterResult.data,
+      ...(companyId ? { companyId } : {}),
+    });
 
     return res
       .status(StatusCodes.OK)
@@ -186,10 +199,16 @@ export class QuotationController {
       );
     }
 
+    const companyId =
+      req.company?.id ||
+      (typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined);
+
     const result = await this.quotationService.listQuotationsByDeal(
       dealId,
       filterResult.data,
-      req.company?.id,
+      companyId,
     );
 
     return res

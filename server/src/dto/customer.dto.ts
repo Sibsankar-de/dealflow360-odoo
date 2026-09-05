@@ -38,3 +38,36 @@ export const toCustomerDto = (
     updatedAt: membership?.updatedAt ?? user.updatedAt,
   };
 };
+
+export interface CustomerSummaryResponseDto {
+  id: string;
+  companyUserId?: string | null;
+  companyId: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  customerTier: CustomerTier | null;
+  role: CompanyUserRole;
+}
+
+export const toCustomerSummaryDto = (
+  user: User & {
+    companyUsers?: CompanyUser[];
+  },
+  companyId: string,
+): CustomerSummaryResponseDto => {
+  const membership = user.companyUsers?.find(
+    (cu) => cu.companyId === companyId,
+  );
+
+  return {
+    id: user.id,
+    companyUserId: membership?.id ?? null,
+    companyId,
+    name: user.userName,
+    email: user.email,
+    avatar: user.avatar ?? null,
+    customerTier: membership?.customerTier ?? null,
+    role: membership?.role ?? CompanyUserRole.CUSTOMER,
+  };
+};

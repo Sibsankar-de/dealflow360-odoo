@@ -28,6 +28,17 @@ router.post(
 );
 
 router.get(
+  "/:companyId/search",
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_REP,
+    CompanyUserRole.SALES_MANAGER,
+    CompanyUserRole.FINANCE_MANAGER,
+  ),
+  productController.search,
+);
+
+router.get(
   "/:companyId/:productId",
   requireRole(
     CompanyUserRole.ADMIN,
@@ -63,18 +74,6 @@ router.delete(
 );
 
 router.put(
-  "/:companyId/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
-router.patch(
-  "/:companyId/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
-router.post(
   "/:companyId/:productId/categories",
   requireRole(CompanyUserRole.ADMIN),
   productController.addOrRemoveCategories,
