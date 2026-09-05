@@ -1,0 +1,79 @@
+enum NegotiationStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum OfferParty {
+  CUSTOMER
+  SALES_REP
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+model Negotiation {
+  id          String            @id @default(uuid()) @db.Uuid
+  quotationId String            @map("quotation_id") @db.Uuid
+  status      NegotiationStatus @default(OPEN)
+  startedAt   DateTime          @default(now()) @map("started_at")
+  closedAt    DateTime?         @map("closed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  quotation Quotation          @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  offers    NegotiationOffer[]
+
+  @@index([quotationId])
+  @@index([status])
+  @@map("negotiations")
+}
+
+model NegotiationOffer {
+  id             String      @id @default(uuid()) @db.Uuid
+  negotiationId  String      @map("negotiation_id") @db.Uuid
+  baseRevisionId String?     @map("base_revision_id") @db.Uuid
+  offeredBy      OfferParty  @map("offered_by")
+  status         OfferStatus @default(PENDING)
+  message        String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  negotiation  Negotiation            @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  baseRevision QuotationRevision?     @relation(fields: [baseRevisionId], references: [id], onDelete: SetNull)
+  items        NegotiationOfferItem[]
+
+  @@index([negotiationId])
+  @@index([baseRevisionId])
+  @@index([status])
+  @@index([offeredBy])
+  @@map("negotiation_offers")
+}
+
+model NegotiationOfferItem {
+  id                     String       @id @default(uuid()) @db.Uuid
+  negotiationOfferId     String       @map("negotiation_offer_id") @db.Uuid
+  quotationItemId        String?      @map("quotation_item_id") @db.Uuid
+  productId              String       @map("product_id") @db.Uuid
+  requestedQuantity      Decimal      @map("requested_quantity") @db.Decimal(12, 2)
+  requestedUnitPrice     Decimal      @map("requested_unit_price") @db.Decimal(12, 2)
+  requestedDiscountType  DiscountType @default(PERCENTAGE) @map("requested_discount_type")
+  requestedDiscountValue Decimal      @default(0) @map("requested_discount_value") @db.Decimal(12, 2)
+  requestedLineTotal     Decimal      @map("requested_line_total") @db.Decimal(12, 2)
+
+  // Relations
+  offer         NegotiationOffer @relation(fields: [negotiationOfferId], references: [id], onDelete: Cascade)
+  quotationItem QuotationItem?   @relation(fields: [quotationItemId], references: [id], onDelete: SetNull)
+  product       Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([negotiationOfferId])
+  @@index([quotationItemId])
+  @@index([productId])
+  @@map("negotiation_offer_items")
+}

@@ -23,7 +23,10 @@ router.post(
 
 router.get("/", quotationController.list);
 router.get("/:id", quotationController.getById);
+router.get("/:id/revisions", quotationController.getRevisions);
 router.patch("/:id", quotationController.update);
+router.post("/:id/send", quotationController.send);
+router.patch("/:id/send", quotationController.send);
 router.patch("/:id/status", quotationController.updateStatus);
 router.post("/:id/cancel", quotationController.cancel);
 router.patch("/:id/cancel", quotationController.cancel);

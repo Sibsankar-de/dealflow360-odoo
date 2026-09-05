@@ -11,10 +11,18 @@ const router = Router();
 router.use(verifyAuth);
 
 router.post("/", companyController.create);
-router.get("/", companyController.getUserCompanies);
+router.get("/", companyController.list);
+router.get("/my", companyController.getUserCompanies);
+router.get("/roles", companyController.listCompanyRoles);
 
 // Routes scoped to a specific company ID
 router.get("/:id", verifyCompanyAccess, companyController.getById);
+router.get(
+  "/:id/roles",
+  verifyCompanyAccess,
+  requireRole(CompanyUserRole.ADMIN),
+  companyController.listCompanyRoles,
+);
 router.patch(
   "/:id",
   verifyCompanyAccess,
