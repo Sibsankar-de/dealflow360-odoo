@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { CompanyUserRole } from "@prisma/client";
 import { companyController } from "../controllers/company.controller";
+import { customerController } from "../controllers/customer.controller";
 import { verifyAuth } from "../middlewares/auth.middleware";
 import { verifyCompanyAccess } from "../middlewares/company.middleware";
 import { requireRole } from "../middlewares/rbac.middleware";
@@ -51,6 +52,17 @@ router.put(
 
 // Company members management
 router.get("/:id/users", verifyCompanyAccess, companyController.listMembers);
+router.get(
+  "/:id/customers",
+  verifyCompanyAccess,
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_REP,
+    CompanyUserRole.SALES_MANAGER,
+    CompanyUserRole.FINANCE_MANAGER,
+  ),
+  customerController.list,
+);
 router.post(
   "/:id/users",
   verifyCompanyAccess,

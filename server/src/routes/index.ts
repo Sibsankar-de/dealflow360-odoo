@@ -6,6 +6,7 @@ import quotationRoutes from "./quotation.routes";
 import warehouseRoutes from "./warehouse.routes";
 import productRoutes from "./product.routes";
 import categoryRoutes from "./category.routes";
+import customerRoutes from "./customer.routes";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/api/v1/quotations", quotationRoutes);
 router.use("/api/v1/warehouses", warehouseRoutes);
 router.use("/api/v1/products", productRoutes);
 router.use("/api/v1/categories", categoryRoutes);
+router.use("/api/v1/customers", customerRoutes);
 
 export default router;
