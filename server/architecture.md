@@ -82,7 +82,7 @@ Responsibilities:
 - Resolve the current user (`req.user`) and validate active session tokens.
 - Resolve company context via `verifyCompanyAccess` middleware:
   - Extracts company ID from route parameters (`:companyId`, `:id`), `x-company-id` header, request body, or query parameters.
-  - Validates company existence and active state.
+  - Validates company existence and active state (rejects suspended or deleted companies).
   - Verifies the user is either the company owner or an active member of `company_users`.
   - Attaches `req.company`, `req.companyUser`, and `req.companyRole` to the request object.
   - Eliminates redundant company database queries across downstream controllers and application services.
@@ -190,7 +190,8 @@ Responsibilities:
 Responsibilities:
 
 - Store quotation records (`quotations`) linking company, creator (sales representative or admin), and registered customer account.
-- Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`).
+- Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`), allowing DRAFT or SENT at creation.
+- Protect quotation creation routes using company-level RBAC middleware (`verifyCompanyAccess`, `requireRole`) restricted to ADMIN, SALES_REP, and SALES_MANAGER roles.
 - Store line items (`quotation_items`) with decimal quantities, unit prices, discount percentages, tax percentages, and line totals.
 - Track negotiations (`quotation_negotiations`) with proposed discounts, proposed totals, customer messages, admin messages, and `NegotiationStatus` enum (`APPROVED`, `UNDER_REVIEW`, `REJECTED`).
 - Ensure atomic creation and modification of quotations and line items using database transactions.

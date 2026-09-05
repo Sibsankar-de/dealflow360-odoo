@@ -32,7 +32,16 @@ export const createQuotationSchema = z.object({
   currency: z.string().min(2).max(10).trim().optional(),
   notes: z.string().max(2000, "Notes cannot exceed 2000 characters").optional().nullable(),
   discountAmount: z.number().nonnegative("Discount amount cannot be negative").default(0).optional(),
-  status: z.nativeEnum(QuotationStatus).default(QuotationStatus.DRAFT).optional(),
+  status: z
+    .nativeEnum(QuotationStatus)
+    .refine(
+      (val) => val === QuotationStatus.DRAFT || val === QuotationStatus.SENT,
+      {
+        message: `Status must be ${QuotationStatus.DRAFT} or ${QuotationStatus.SENT}`,
+      },
+    )
+    .default(QuotationStatus.DRAFT)
+    .optional(),
 });
 
 export const updateQuotationSchema = z.object({

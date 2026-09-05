@@ -74,8 +74,10 @@ export class CompanyRepository {
   public async findById(
     id: string,
     includeDeleted: boolean = false,
+    tx?: TransactionClient,
   ): Promise<(Company & { owner?: User; settings?: CompanySetting | null }) | null> {
-    return this.prisma.company.findFirst({
+    const client = tx || this.prisma;
+    return client.company.findFirst({
       where: {
         id,
         ...(includeDeleted ? {} : { deletedAt: null }),
@@ -122,8 +124,10 @@ export class CompanyRepository {
   public async update(
     id: string,
     data: Prisma.CompanyUpdateInput,
+    tx?: TransactionClient,
   ): Promise<Company & { owner?: User; settings?: CompanySetting | null }> {
-    return this.prisma.company.update({
+    const client = tx || this.prisma;
+    return client.company.update({
       where: { id },
       data,
       include: {
@@ -136,8 +140,10 @@ export class CompanyRepository {
   public async findCompanyUser(
     companyId: string,
     userId: string,
+    tx?: TransactionClient,
   ): Promise<CompanyUser | null> {
-    return this.prisma.companyUser.findUnique({
+    const client = tx || this.prisma;
+    return client.companyUser.findUnique({
       where: {
         companyId_userId: {
           companyId,

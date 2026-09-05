@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { CompanyUserRole } from "@prisma/client";
+import { CompanyStatus, CompanyUserRole } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
@@ -48,6 +48,16 @@ export class CompanyMiddleware {
 
       if (!company) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+      }
+
+      if (
+        company.status === CompanyStatus.SUSPENDED ||
+        company.status === CompanyStatus.DELETED
+      ) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          `Company is ${company.status.toLowerCase()} and cannot be accessed`,
+        );
       }
 
       const isOwner = company.ownerId === req.user.id;

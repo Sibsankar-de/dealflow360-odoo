@@ -1,4 +1,4 @@
-import { Prisma, QuotationStatus, CompanyUserRole } from "@prisma/client";
+import { Prisma, QuotationStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
   QuotationRepository,
@@ -41,54 +41,45 @@ export class QuotationService {
     creatorUserId: string,
     dto: CreateQuotationDto,
   ): Promise<QuotationResponseDto> {
-    const creator = await this.userRepo.findById(creatorUserId);
-    if (!creator) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Creator user not found");
-    }
-
-    const company = await this.companyRepo.findById(dto.companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
-    if (company.status === "DELETED" || company.status === "SUSPENDED") {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Cannot create quotations for ${company.status.toLowerCase()} company`,
-      );
-    }
-
-    // Verify creator belongs to company with appropriate role
-    await this.assertCompanySalesMember(dto.companyId, creatorUserId, company.ownerId);
-
-    // Verify target customer exists
-    const customer = await this.userRepo.findById(dto.customerId);
-    if (!customer) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Customer not found");
-    }
-
-    // Fetch and validate all products
-    const productIds = dto.items.map((item) => item.productId);
-    const products = await this.quotationRepo.findProductsByIds(
-      productIds,
-      dto.companyId,
-    );
-
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    for (const item of dto.items) {
-      if (!productMap.has(item.productId)) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          `Product ${item.productId} not found or does not belong to the company`,
-        );
-      }
-    }
-
-    // Calculate line items and totals
-    const { itemsToCreate, subtotal, totalDiscount, total } =
-      this.calculateQuotationTotals(dto.items, productMap, dto.discountAmount);
-
     return prismaTransaction(async (tx: TransactionClient) => {
+      const creator = await this.userRepo.findById(creatorUserId, tx);
+      if (!creator) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Creator user not found");
+      }
+
+      const company = await this.companyRepo.findById(dto.companyId, false, tx);
+      if (!company) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+      }
+
+      // Verify target customer exists
+      const customer = await this.userRepo.findById(dto.customerId, tx);
+      if (!customer) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Customer not found");
+      }
+
+      // Fetch and validate all products
+      const productIds = dto.items.map((item) => item.productId);
+      const products = await this.quotationRepo.findProductsByIds(
+        productIds,
+        dto.companyId,
+        tx,
+      );
+
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      for (const item of dto.items) {
+        if (!productMap.has(item.productId)) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Product ${item.productId} not found or does not belong to the company`,
+          );
+        }
+      }
+
+      // Calculate line items and totals
+      const { itemsToCreate, subtotal, totalDiscount, total } =
+        this.calculateQuotationTotals(dto.items, productMap, dto.discountAmount);
+
       const count = await this.quotationRepo.countCompanyQuotations(
         dto.companyId,
         tx,
@@ -213,28 +204,29 @@ export class QuotationService {
     requestingUserId: string,
     dto: UpdateQuotationDto,
   ): Promise<QuotationResponseDto> {
-    const quotation = await this.quotationRepo.findById(quotationId);
-    if (!quotation) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
-    }
-
-    if (quotation.status !== QuotationStatus.DRAFT && quotation.status !== QuotationStatus.UNDER_NEGOTIATION) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Cannot edit a quotation in status ${quotation.status}`,
-      );
-    }
-
-    await this.assertCompanySalesMember(quotation.companyId, requestingUserId, quotation.company.ownerId);
-
-    if (dto.customerId) {
-      const customer = await this.userRepo.findById(dto.customerId);
-      if (!customer) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Customer not found");
-      }
-    }
-
     return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      if (
+        quotation.status !== QuotationStatus.DRAFT &&
+        quotation.status !== QuotationStatus.UNDER_NEGOTIATION
+      ) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Cannot edit a quotation in status ${quotation.status}`,
+        );
+      }
+
+      if (dto.customerId) {
+        const customer = await this.userRepo.findById(dto.customerId, tx);
+        if (!customer) {
+          throw new ApiError(StatusCodes.NOT_FOUND, "Customer not found");
+        }
+      }
+
       let itemsToCreate;
       let subtotal = quotation.subtotal;
       let totalDiscount = quotation.discountAmount;
@@ -307,41 +299,29 @@ export class QuotationService {
     requestingUserId: string,
     status: QuotationStatus,
   ): Promise<QuotationResponseDto> {
-    const quotation = await this.quotationRepo.findById(quotationId);
-    if (!quotation) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
-    }
-
-    const isCustomer = quotation.customerId === requestingUserId;
-    const isCompanySales = await this.isCompanySalesMember(
-      quotation.companyId,
-      requestingUserId,
-      quotation.company.ownerId,
-    );
-
-    if (!isCustomer && !isCompanySales) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "You do not have permission to update the status of this quotation",
-      );
-    }
-
-    // Customer status transitions
-    if (isCustomer && !isCompanySales) {
-      if (
-        status !== QuotationStatus.ACCEPTED &&
-        status !== QuotationStatus.REJECTED &&
-        status !== QuotationStatus.UNDER_NEGOTIATION
-      ) {
-        throw new ApiError(
-          StatusCodes.BAD_REQUEST,
-          "Customer can only ACCEPT, REJECT, or mark quotation UNDER_NEGOTIATION",
-        );
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
       }
-    }
 
-    const updated = await this.quotationRepo.updateStatus(quotationId, status);
-    return toQuotationDto(updated);
+      // Customer status transitions
+      if (quotation.customerId === requestingUserId) {
+        if (
+          status !== QuotationStatus.ACCEPTED &&
+          status !== QuotationStatus.REJECTED &&
+          status !== QuotationStatus.UNDER_NEGOTIATION
+        ) {
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            "Customer can only ACCEPT, REJECT, or mark quotation UNDER_NEGOTIATION",
+          );
+        }
+      }
+
+      const updated = await this.quotationRepo.updateStatus(quotationId, status, tx);
+      return toQuotationDto(updated);
+    });
   }
 
   private calculateQuotationTotals(
@@ -364,7 +344,6 @@ export class QuotationService {
     let subtotalNum = 0;
     let itemDiscountSum = 0;
     let totalNum = 0;
-
     const itemsToCreate = items.map((item) => {
       const product = productMap.get(item.productId)!;
       const unitPriceNum =
@@ -402,41 +381,6 @@ export class QuotationService {
       totalDiscount: new Prisma.Decimal(finalTotalDiscountNum.toFixed(2)),
       total: new Prisma.Decimal(finalTotalNum.toFixed(2)),
     };
-  }
-
-  private async assertCompanySalesMember(
-    companyId: string,
-    userId: string,
-    ownerId: string,
-  ): Promise<void> {
-    const isSales = await this.isCompanySalesMember(companyId, userId, ownerId);
-    if (!isSales) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Only company sales representatives or admins can perform this action",
-      );
-    }
-  }
-
-  private async isCompanySalesMember(
-    companyId: string,
-    userId: string,
-    ownerId: string,
-  ): Promise<boolean> {
-    if (userId === ownerId) {
-      return true;
-    }
-
-    const membership = await this.companyRepo.findCompanyUser(companyId, userId);
-    if (!membership) {
-      return false;
-    }
-
-    return (
-      membership.role === CompanyUserRole.ADMIN ||
-      membership.role === CompanyUserRole.SALES_REP ||
-      membership.role === CompanyUserRole.SALES_MANAGER
-    );
   }
 
   private async assertQuotationAccess(

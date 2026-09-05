@@ -56,6 +56,18 @@ CREATE TABLE "companies" (
 );
 
 -- CreateTable
+CREATE TABLE "company_configs" (
+    "id" UUID NOT NULL,
+    "companyId" UUID NOT NULL,
+    "config_key" TEXT NOT NULL,
+    "config_value" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "company_configs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "company_settings" (
     "id" UUID NOT NULL,
     "companyId" UUID NOT NULL,
@@ -243,6 +255,12 @@ CREATE INDEX "companies_ownerId_idx" ON "companies"("ownerId");
 CREATE INDEX "companies_status_idx" ON "companies"("status");
 
 -- CreateIndex
+CREATE INDEX "company_configs_companyId_idx" ON "company_configs"("companyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "company_configs_companyId_config_key_key" ON "company_configs"("companyId", "config_key");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "company_settings_companyId_key" ON "company_settings"("companyId");
 
 -- CreateIndex
@@ -343,6 +361,9 @@ ALTER TABLE "auth_tokens" ADD CONSTRAINT "auth_tokens_userId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "companies" ADD CONSTRAINT "companies_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "company_configs" ADD CONSTRAINT "company_configs_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "company_settings" ADD CONSTRAINT "company_settings_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
