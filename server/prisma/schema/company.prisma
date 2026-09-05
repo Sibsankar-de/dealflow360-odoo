@@ -22,6 +22,7 @@ model Company {
   companyUsers CompanyUser[]
   warehouses   Warehouse[]
   products     Product[]
+  quotations   Quotation[]
 
   @@index([ownerId])
   @@index([status])
