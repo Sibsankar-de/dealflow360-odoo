@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { CompanyUserRole } from "@prisma/client";
-import { productController } from "../controllers/product.controller";
+import { categoryController } from "../controllers/category.controller";
 import { verifyAuth } from "../middlewares/auth.middleware";
 import { verifyCompanyAccess } from "../middlewares/company.middleware";
 import { requireRole } from "../middlewares/rbac.middleware";
@@ -18,66 +18,36 @@ router.get(
     CompanyUserRole.SALES_MANAGER,
     CompanyUserRole.FINANCE_MANAGER,
   ),
-  productController.list,
+  categoryController.list,
 );
 
 router.post(
   "/",
   requireRole(CompanyUserRole.ADMIN),
-  productController.create,
+  categoryController.create,
 );
 
 router.get(
-  "/:productId",
+  "/:categoryId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
     CompanyUserRole.SALES_MANAGER,
     CompanyUserRole.FINANCE_MANAGER,
   ),
-  productController.getById,
+  categoryController.getById,
 );
 
 router.patch(
-  "/:productId",
+  "/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
-  productController.update,
+  categoryController.update,
 );
 
 router.delete(
-  "/:productId",
+  "/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
-  productController.delete,
-);
-
-router.put(
-  "/:productId/stock/:warehouseId",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.upsertStock,
-);
-
-router.delete(
-  "/:productId/stock/:warehouseId",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.deleteStock,
-);
-
-router.put(
-  "/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
-router.patch(
-  "/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
-);
-
-router.post(
-  "/:productId/categories",
-  requireRole(CompanyUserRole.ADMIN),
-  productController.addOrRemoveCategories,
+  categoryController.delete,
 );
 
 export default router;

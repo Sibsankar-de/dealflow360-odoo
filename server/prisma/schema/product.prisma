@@ -21,6 +21,7 @@ model Product {
   quotationRevisionItems QuotationRevisionItem[]
   negotiationOfferItems  NegotiationOfferItem[]
   discountTiers          ProductDiscountTier[]
+  categories             CategoryProduct[]
 
   @@index([companyId])
   @@index([type])
