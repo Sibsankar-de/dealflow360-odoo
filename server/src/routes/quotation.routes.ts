@@ -23,6 +23,12 @@ router.post(
   requireRole(...salesRoles),
   quotationController.create,
 );
+router.post(
+  "/:companyId",
+  verifyCompanyAccess,
+  requireRole(...salesRoles),
+  quotationController.create,
+);
 
 // Open to any authenticated user (company members and customers both need to list/read).
 router.get("/", quotationController.list);

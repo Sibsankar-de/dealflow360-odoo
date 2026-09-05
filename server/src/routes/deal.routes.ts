@@ -5,7 +5,7 @@ import { verifyAuth } from "../middlewares/auth.middleware";
 import { verifyCompanyAccess } from "../middlewares/company.middleware";
 import { requireRole } from "../middlewares/rbac.middleware";
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 const salesRoles = [
   CompanyUserRole.ADMIN,
@@ -15,19 +15,19 @@ const salesRoles = [
 
 // All deal routes require authentication and a company context.
 router.use(verifyAuth);
-router.use(verifyCompanyAccess);
+router.use("/:companyId", verifyCompanyAccess);
 
 // List deals within the company.
-router.get("/", requireRole(...salesRoles), dealController.list);
+router.get("/:companyId", requireRole(...salesRoles), dealController.list);
 
 // Create a new deal.
-router.post("/", requireRole(...salesRoles), dealController.create);
+router.post("/:companyId", requireRole(...salesRoles), dealController.create);
 
 // Read a single deal.
-router.get("/:id", requireRole(...salesRoles), dealController.getById);
+router.get("/:companyId/:id", requireRole(...salesRoles), dealController.getById);
 
 // Update deal fields.
-router.patch("/:id", requireRole(...salesRoles), dealController.update);
-router.put("/:id", requireRole(...salesRoles), dealController.update);
+router.patch("/:companyId/:id", requireRole(...salesRoles), dealController.update);
+router.put("/:companyId/:id", requireRole(...salesRoles), dealController.update);
 
 export default router;

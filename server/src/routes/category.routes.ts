@@ -8,10 +8,10 @@ import { requireRole } from "../middlewares/rbac.middleware";
 const router = Router({ mergeParams: true });
 
 router.use(verifyAuth);
-router.use(verifyCompanyAccess);
+router.use("/:companyId", verifyCompanyAccess);
 
 router.get(
-  "/",
+  "/:companyId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
@@ -22,13 +22,13 @@ router.get(
 );
 
 router.post(
-  "/",
+  "/:companyId",
   requireRole(CompanyUserRole.ADMIN),
   categoryController.create,
 );
 
 router.get(
-  "/:categoryId",
+  "/:companyId/:categoryId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
@@ -39,13 +39,13 @@ router.get(
 );
 
 router.patch(
-  "/:categoryId",
+  "/:companyId/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
   categoryController.update,
 );
 
 router.delete(
-  "/:categoryId",
+  "/:companyId/:categoryId",
   requireRole(CompanyUserRole.ADMIN),
   categoryController.delete,
 );

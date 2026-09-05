@@ -8,10 +8,10 @@ import { requireRole } from "../middlewares/rbac.middleware";
 const router = Router({ mergeParams: true });
 
 router.use(verifyAuth);
-router.use(verifyCompanyAccess);
+router.use("/:companyId", verifyCompanyAccess);
 
 router.get(
-  "/",
+  "/:companyId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
@@ -22,13 +22,13 @@ router.get(
 );
 
 router.post(
-  "/",
+  "/:companyId",
   requireRole(CompanyUserRole.ADMIN),
   productController.create,
 );
 
 router.get(
-  "/:productId",
+  "/:companyId/:productId",
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_REP,
@@ -39,43 +39,43 @@ router.get(
 );
 
 router.patch(
-  "/:productId",
+  "/:companyId/:productId",
   requireRole(CompanyUserRole.ADMIN),
   productController.update,
 );
 
 router.delete(
-  "/:productId",
+  "/:companyId/:productId",
   requireRole(CompanyUserRole.ADMIN),
   productController.delete,
 );
 
 router.put(
-  "/:productId/stock/:warehouseId",
+  "/:companyId/:productId/stock/:warehouseId",
   requireRole(CompanyUserRole.ADMIN),
   productController.upsertStock,
 );
 
 router.delete(
-  "/:productId/stock/:warehouseId",
+  "/:companyId/:productId/stock/:warehouseId",
   requireRole(CompanyUserRole.ADMIN),
   productController.deleteStock,
 );
 
 router.put(
-  "/:productId/categories",
+  "/:companyId/:productId/categories",
   requireRole(CompanyUserRole.ADMIN),
   productController.addOrRemoveCategories,
 );
 
 router.patch(
-  "/:productId/categories",
+  "/:companyId/:productId/categories",
   requireRole(CompanyUserRole.ADMIN),
   productController.addOrRemoveCategories,
 );
 
 router.post(
-  "/:productId/categories",
+  "/:companyId/:productId/categories",
   requireRole(CompanyUserRole.ADMIN),
   productController.addOrRemoveCategories,
 );
