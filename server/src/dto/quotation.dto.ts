@@ -22,6 +22,7 @@ import {
   Company,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
+import { DiscountViolationEvaluation } from "../utils/discount-violation.util";
 import {
   addQuotationItemSchema,
   createQuotationItemSchema,
@@ -31,6 +32,8 @@ import {
   cancelQuotationSchema,
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
+  counterOfferItemSchema,
+  submitCounterOfferSchema,
 } from "../schemas/quotation.schema";
 
 export type AddQuotationItemDto = z.infer<typeof addQuotationItemSchema>;
@@ -41,6 +44,8 @@ export type QuotationFilterDto = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationDto = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryDto = z.infer<typeof dealQuotationsQuerySchema>;
+export type CounterOfferItemDto = z.infer<typeof counterOfferItemSchema>;
+export type SubmitCounterOfferDto = z.infer<typeof submitCounterOfferSchema>;
 
 export interface QuotationItemResponseDto {
   id: string;
@@ -119,6 +124,8 @@ export interface QuotationResponseDto {
     id: string;
     name: string;
   };
+  negotiations?: NegotiationResponseDto[];
+  discountEvaluation?: DiscountViolationEvaluation;
 }
 
 export interface DealResponseDto {
@@ -353,6 +360,7 @@ export const toQuotationDto = (
     salesRep?: User;
     customer?: User;
     company?: Company;
+    negotiations?: Parameters<typeof toNegotiationDto>[0][];
   },
 ): QuotationResponseDto => {
   const items = quotation.items ? quotation.items.map(toQuotationItemDto) : [];
@@ -401,6 +409,9 @@ export const toQuotationDto = (
           id: quotation.company.id,
           name: quotation.company.name,
         }
+      : undefined,
+    negotiations: quotation.negotiations
+      ? quotation.negotiations.map(toNegotiationDto)
       : undefined,
   };
 };

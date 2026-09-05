@@ -15,6 +15,9 @@ import {
   User,
   Company,
   Deal,
+  Negotiation,
+  NegotiationOffer,
+  NegotiationOfferItem,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
@@ -32,6 +35,11 @@ export type QuotationWithRelations = Quotation & {
   salesRep: User;
   customer: User;
   company: Company;
+  negotiations?: (Negotiation & {
+    offers: (NegotiationOffer & {
+      items: (NegotiationOfferItem & { product: Product })[];
+    })[];
+  })[];
 };
 
 export class QuotationRepository {
@@ -391,6 +399,21 @@ export class QuotationRepository {
         salesRep: true,
         customer: true,
         company: true,
+        negotiations: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            offers: {
+              orderBy: { createdAt: "asc" },
+              include: {
+                items: {
+                  include: {
+                    product: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -411,6 +434,21 @@ export class QuotationRepository {
       salesRep: true,
       customer: true,
       company: true,
+      negotiations: {
+        orderBy: { createdAt: "desc" as const },
+        include: {
+          offers: {
+            orderBy: { createdAt: "asc" as const },
+            include: {
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          },
+        },
+      },
     };
 
     const prisma = this.prisma;
@@ -606,6 +644,29 @@ export class QuotationRepository {
           },
         },
         creator: true,
+      },
+    });
+  }
+
+  public async findNegotiationsByQuotationId(
+    quotationId: string,
+    tx?: TransactionClient,
+  ) {
+    const client = tx || this.prisma;
+    return client.negotiation.findMany({
+      where: { quotationId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        offers: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
       },
     });
   }

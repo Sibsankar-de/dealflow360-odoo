@@ -389,44 +389,54 @@ Revisions capture versioned history:
 - When a draft or negotiating quotation is updated with revised proposal lines or pricing, previous items are replaced on the active quotation and a versioned QuotationRevision (revision_type = SALES_COUNTER) is recorded.
 - Revisions can be retrieved via GET /api/v1/quotations/:id/revisions.
 
-### Step 5: Quotation Approval
+### Step 5: Discount Violation Evaluation and Commercial Approval
 
-If a quotation exceeds configured discount or commercial thresholds, it can require sales manager or administrator approval.
+If a quotation exceeds configured discount or commercial thresholds, it requires sales manager or administrator approval. The server evaluates discount violations using two quantitative formulas:
 
-Example flow:
-
+#### Formula 1: Line-Level Violation
+For every order line item i:
 ```text
-Draft
-  |
-  v
-Pending Approval
-  |
-  +----> Rejected
-  |
-  v
-Approved
+V_i = max(0, D_i - A_i)
 ```
+Where:
+- D_i = actual discount percentage given on line i
+- A_i = maximum discount percentage allowed for line i (from product discount tier or customer tier default)
+- V_i = discount violation percentage for that line (0% if within limit)
 
-Approval must be a server side authorization decision.
-
-### Step 6: Customer Acceptance
-
-The customer reviews the final quotation.
-
-Possible outcomes:
-
+#### Formula 2: Blended Violation Score
+Across the quotation, the blended violation score is calculated using pre-discount line weights:
 ```text
-Quotation
-  |
-  +----> Rejected
-  |
-  +----> Expired
-  |
-  v
-Accepted
+BV = [sum(W_i * V_i)] / [sum(W_i)]
 ```
+Where:
+- V_i = line-level violation percentage for line i
+- W_i = pre-discount monetary weight/value of line i (quantity * base unit price)
+- BV = blended violation percentage across the whole quotation
 
-Only an accepted quotation should progress into a confirmed sales order.
+Quotation discount evaluations:
+- The evaluation checks if any line exceeds allowed limits (maxLineViolation > 0) or if the blended score exceeds the company threshold (BLENDED_DISCOUNT_THRESHOLD).
+- Automated evaluation is executed on quotation send (POST /api/v1/quotations/:id/send), customer counter-offer (POST /api/v1/quotations/:id/counter-offer), and retrieval (GET /api/v1/quotations/:id/discount-evaluation).
+
+### Step 6: Customer Review, Negotiation, and Acceptance
+
+The customer reviews the quotation through authenticated endpoints:
+
+#### Customer Negotiation (Counter-Offer):
+- Customer submits counter-offer (POST /api/v1/quotations/:id/counter-offer or POST /api/v1/quotations/:id/negotiate) with proposed discount, price, line item adjustments, and an optional message.
+- The server verifies that the requesting user is the assigned customer with the CUSTOMER role in that company.
+- Active negotiation session is tracked in `negotiations`, `negotiation_offers`, and `negotiation_offer_items`.
+- Quotation transitions to NEGOTIATING status, Deal stage advances to NEGOTIATION, and a new revision of type CUSTOMER_COUNTER is recorded.
+- Open negotiations and offer history can be retrieved via GET /api/v1/quotations/:id/negotiations.
+
+#### Customer Rejection:
+- Customer rejects quotation (POST /api/v1/quotations/:id/reject) with an optional rejection reason.
+- The server verifies customer authorization and company membership.
+- Rejection closes any open negotiations, marks pending offers as REJECTED, updates the current revision with the rejection reason in customerNote, and transitions quotation status to REJECTED.
+
+#### Customer Acceptance:
+- Customer accepts the quotation (PATCH /api/v1/quotations/:id/status with status ACCEPTED).
+- Accepted quotations progress into fulfillment review and sales order confirmation.
+- Only an accepted quotation should progress into a confirmed sales order.
 
 ### Step 7: Sales Order Creation
 

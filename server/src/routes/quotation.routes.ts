@@ -94,4 +94,18 @@ router.patch(
 router.post("/:id/reject", quotationController.reject);
 router.patch("/:id/reject", quotationController.reject);
 
+// Customer-facing: submit counter-offer / negotiation.
+router.post("/:id/counter-offer", quotationController.counterOffer);
+router.patch("/:id/counter-offer", quotationController.counterOffer);
+router.post("/:id/negotiate", quotationController.counterOffer);
+router.patch("/:id/negotiate", quotationController.counterOffer);
+
+// Negotiation history and offers.
+router.get("/:id/negotiations", quotationController.getNegotiations);
+router.get("/:id/offers", quotationController.getNegotiations);
+
+// Discount violation evaluation.
+router.get("/:id/discount-evaluation", quotationController.getDiscountEvaluation);
+router.get("/:id/evaluation", quotationController.getDiscountEvaluation);
+
 export default router;
