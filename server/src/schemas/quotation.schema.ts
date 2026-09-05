@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { QuotationStatus, DiscountType } from "@prisma/client";
 
+export const addQuotationItemSchema = z.object({
+  productId: z
+    .string({ required_error: "Product ID is required" })
+    .uuid("Invalid product ID"),
+  quantity: z
+    .number({ required_error: "Quantity is required" })
+    .positive("Quantity must be greater than 0"),
+});
+
 export const createQuotationItemSchema = z.object({
   productId: z
     .string({ required_error: "Product ID is required" })
@@ -30,20 +39,14 @@ export const createQuotationItemSchema = z.object({
 });
 
 export const createQuotationSchema = z.object({
-  companyId: z
-    .string({ required_error: "Company ID is required" })
-    .uuid("Invalid company ID"),
+  companyId: z.string().uuid("Invalid company ID").optional(),
   dealId: z
     .string({ required_error: "Deal ID is required" })
     .uuid("Invalid deal ID"),
   customerId: z
     .string({ required_error: "Customer ID is required" })
     .uuid("Invalid customer ID"),
-  items: z
-    .array(createQuotationItemSchema, {
-      required_error: "Items array is required",
-    })
-    .min(1, "Quotation must contain at least one item"),
+  salesRepId: z.string().uuid("Invalid sales rep ID").optional(),
   validUntil: z
     .string()
     .datetime({ offset: true })
@@ -61,22 +64,8 @@ export const createQuotationSchema = z.object({
     .max(2000, "Internal note cannot exceed 2000 characters")
     .optional()
     .nullable(),
-  discountAmount: z
-    .number()
-    .nonnegative("Discount amount cannot be negative")
-    .default(0)
-    .optional(),
-  status: z
-    .nativeEnum(QuotationStatus)
-    .refine(
-      (val) => val === QuotationStatus.DRAFT || val === QuotationStatus.SENT,
-      {
-        message: `Status must be ${QuotationStatus.DRAFT} or ${QuotationStatus.SENT}`,
-      },
-    )
-    .default(QuotationStatus.DRAFT)
-    .optional(),
 });
+
 
 export const updateQuotationSchema = z.object({
   customerId: z.string().uuid("Invalid customer ID").optional(),
@@ -133,6 +122,7 @@ export const rejectQuotationSchema = z.object({
     .optional(),
 });
 
+export type AddQuotationItemInput = z.infer<typeof addQuotationItemSchema>;
 export type CreateQuotationItemInput = z.infer<
   typeof createQuotationItemSchema
 >;

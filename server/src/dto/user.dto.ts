@@ -1,4 +1,16 @@
+import { z } from "zod";
 import { User, AuthProvider, UserRole } from "@prisma/client";
+import {
+  registerUserSchema,
+  loginUserSchema,
+  updateUserSchema,
+  updatePasswordSchema,
+} from "../schemas/user.schema";
+
+export type RegisterUserDto = z.infer<typeof registerUserSchema>;
+export type LoginUserDto = z.infer<typeof loginUserSchema>;
+export type UpdateUserDto = z.infer<typeof updateUserSchema>;
+export type UpdatePasswordDto = z.infer<typeof updatePasswordSchema>;
 
 export interface UserResponseDto {
   id: string;
@@ -16,27 +28,6 @@ export interface AuthResponseDto {
   user: UserResponseDto;
   accessToken?: string;
   refreshToken?: string;
-}
-
-export interface RegisterUserDto {
-  userName: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginUserDto {
-  email: string;
-  password: string;
-}
-
-export interface UpdateUserDto {
-  userName?: string;
-  avatar?: string | null;
-}
-
-export interface UpdatePasswordDto {
-  currentPassword: string;
-  newPassword: string;
 }
 
 export const toUserDto = (user: User): UserResponseDto => {

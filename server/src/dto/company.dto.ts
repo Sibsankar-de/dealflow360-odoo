@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   Company,
   CompanyUser,
@@ -8,6 +9,19 @@ import {
 import { UserResponseDto, toUserDto } from "./user.dto";
 import { customerDiscountTierConverter } from "../converters/companySetting.converter";
 import { CustomerDiscountTierMap } from "../schemas/companySetting.schema";
+import {
+  createCompanySchema,
+  updateCompanySchema,
+  addCompanyUserSchema,
+  updateCompanyUserRoleSchema,
+  listCompaniesQuerySchema,
+} from "../schemas/company.schema";
+
+export type CreateCompanyDto = z.infer<typeof createCompanySchema>;
+export type UpdateCompanyDto = z.infer<typeof updateCompanySchema>;
+export type AddCompanyUserDto = z.infer<typeof addCompanyUserSchema>;
+export type UpdateCompanyUserRoleDto = z.infer<typeof updateCompanyUserRoleSchema>;
+export type ListCompaniesDto = z.infer<typeof listCompaniesQuerySchema>;
 
 export interface CompanySettingResponseDto {
   id: string;
@@ -42,43 +56,6 @@ export interface CompanyUserResponseDto {
   createdAt: Date;
   updatedAt: Date;
   user?: UserResponseDto;
-}
-
-export interface CreateCompanyDto {
-  name: string;
-  currency?: string;
-  country: string;
-  postalCode: string;
-  addressLine: string;
-}
-
-export interface UpdateCompanyDto {
-  name?: string;
-  currency?: string;
-  status?: CompanyStatus;
-  country?: string;
-  postalCode?: string;
-  addressLine?: string;
-}
-
-export interface AddCompanyUserDto {
-  userEmail: string;
-  role: CompanyUserRole;
-}
-
-export interface UpdateCompanyUserRoleDto {
-  userEmail: string;
-  role: CompanyUserRole;
-}
-
-export interface ListCompaniesDto {
-  page?: number;
-  limit?: number;
-  search?: string;
-  status?: CompanyStatus;
-  sortBy?: "name" | "createdAt" | "updatedAt" | "status" | "country";
-  sortOrder?: "asc" | "desc";
-  myCompanies?: boolean;
 }
 
 export interface CompanyRoleResponseDto {
