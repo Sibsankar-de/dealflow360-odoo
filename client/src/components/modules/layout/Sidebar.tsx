@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { AppLogo } from "@/components/ui/AppLogo";
 import { StoreInfo } from "./StoreInfo";
 import {
   LayoutDashboard,
@@ -16,7 +16,6 @@ import {
   HelpCircle,
   Settings,
   PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 
 export interface SidebarProps {
@@ -118,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Top Header & Main Navigation */}
       <div className="flex flex-col">
-        {/* Header with Company Logo & Collapse Button */}
+        {/* Header with AppLogo & Collapse Button */}
         <div
           className={`h-16 px-4 flex items-center border-b border-navy-900 ${
             isCollapsed ? "justify-center" : "justify-between"
@@ -131,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Expand sidebar"
               className="cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <CompanyLogo showText={false} size="sm" />
+              <AppLogo showText={false} size="sm" textColor="white" />
             </button>
           ) : (
             <>
@@ -139,7 +138,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 href={`/company/${companyId}/quotations`}
                 className="flex items-center min-w-0 hover:opacity-90 transition-opacity"
               >
-                <CompanyLogo name="DealFlow360" size="sm" showText={true} />
+                <AppLogo
+                  name="DealFlow360"
+                  size="sm"
+                  textColor="white"
+                  showText={true}
+                />
               </Link>
               <button
                 type="button"
@@ -189,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Bottom Footer Section: Help & Support, Settings, and StoreInfo at the bottom */}
+      {/* Bottom Footer Section: Help & Support, Settings, and StoreInfo */}
       <div className="p-3 border-t border-navy-900 space-y-3">
         {/* Secondary Utility Links */}
         <div className="space-y-0.5">
@@ -215,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </Link>
         </div>
 
-        {/* StoreInfo component at the bottom of the sidebar (without demo role) */}
+        {/* StoreInfo component at the bottom of the sidebar */}
         {!isCollapsed ? (
           <div className="pt-2 border-t border-navy-900/80">
             <StoreInfo

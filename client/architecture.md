@@ -48,25 +48,17 @@ The project follows a modular, feature-oriented structure under `src/`:
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
 ├── components/           # Reusable shared UI and layout components
-<<<<<<< HEAD
-│   ├── ui/               # Base primitives (Avatar, CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
-│   └── shared/           # Shared compound components (navbar, sidebar, tables)
-├── modules/              # Feature modules containing domain-specific logic
-│   ├── auth/             # Login, registration, company onboarding
-=======
-│   ├── ui/               # Base primitives (buttons, inputs, modals, cards)
+│   ├── ui/               # Base primitives (Avatar, AppLogo/CompanyLogo, buttons, inputs, modals, cards, badges, tabs)
 │   ├── shared/           # Shared compound components (navbar, sidebar, tables)
 │   └── modules/          # Feature module UI components
-│       └── auth/         # LoginForm, SignupForm, AuthBrandingPanel
->>>>>>> 59ce6cd (login and sign up page added)
-│   ├── dashboard/        # Metrics, deal health, recent activities
-│   ├── quotations/       # Quotation creator, evaluation, approval workflows
-│   ├── fulfillment/      # Delivery tracking, backorders
-│   ├── finance/          # Invoices, financial approvals
-│   ├── customers/        # Customer directory and interaction history
-│   ├── layout/           # App navigation (Collapsible Sidebar, Navbar: profile vs company view, StoreInfo, UserAvatarMenu)
-│   ├── profile/          # User profile, credentials, and company affiliations
-│   └── company/          # Team, roles, product management
+│       ├── auth/         # LoginForm, SignupForm, AuthBrandingPanel
+│       ├── layout/       # Collapsible Sidebar, Navbar: profile vs company view, StoreInfo, UserAvatarMenu
+│       ├── profile/      # ProfileInfoCard, CompanyCard, CompanyList, EditProfileModal, ChangePasswordModal, CreateCompanyModal
+│       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard
+│       ├── fulfillment/  # Delivery tracking, backorders
+│       ├── finance/      # Invoices, financial approvals
+│       ├── customers/    # Customer directory and interaction history
+│       └── company/      # Team, roles, product management
 ├── services/             # Centralized API clients and endpoint definitions
 │   └── api/              # Base API configuration and domain services
 ├── hooks/                # Reusable custom React hooks
