@@ -19,7 +19,7 @@ model Product {
   productStocks          ProductStock[]
   quotationItems         QuotationItem[]
   quotationRevisionItems QuotationRevisionItem[]
-  negotiationOfferItems  NegotiationOfferItem[]
+  negotiationItems       NegotiationItem[]
   discountTiers          ProductDiscountTier[]
   categories             CategoryProduct[]
   salesOrderItems        SalesOrderItem[]

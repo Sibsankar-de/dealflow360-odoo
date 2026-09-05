@@ -85,21 +85,33 @@ router.post("/:companyId/:id/reject", quotationController.reject);
 
 // Customer counter-offer and negotiation.
 router.post("/:companyId/:id/counter-offer", quotationController.counterOffer);
-router.post("/:companyId/:id/negotiate", quotationController.counterOffer);
+router.post("/:companyId/:id/negotiate", quotationController.negotiate);
 
 // Negotiation history.
 router.get("/:companyId/:id/negotiations", quotationController.getNegotiations);
 
-// Approve quotation or negotiation counter-offer.
+// Approve negotiation.
 router.post(
-  "/:companyId/:id/approve",
+  "/:companyId/:id/negotiations/:negotiationId/approve",
   verifyCompanyAccess,
   requireRole(
     CompanyUserRole.ADMIN,
     CompanyUserRole.SALES_MANAGER,
     CompanyUserRole.FINANCE_MANAGER,
   ),
-  quotationController.approve,
+  quotationController.approveNegotiation,
+);
+
+// Reject negotiation.
+router.post(
+  "/:companyId/:id/negotiations/:negotiationId/reject",
+  verifyCompanyAccess,
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_MANAGER,
+    CompanyUserRole.FINANCE_MANAGER,
+  ),
+  quotationController.rejectNegotiation,
 );
 
 // Fulfill quotation: warehouse stock deduction, delivery, invoice, and backorder creation.

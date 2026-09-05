@@ -33,7 +33,6 @@ model QuotationRevision {
   currentForQuotation Quotation?              @relation("CurrentQuotationRevision")
   creator             User                    @relation("RevisionCreator", fields: [createdById], references: [id], onDelete: Restrict)
   items               QuotationRevisionItem[]
-  negotiationOffers   NegotiationOffer[]
 
   @@unique([quotationId, revisionNo])
   @@index([quotationId])

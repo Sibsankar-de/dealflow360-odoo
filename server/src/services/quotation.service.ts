@@ -7,8 +7,6 @@ import {
   DealStage,
   DealStatus,
   NegotiationStatus,
-  OfferParty,
-  OfferStatus,
   CompanyUserRole,
   SalesOrderStatus,
   DeliveryStatus,
@@ -73,8 +71,9 @@ import {
   QuotationFilterDto,
   DealQuotationsQueryDto,
   RejectQuotationDto,
-  SubmitCounterOfferDto,
-  ApproveQuotationDto,
+  SubmitNegotiationDto,
+  ApproveNegotiationDto,
+  RejectNegotiationDto,
   FulfillQuotationDto,
   FulfillmentResultDto,
   NegotiationResponseDto,
@@ -719,6 +718,7 @@ export class QuotationService {
     dealId: string,
     filters: DealQuotationsQueryDto = {},
     companyId?: string,
+    excludeDraft: boolean = false,
   ): Promise<PaginatedResult<QuotationResponseDto>> {
     const deal = await this.dealRepo.findById(dealId);
     if (!deal) {
@@ -744,7 +744,17 @@ export class QuotationService {
     }
 
     if (filters.status) {
-      where.status = filters.status;
+      if (excludeDraft && filters.status === QuotationStatus.DRAFT) {
+        where.status = {
+          not: QuotationStatus.DRAFT,
+        };
+      } else {
+        where.status = filters.status;
+      }
+    } else if (excludeDraft) {
+      where.status = {
+        not: QuotationStatus.DRAFT,
+      };
     }
 
     if (filters.search) {
@@ -790,8 +800,6 @@ export class QuotationService {
         }
       }
 
-      const targetStatus = dto.status || quotation.status;
-
       let itemsToCreate;
       if (dto.items && dto.items.length > 0) {
         const productIds = dto.items.map((item) => item.productId);
@@ -825,7 +833,7 @@ export class QuotationService {
           quotationId,
           requestingUserId,
           RevisionType.SALES_COUNTER,
-          targetStatus === QuotationStatus.SENT
+          quotation.status === QuotationStatus.NEGOTIATING
             ? RevisionStatus.SENT
             : RevisionStatus.DRAFT,
           {
@@ -861,31 +869,6 @@ export class QuotationService {
         });
       }
 
-      if (dto.status === QuotationStatus.SENT) {
-        if (quotation.currentRevisionId) {
-          await tx.quotationRevision.update({
-            where: { id: quotation.currentRevisionId },
-            data: { status: RevisionStatus.SENT },
-          });
-        }
-
-        const deal = await tx.deal.findUnique({
-          where: { id: quotation.dealId },
-        });
-
-        if (
-          deal &&
-          (deal.stage === DealStage.NEW ||
-            deal.stage === DealStage.QUALIFICATION ||
-            deal.stage === DealStage.REQUIREMENT)
-        ) {
-          await tx.deal.update({
-            where: { id: deal.id },
-            data: { stage: DealStage.QUOTATION },
-          });
-        }
-      }
-
       const updateData: Prisma.QuotationUpdateInput = {
         ...(dto.customerId
           ? { customer: { connect: { id: dto.customerId } } }
@@ -896,7 +879,6 @@ export class QuotationService {
             }
           : {}),
         ...(dto.currency ? { currency: dto.currency } : {}),
-        ...(dto.status ? { status: dto.status } : {}),
       };
 
       const updated = await this.quotationRepo.update(
@@ -1117,7 +1099,7 @@ export class QuotationService {
 
   public async rejectQuotation(
     quotationId: string,
-    requestingUserId?: string,
+    requestingUserId: string,
     dto?: RejectQuotationDto,
   ): Promise<QuotationResponseDto> {
     return prismaTransaction(async (tx: TransactionClient) => {
@@ -1126,35 +1108,11 @@ export class QuotationService {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
       }
 
-      if (requestingUserId) {
-        const isAssignedCustomer = quotation.customerId === requestingUserId;
-        const membership = await this.companyRepo.findCompanyUser(
-          quotation.companyId,
-          requestingUserId,
-          tx,
+      if (quotation.customerId !== requestingUserId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Only the customer assigned to this quotation can reject it",
         );
-
-        const isStaff =
-          membership &&
-          (membership.role === CompanyUserRole.ADMIN ||
-            membership.role === CompanyUserRole.SALES_MANAGER);
-
-        if (!isAssignedCustomer && !isStaff) {
-          throw new ApiError(
-            StatusCodes.FORBIDDEN,
-            "Only the customer assigned to this quotation can reject it",
-          );
-        }
-
-        if (
-          isAssignedCustomer &&
-          (!membership || membership.role !== CompanyUserRole.CUSTOMER)
-        ) {
-          throw new ApiError(
-            StatusCodes.FORBIDDEN,
-            "User does not have the CUSTOMER role in this company",
-          );
-        }
       }
 
       if (quotation.status === QuotationStatus.REJECTED) {
@@ -1192,21 +1150,13 @@ export class QuotationService {
         );
       }
 
+      // Close any pending negotiations when customer rejects the quotation.
       await tx.negotiation.updateMany({
-        where: { quotationId, status: NegotiationStatus.OPEN },
+        where: { quotationId, status: NegotiationStatus.PENDING },
         data: {
-          status: NegotiationStatus.CLOSED,
-          closedAt: new Date(),
-        },
-      });
-
-      await tx.negotiationOffer.updateMany({
-        where: {
-          negotiation: { quotationId },
-          status: OfferStatus.PENDING,
-        },
-        data: {
-          status: OfferStatus.REJECTED,
+          status: NegotiationStatus.REJECTED,
+          rejectedAt: new Date(),
+          rejectionReason: "Quotation rejected by customer",
         },
       });
 
@@ -1217,63 +1167,6 @@ export class QuotationService {
             status: RevisionStatus.REJECTED,
             ...(dto?.reason ? { customerNote: dto.reason } : {}),
           },
-        });
-      } else {
-        const lastRev = await tx.quotationRevision.findFirst({
-          where: { quotationId },
-          orderBy: { revisionNo: "desc" },
-        });
-        const nextRevNo = (lastRev?.revisionNo || 0) + 1;
-
-        let subtotal = new Prisma.Decimal(0);
-        let discountTotal = new Prisma.Decimal(0);
-        let taxTotal = new Prisma.Decimal(0);
-        let totalAmount = new Prisma.Decimal(0);
-
-        const revisionItems = (quotation.items || []).map((item) => {
-          subtotal = subtotal.add(item.unitPrice.mul(item.quantity));
-          discountTotal = discountTotal.add(item.discountAmount);
-          taxTotal = taxTotal.add(
-            item.lineTotal.sub(
-              item.unitPrice.mul(item.quantity).sub(item.discountAmount),
-            ),
-          );
-          totalAmount = totalAmount.add(item.lineTotal);
-
-          return {
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discountType: item.discountType,
-            discountValue: item.discountValue,
-            discountAmount: item.discountAmount,
-            taxRate: item.taxRate,
-            finalUnitPrice: item.finalUnitPrice,
-            lineTotal: item.lineTotal,
-          };
-        });
-
-        const revision = await tx.quotationRevision.create({
-          data: {
-            quotationId,
-            revisionNo: nextRevNo,
-            createdById: requestingUserId || quotation.salesRepId,
-            revisionType: RevisionType.INITIAL,
-            status: RevisionStatus.REJECTED,
-            subtotal,
-            discountAmount: discountTotal,
-            taxAmount: taxTotal,
-            totalAmount,
-            customerNote: dto?.reason || null,
-            items: {
-              create: revisionItems,
-            },
-          },
-        });
-
-        await tx.quotation.update({
-          where: { id: quotationId },
-          data: { currentRevisionId: revision.id },
         });
       }
 
@@ -1290,10 +1183,10 @@ export class QuotationService {
     });
   }
 
-  public async submitCounterOffer(
+  public async submitNegotiation(
     quotationId: string,
     requestingUserId: string,
-    dto: SubmitCounterOfferDto,
+    dto: SubmitNegotiationDto,
   ): Promise<QuotationResponseDto> {
     return prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
@@ -1305,19 +1198,6 @@ export class QuotationService {
         throw new ApiError(
           StatusCodes.FORBIDDEN,
           "Only the customer assigned to this quotation can negotiate",
-        );
-      }
-
-      const membership = await this.companyRepo.findCompanyUser(
-        quotation.companyId,
-        requestingUserId,
-        tx,
-      );
-
-      if (!membership || membership.role !== CompanyUserRole.CUSTOMER) {
-        throw new ApiError(
-          StatusCodes.FORBIDDEN,
-          "User does not have the CUSTOMER role in this company",
         );
       }
 
@@ -1360,7 +1240,7 @@ export class QuotationService {
       let calculatedTax = new Prisma.Decimal(0);
       let calculatedTotal = new Prisma.Decimal(0);
 
-      const offerItemsData: Array<{
+      const negotiationItemsData: Array<{
         quotationItemId?: string | null;
         productId: string;
         requestedQuantity: Prisma.Decimal;
@@ -1421,7 +1301,7 @@ export class QuotationService {
           }
 
           const lineBase = unitPrice.mul(quantity).sub(discountAmount);
-          const finalUnitPrice = lineBase.div(quantity);
+          const finalUnitPrice = quantity.gt(0) ? lineBase.div(quantity) : unitPrice;
           const lineTax = lineBase.mul(taxRate).div(100);
           const lineTotal = lineBase.add(lineTax);
 
@@ -1430,7 +1310,7 @@ export class QuotationService {
           calculatedTax = calculatedTax.add(lineTax);
           calculatedTotal = calculatedTotal.add(lineTotal);
 
-          offerItemsData.push({
+          negotiationItemsData.push({
             quotationItemId: existing.id,
             productId: existing.productId,
             requestedQuantity: quantity,
@@ -1456,47 +1336,21 @@ export class QuotationService {
         for (const existing of baseItems) {
           const quantity = new Prisma.Decimal(existing.quantity);
           const unitPrice = new Prisma.Decimal(existing.unitPrice);
-          let discountType = existing.discountType;
-          let discountValue = new Prisma.Decimal(existing.discountValue);
+          const discountType = existing.discountType;
+          const discountValue = new Prisma.Decimal(existing.discountValue);
           const taxRate = new Prisma.Decimal(existing.taxRate);
-
-          if (dto.proposedDiscount !== undefined) {
-            discountType = dto.discountType ?? DiscountType.PERCENTAGE;
-            discountValue = new Prisma.Decimal(dto.proposedDiscount);
-          } else if (dto.proposedPrice !== undefined) {
-            const currentSubtotal = baseItems.reduce(
-              (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
-              0,
-            );
-            if (currentSubtotal > 0 && dto.proposedPrice < currentSubtotal) {
-              discountType = DiscountType.PERCENTAGE;
-              const discPercent =
-                ((currentSubtotal - dto.proposedPrice) / currentSubtotal) * 100;
-              discountValue = new Prisma.Decimal(discPercent.toFixed(2));
-            }
-          }
-
-          let discountAmount = new Prisma.Decimal(0);
-          if (discountType === DiscountType.PERCENTAGE) {
-            discountAmount = unitPrice
-              .mul(quantity)
-              .mul(discountValue)
-              .div(100);
-          } else {
-            discountAmount = discountValue;
-          }
-
-          const lineBase = unitPrice.mul(quantity).sub(discountAmount);
-          const finalUnitPrice = lineBase.div(quantity);
-          const lineTax = lineBase.mul(taxRate).div(100);
-          const lineTotal = lineBase.add(lineTax);
+          const discountAmount = new Prisma.Decimal(existing.discountAmount);
+          const finalUnitPrice = new Prisma.Decimal(existing.finalUnitPrice);
+          const lineTotal = new Prisma.Decimal(existing.lineTotal);
 
           calculatedSubtotal = calculatedSubtotal.add(unitPrice.mul(quantity));
           calculatedTotalDiscount = calculatedTotalDiscount.add(discountAmount);
-          calculatedTax = calculatedTax.add(lineTax);
+          calculatedTax = calculatedTax.add(
+            lineTotal.sub(unitPrice.mul(quantity).sub(discountAmount)),
+          );
           calculatedTotal = calculatedTotal.add(lineTotal);
 
-          offerItemsData.push({
+          negotiationItemsData.push({
             quotationItemId: existing.id,
             productId: existing.productId,
             requestedQuantity: quantity,
@@ -1520,42 +1374,12 @@ export class QuotationService {
         }
       }
 
-      let negotiation = await tx.negotiation.findFirst({
-        where: { quotationId, status: NegotiationStatus.OPEN },
-      });
-      if (!negotiation) {
-        negotiation = await tx.negotiation.create({
-          data: {
-            quotationId,
-            status: NegotiationStatus.OPEN,
-          },
-        });
-      }
-
-      await tx.negotiationOffer.updateMany({
-        where: {
-          negotiationId: negotiation.id,
-          status: OfferStatus.PENDING,
-        },
-        data: {
-          status: OfferStatus.SUPERSEDED,
-        },
-      });
-
-      await tx.negotiationOffer.create({
-        data: {
-          negotiationId: negotiation.id,
-          baseRevisionId: quotation.currentRevisionId,
-          offeredBy: OfferParty.CUSTOMER,
-          status: OfferStatus.PENDING,
-          message: dto.message || null,
-          items: {
-            create: offerItemsData,
-          },
-        },
-      });
-
-      const customerTier = membership.customerTier ?? null;
+      const companyUser = await this.companyRepo.findCompanyUser(
+        quotation.companyId,
+        quotation.customerId,
+        tx,
+      );
+      const customerTier = companyUser?.customerTier ?? null;
 
       let defaultTierMap: Record<string, number> = {};
       const settings = await this.companyRepo.findSettings(
@@ -1630,7 +1454,7 @@ export class QuotationService {
         blendedThreshold,
         midThreshold,
       );
-      const counterEvalNote = `Counter-Offer Discount Evaluation: maxLineViolation=${counterDiscountEvaluation.maxLineViolation}%, blendedViolationScore=${counterDiscountEvaluation.blendedViolationScore}%, riskLevel=${counterDiscountEvaluation.riskLevel}, requiredApproval=${counterDiscountEvaluation.requiredApprovalRole || "NONE"}`;
+      const counterEvalNote = `Negotiation Discount Evaluation: maxLineViolation=${counterDiscountEvaluation.maxLineViolation}%, blendedViolationScore=${counterDiscountEvaluation.blendedViolationScore}%, riskLevel=${counterDiscountEvaluation.riskLevel}, requiredApproval=${counterDiscountEvaluation.requiredApprovalRole || "NONE"}`;
 
       const revisionCount = await tx.quotationRevision.count({
         where: { quotationId },
@@ -1638,22 +1462,29 @@ export class QuotationService {
 
       const isLowRisk = counterDiscountEvaluation.riskLevel === RiskLevel.LOW;
 
-      if (isLowRisk) {
-        await tx.negotiationOffer.updateMany({
-          where: {
-            negotiationId: negotiation.id,
-            status: OfferStatus.PENDING,
+      await tx.negotiation.create({
+        data: {
+          quotationId,
+          status: isLowRisk ? NegotiationStatus.APPROVED : NegotiationStatus.PENDING,
+          message: dto.message || null,
+          riskScore: new Prisma.Decimal(counterDiscountEvaluation.blendedViolationScore),
+          riskLevel: counterDiscountEvaluation.riskLevel,
+          requiredRole: counterDiscountEvaluation.requiredApprovalRole || null,
+          approvedAt: isLowRisk ? new Date() : null,
+          items: {
+            create: negotiationItemsData,
           },
-          data: { status: OfferStatus.ACCEPTED },
-        });
+        },
+      });
 
+      if (isLowRisk) {
         const revision = await tx.quotationRevision.create({
           data: {
             quotationId,
             revisionNo: revisionCount + 1,
             createdById: requestingUserId,
             revisionType: RevisionType.CUSTOMER_COUNTER,
-            status: RevisionStatus.ACCEPTED,
+            status: RevisionStatus.SENT,
             subtotal: calculatedSubtotal,
             discountAmount: calculatedTotalDiscount,
             taxAmount: calculatedTax,
@@ -1670,7 +1501,7 @@ export class QuotationService {
         await tx.quotation.update({
           where: { id: quotationId },
           data: {
-            status: QuotationStatus.ACCEPTED,
+            status: QuotationStatus.SENT,
             currentRevisionId: revision.id,
             items: {
               create: revisionItemsData.map((it) => ({
@@ -1687,39 +1518,11 @@ export class QuotationService {
             },
           },
         });
-
-        await tx.negotiation.update({
-          where: { id: negotiation.id },
-          data: {
-            status: NegotiationStatus.CLOSED,
-            closedAt: new Date(),
-          },
-        });
       } else {
-        const revision = await tx.quotationRevision.create({
-          data: {
-            quotationId,
-            revisionNo: revisionCount + 1,
-            createdById: requestingUserId,
-            revisionType: RevisionType.CUSTOMER_COUNTER,
-            status: RevisionStatus.SENT,
-            subtotal: calculatedSubtotal,
-            discountAmount: calculatedTotalDiscount,
-            taxAmount: calculatedTax,
-            totalAmount: calculatedTotal,
-            customerNote: dto.message || null,
-            internalNote: counterEvalNote,
-            items: {
-              create: revisionItemsData,
-            },
-          },
-        });
-
         await tx.quotation.update({
           where: { id: quotationId },
           data: {
             status: QuotationStatus.NEGOTIATING,
-            currentRevisionId: revision.id,
           },
         });
 
@@ -1747,12 +1550,22 @@ export class QuotationService {
     });
   }
 
-  public async approveQuotation(
+  // Alias for backward compatibility
+  public async submitCounterOffer(
+    quotationId: string,
+    requestingUserId: string,
+    dto: SubmitNegotiationDto,
+  ): Promise<QuotationResponseDto> {
+    return this.submitNegotiation(quotationId, requestingUserId, dto);
+  }
+
+  public async approveNegotiation(
     companyId: string,
     quotationId: string,
+    negotiationId: string,
     reviewerUserId: string,
     reviewerRole: CompanyUserRole,
-    dto?: ApproveQuotationDto,
+    dto?: ApproveNegotiationDto,
   ): Promise<QuotationResponseDto> {
     return prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
@@ -1760,72 +1573,184 @@ export class QuotationService {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
       }
 
-      this.validateQuotationCanBeApproved(quotation.status);
+      const negotiation = await tx.negotiation.findUnique({
+        where: { id: negotiationId },
+        include: {
+          items: true,
+        },
+      });
 
-      const discountEvaluation = await this.evaluateDiscountViolations(
-        quotationId,
-        tx,
-      );
+      if (!negotiation || negotiation.quotationId !== quotationId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Negotiation not found");
+      }
+
+      if (negotiation.status !== NegotiationStatus.PENDING) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Cannot approve negotiation with status ${negotiation.status}`,
+        );
+      }
 
       this.validateReviewerApprovalPermission(
         reviewerRole,
         reviewerUserId,
         quotation.company.ownerId,
-        discountEvaluation.requiredApprovalRole,
+        negotiation.requiredRole as CompanyUserRole | null,
       );
 
-      const pendingOffer = await tx.negotiationOffer.findFirst({
-        where: {
-          negotiation: { quotationId },
-          status: OfferStatus.PENDING,
-          ...(dto?.offerId ? { id: dto.offerId } : {}),
-        },
-        include: {
-          items: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (pendingOffer) {
-        await this.acceptNegotiationOffer(
-          quotationId,
+      if (negotiation.items.length > 0) {
+        const productIds = negotiation.items.map((i) => i.productId);
+        const products = await this.quotationRepo.findProductsByIds(
+          productIds,
           companyId,
-          pendingOffer,
-          reviewerUserId,
-          reviewerRole,
-          dto?.notes,
           tx,
         );
+        const productMap = new Map(products.map((p) => [p.id, p]));
+
+        const calculated = this.calculateQuotationTotals(
+          negotiation.items.map((item) => ({
+            productId: item.productId,
+            quantity: Number(item.requestedQuantity),
+            unitPrice: Number(item.requestedUnitPrice),
+            discountType: item.requestedDiscountType,
+            discountValue: Number(item.requestedDiscountValue),
+          })),
+          productMap,
+        );
+
+        await this.quotationRepo.deleteItemsByQuotationId(quotationId, tx);
+
+        const revision = await this.quotationRepo.createRevision(
+          quotationId,
+          reviewerUserId,
+          RevisionType.CUSTOMER_COUNTER,
+          RevisionStatus.SENT,
+          {
+            subtotal: calculated.subtotal,
+            discountAmount: calculated.totalDiscount,
+            taxAmount: calculated.taxAmount,
+            totalAmount: calculated.total,
+            customerNote: negotiation.message || null,
+            internalNote: dto?.notes || `Approved by ${reviewerRole} (${reviewerUserId})`,
+          },
+          calculated.itemsToCreate,
+          tx,
+        );
+
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: {
+            status: QuotationStatus.SENT,
+            currentRevisionId: revision.id,
+            items: {
+              create: calculated.itemsToCreate.map((it) => ({
+                productId: it.productId,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                discountType: it.discountType,
+                discountValue: it.discountValue,
+                discountAmount: it.discountAmount,
+                taxRate: it.taxRate,
+                finalUnitPrice: it.finalUnitPrice,
+                lineTotal: it.lineTotal,
+              })),
+            },
+          },
+        });
       } else {
-        await this.acceptCurrentQuotationRevision(quotation, reviewerRole, tx);
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: {
+            status: QuotationStatus.SENT,
+          },
+        });
       }
 
-      await this.closeOpenNegotiations(quotationId, tx);
+      await tx.negotiation.update({
+        where: { id: negotiationId },
+        data: {
+          status: NegotiationStatus.APPROVED,
+          approvedBy: reviewerUserId,
+          approvedAt: new Date(),
+        },
+      });
 
       const updated = await this.quotationRepo.findById(quotationId, tx);
-      const resDto = toQuotationDto(updated!);
-      resDto.discountEvaluation = discountEvaluation;
-      return resDto;
+      return toQuotationDto(updated!);
     });
   }
 
-  private validateQuotationCanBeApproved(status: QuotationStatus): void {
-    if (status === QuotationStatus.ACCEPTED) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        "Quotation has already been accepted",
-      );
-    }
+  public async rejectNegotiation(
+    companyId: string,
+    quotationId: string,
+    negotiationId: string,
+    reviewerUserId: string,
+    reviewerRole: CompanyUserRole,
+    dto?: RejectNegotiationDto,
+  ): Promise<QuotationResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation || quotation.companyId !== companyId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
 
-    if (
-      status !== QuotationStatus.NEGOTIATING &&
-      status !== QuotationStatus.SENT
-    ) {
-      throw new ApiError(
-        StatusCodes.BAD_REQUEST,
-        `Cannot approve a quotation with status ${status}`,
-      );
-    }
+      const negotiation = await tx.negotiation.findUnique({
+        where: { id: negotiationId },
+      });
+
+      if (!negotiation || negotiation.quotationId !== quotationId) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Negotiation not found");
+      }
+
+      if (negotiation.status !== NegotiationStatus.PENDING) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Cannot reject negotiation with status ${negotiation.status}`,
+        );
+      }
+
+      const isAuthorizedStaff =
+        reviewerRole === CompanyUserRole.ADMIN ||
+        reviewerRole === CompanyUserRole.SALES_MANAGER ||
+        reviewerRole === CompanyUserRole.FINANCE_MANAGER ||
+        quotation.company.ownerId === reviewerUserId;
+
+      if (!isAuthorizedStaff) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "Only authorized staff can reject negotiations",
+        );
+      }
+
+      await tx.negotiation.update({
+        where: { id: negotiationId },
+        data: {
+          status: NegotiationStatus.REJECTED,
+          rejectedBy: reviewerUserId,
+          rejectedAt: new Date(),
+          rejectionReason: dto?.reason || "Rejected by reviewer",
+        },
+      });
+
+      const remainingPending = await tx.negotiation.count({
+        where: {
+          quotationId,
+          status: NegotiationStatus.PENDING,
+        },
+      });
+
+      if (remainingPending === 0) {
+        await tx.quotation.update({
+          where: { id: quotationId },
+          data: {
+            status: QuotationStatus.SENT,
+          },
+        });
+      }
+
+      const updated = await this.quotationRepo.findById(quotationId, tx);
+      return toQuotationDto(updated!);
+    });
   }
 
   private validateReviewerApprovalPermission(
@@ -1859,133 +1784,6 @@ export class QuotationService {
         );
       }
     }
-  }
-
-  private async acceptNegotiationOffer(
-    quotationId: string,
-    companyId: string,
-    pendingOffer: {
-      id: string;
-      items: Array<{
-        productId: string;
-        requestedQuantity: Prisma.Decimal;
-        requestedUnitPrice: Prisma.Decimal;
-        requestedDiscountType: DiscountType;
-        requestedDiscountValue: Prisma.Decimal;
-      }>;
-    },
-    reviewerUserId: string,
-    reviewerRole: CompanyUserRole,
-    notes: string | undefined,
-    tx: TransactionClient,
-  ): Promise<void> {
-    await tx.negotiationOffer.update({
-      where: { id: pendingOffer.id },
-      data: { status: OfferStatus.ACCEPTED },
-    });
-
-    if (pendingOffer.items.length === 0) {
-      return;
-    }
-
-    const productIds = pendingOffer.items.map((i) => i.productId);
-    const products = await this.quotationRepo.findProductsByIds(
-      productIds,
-      companyId,
-      tx,
-    );
-    const productMap = new Map(products.map((p) => [p.id, p]));
-
-    const calculated = this.calculateQuotationTotals(
-      pendingOffer.items.map((item) => ({
-        productId: item.productId,
-        quantity: Number(item.requestedQuantity),
-        unitPrice: Number(item.requestedUnitPrice),
-        discountType: item.requestedDiscountType,
-        discountValue: Number(item.requestedDiscountValue),
-      })),
-      productMap,
-    );
-
-    await this.quotationRepo.deleteItemsByQuotationId(quotationId, tx);
-
-    const revision = await this.quotationRepo.createRevision(
-      quotationId,
-      reviewerUserId,
-      RevisionType.FINAL,
-      RevisionStatus.ACCEPTED,
-      {
-        subtotal: calculated.subtotal,
-        discountAmount: calculated.totalDiscount,
-        taxAmount: calculated.taxAmount,
-        totalAmount: calculated.total,
-        customerNote: notes || null,
-        internalNote: `Approved by ${reviewerRole} (${reviewerUserId})`,
-      },
-      calculated.itemsToCreate,
-      tx,
-    );
-
-    await tx.quotation.update({
-      where: { id: quotationId },
-      data: {
-        status: QuotationStatus.ACCEPTED,
-        currentRevisionId: revision.id,
-        items: {
-          create: calculated.itemsToCreate.map((it) => ({
-            productId: it.productId,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            discountType: it.discountType,
-            discountValue: it.discountValue,
-            discountAmount: it.discountAmount,
-            taxRate: it.taxRate,
-            finalUnitPrice: it.finalUnitPrice,
-            lineTotal: it.lineTotal,
-          })),
-        },
-      },
-    });
-  }
-
-  private async acceptCurrentQuotationRevision(
-    quotation: {
-      id: string;
-      currentRevisionId: string | null;
-      currentRevision?: { internalNote?: string | null } | null;
-    },
-    reviewerRole: CompanyUserRole,
-    tx: TransactionClient,
-  ): Promise<void> {
-    if (quotation.currentRevisionId) {
-      await tx.quotationRevision.update({
-        where: { id: quotation.currentRevisionId },
-        data: {
-          status: RevisionStatus.ACCEPTED,
-          internalNote:
-            `${quotation.currentRevision?.internalNote || ""} | Approved by ${reviewerRole}`.trim(),
-        },
-      });
-    }
-
-    await this.quotationRepo.update(
-      quotation.id,
-      { status: QuotationStatus.ACCEPTED },
-      tx,
-    );
-  }
-
-  private async closeOpenNegotiations(
-    quotationId: string,
-    tx: TransactionClient,
-  ): Promise<void> {
-    await tx.negotiation.updateMany({
-      where: { quotationId, status: NegotiationStatus.OPEN },
-      data: {
-        status: NegotiationStatus.CLOSED,
-        closedAt: new Date(),
-      },
-    });
   }
 
   public async fulfillQuotation(

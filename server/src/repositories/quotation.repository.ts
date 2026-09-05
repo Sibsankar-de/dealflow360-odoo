@@ -16,8 +16,7 @@ import {
   Company,
   Deal,
   Negotiation,
-  NegotiationOffer,
-  NegotiationOfferItem,
+  NegotiationItem,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
@@ -36,9 +35,7 @@ export type QuotationWithRelations = Quotation & {
   customer: User;
   company: Company;
   negotiations?: (Negotiation & {
-    offers: (NegotiationOffer & {
-      items: (NegotiationOfferItem & { product: Product })[];
-    })[];
+    items: (NegotiationItem & { product: Product })[];
   })[];
 };
 
@@ -402,14 +399,9 @@ export class QuotationRepository {
         negotiations: {
           orderBy: { createdAt: "desc" },
           include: {
-            offers: {
-              orderBy: { createdAt: "asc" },
+            items: {
               include: {
-                items: {
-                  include: {
-                    product: true,
-                  },
-                },
+                product: true,
               },
             },
           },
@@ -437,14 +429,9 @@ export class QuotationRepository {
       negotiations: {
         orderBy: { createdAt: "desc" as const },
         include: {
-          offers: {
-            orderBy: { createdAt: "asc" as const },
+          items: {
             include: {
-              items: {
-                include: {
-                  product: true,
-                },
-              },
+              product: true,
             },
           },
         },
@@ -657,14 +644,9 @@ export class QuotationRepository {
       where: { quotationId },
       orderBy: { createdAt: "desc" },
       include: {
-        offers: {
-          orderBy: { createdAt: "asc" },
+        items: {
           include: {
-            items: {
-              include: {
-                product: true,
-              },
-            },
+            product: true,
           },
         },
       },

@@ -130,6 +130,7 @@ export class ElasticsearchService {
 
     try {
       const es = getElasticsearchClient();
+      const queryLower = query.toLowerCase().trim();
       const response = await es.search({
         index: env.ELASTICSEARCH_USERS_INDEX,
         size: limit,
@@ -137,8 +138,9 @@ export class ElasticsearchService {
         query: {
           bool: {
             should: [
-              { term: { email: { value: query, boost: 4 } } },
-              { prefix: { email: { value: query, boost: 2 } } },
+              { term: { email: { value: queryLower, boost: 4 } } },
+              { prefix: { email: { value: queryLower, boost: 2 } } },
+              { wildcard: { email: { value: `*${queryLower}*` } } },
               {
                 match: {
                   name: {
@@ -167,7 +169,7 @@ export class ElasticsearchService {
       );
 
       if (hitIds.length === 0) {
-        return [];
+        return this.fallbackSearchCustomers(companyId, query, limit);
       }
 
       const users = await prisma.user.findMany({
@@ -205,7 +207,7 @@ export class ElasticsearchService {
     query: string,
     limit: number,
   ): Promise<CustomerSummaryResponseDto[]> {
-    const term = decodeURIComponent(query);
+    const term = decodeURIComponent(query).trim();
     const results = await prisma.user.findMany({
       where: {
         OR: [

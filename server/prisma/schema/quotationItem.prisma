@@ -21,7 +21,7 @@ model QuotationItem {
   // Relations
   quotation             Quotation              @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   product               Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
-  negotiationOfferItems NegotiationOfferItem[]
+  negotiationItems NegotiationItem[]
 
   @@index([quotationId])
   @@index([productId])

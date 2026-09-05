@@ -18,7 +18,6 @@ import {
   dealFilterSchema,
   customerDealFilterSchema,
 } from "../schemas/deal.schema";
-import { QuotationStatus } from "@prisma/client";
 import { dealQuotationsQuerySchema } from "../schemas/quotation.schema";
 import { CreateDealDto } from "../dto/deal.dto";
 
@@ -217,16 +216,16 @@ export class DealController {
         );
       }
 
-      // Customers can only view quotations that have been sent
+      // Customers can view all non-DRAFT quotations (SENT, NEGOTIATING, ACCEPTED, REJECTED, EXPIRED, CANCELLED)
       const queryFilters = {
         ...filterResult.data,
-        status: QuotationStatus.SENT,
       };
 
       const result = await this.quotationService.listQuotationsByDeal(
         dealId,
         queryFilters,
         companyId,
+        true, // excludeDraft: customer cannot view internal DRAFTs
       );
 
       return res

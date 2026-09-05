@@ -165,11 +165,6 @@ Responsibilities:
 
 Persistence models must not become the public API contract automatically.
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 ### 4.6 Company and Multi-Tenancy Context
 
 Responsibilities:
@@ -204,11 +199,8 @@ Responsibilities:
   - Track opportunity progress via `DealStage` enum (`NEW`, `QUALIFICATION`, `REQUIREMENT`, `QUOTATION`, `NEGOTIATION`, `WON`, `LOST`).
   - Track overall outcome via `DealStatus` enum (`OPEN`, `WON`, `LOST`, `CANCELLED`).
   - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
-<<<<<<< Updated upstream
-=======
   - Provide paginated deal listing for company sales members via GET /api/v1/deals/:companyId.
   - Provide paginated deal listing for customers via GET /api/v1/deals/customer and GET /api/v1/deals/customer/:companyId scoped to the authenticated user's customer ID with status filtering and pagination.
->>>>>>> Stashed changes
 - Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
@@ -218,9 +210,8 @@ Responsibilities:
   - Track revision metadata: `revision_no`, author (`created_by`), `revision_type` (`INITIAL`, `SALES_COUNTER`, `CUSTOMER_COUNTER`, `FINAL`), and `status` (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`).
   - Store financial totals: `subtotal`, `discount_amount`, `tax_amount`, `total_amount`, and customer/internal notes.
 - Store historical snapshot line items (`quotation_revision_items`) preserving exact commercial values for each revision, independent of subsequent product price changes.
-- Store negotiation sessions (`negotiations`) per quotation with `NegotiationStatus` enum (`OPEN`, `CLOSED`, `CANCELLED`).
-- Store negotiation offers (`negotiation_offers`) representing distinct offers and counter-offers made by either party (`OfferParty`: `CUSTOMER`, `SALES_REP`) with `OfferStatus` (`PENDING`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`, `WITHDRAWN`) and base revision references.
-- Store line-level negotiation requests (`negotiation_offer_items`) specifying requested quantities, unit prices, discount types, discount values, and line totals.
+- Store flat negotiation records (`negotiations`) per customer counter-offer with `NegotiationStatus` enum (`PENDING`, `APPROVED`, `REJECTED`), `risk_score`, `risk_level`, `required_role`, approver/rejecter references, and rejection reason.
+- Store line-level negotiation requested terms (`negotiation_items`) specifying requested quantities, unit prices, discount types, discount values, and line totals.
 
 ### 4.9 Company Configuration Context
 
@@ -257,10 +248,6 @@ Responsibilities:
 
 
 
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 ## 5. Core Domain Model
 
 The following relationships describe the intended commercial traceability.
@@ -284,15 +271,9 @@ Quotation (Commercial Proposal)
    |        |
    |        +----> Revision Items
    |
-   +----> Negotiation (Negotiation Session)
+   +----> Negotiation (Flat Customer Counter-Offer)
             |
-            +----> Offer 1 (Customer/Sales Offer)
-            |        |
-            |        +----> Offer Items (Requested Lines)
-            |
-            +----> Offer 2 (Counter Offer)
-                     |
-                     +----> Offer Items (Requested Lines)
+            +----> Negotiation Items (Requested Terms)
    |
    v
 Accepted Quotation Revision
@@ -481,22 +462,27 @@ Based on the evaluated blended violation score and maximum line violation, quota
 The customer reviews the quotation through authenticated endpoints:
 
 #### Customer Negotiation (Counter-Offer):
-- Customer submits counter-offer (POST /api/v1/quotations/:companyId/:id/counter-offer or POST /api/v1/quotations/:companyId/:id/negotiate) with proposed discount, price, line item adjustments, and an optional message.
-- The server verifies that the requesting user is the assigned customer with the CUSTOMER role in that company.
-- Active negotiation session is tracked in `negotiations`, `negotiation_offers`, and `negotiation_offer_items`.
+- Customer submits negotiation (POST /api/v1/quotations/:companyId/:id/negotiate or alias /counter-offer) with proposed line item adjustments and an optional message.
+- The server verifies that the requesting user is the assigned customer on the quotation.
+- Each counter-offer is tracked as an independent, immutable `Negotiation` record linked with `NegotiationItem[]`.
 - Evaluates blended risk score for the counter-offer:
-  - If Low Risk: automatically accepts the offer, updates quotation items, and sets quotation status to ACCEPTED.
-  - If Mid or High Risk: records offer as PENDING, sets quotation status to NEGOTIATING, and sets Deal stage to NEGOTIATION.
-- Open negotiations and offer history can be retrieved via GET /api/v1/quotations/:companyId/:id/negotiations.
+  - If Low Risk: automatically approves the negotiation (`status: APPROVED`), applies updated line items to the quotation, creates a new `QuotationRevision` (`CUSTOMER_COUNTER`), and sets the quotation status back to `SENT` (ready for customer explicit acceptance).
+  - If Mid Risk: records negotiation as `PENDING` with required approval role `SALES_MANAGER`, sets quotation status to `NEGOTIATING`, and sets Deal stage to `NEGOTIATION`.
+  - If High Risk: records negotiation as `PENDING` with required approval role `FINANCE_MANAGER`, sets quotation status to `NEGOTIATING`, and sets Deal stage to `NEGOTIATION`.
+- Negotiation history can be retrieved via GET /api/v1/quotations/:companyId/:id/negotiations.
+
+#### Internal Review of Pending Negotiations:
+- Internal approvers review pending negotiations based on risk level:
+  - Approve Negotiation (POST /api/v1/quotations/:companyId/:id/negotiations/:negotiationId/approve): marks negotiation `APPROVED`, updates quotation items, creates a new `QuotationRevision`, and sets quotation status to `SENT` (presenting final terms to customer).
+  - Reject Negotiation (POST /api/v1/quotations/:companyId/:id/negotiations/:negotiationId/reject): marks negotiation `REJECTED` with a rejection reason. Quotation values remain unchanged and quotation status reverts to `SENT` if no other pending negotiations exist.
 
 #### Re-Negotiation after Rejection:
-- If a quotation or counter-offer is rejected (status REJECTED), the customer can submit a new counter-offer on the quotation (POST /api/v1/quotations/:companyId/:id/counter-offer).
-- The server creates a new negotiation cycle and evaluates risk tiers accordingly, enabling iterative customer re-negotiation.
+- If a previous negotiation is rejected, the customer can submit a new counter-offer on the quotation (POST /api/v1/quotations/:companyId/:id/negotiate).
+- The server creates a new independent `Negotiation` record, preserving full audit history.
 
 #### Customer Rejection:
 - Customer rejects quotation (POST /api/v1/quotations/:companyId/:id/reject) with an optional rejection reason.
-- The server verifies customer authorization and company membership.
-- Rejection closes open negotiations, marks pending offers as REJECTED, updates the current revision with the rejection reason in customerNote, and transitions quotation status to REJECTED.
+- Rejection closes any pending negotiations as REJECTED, marks the current revision as REJECTED with the rejection reason in customerNote, and transitions quotation status to REJECTED.
 
 #### Customer Acceptance / Approval (POST /api/v1/quotations/:companyId/:id/accept or POST /api/v1/quotations/:companyId/:id/customer-approve):
 - Customer accepts the proposal (or PATCH /api/v1/quotations/:companyId/:id/status with status ACCEPTED).

@@ -1,3 +1,13 @@
+/*
+  Warnings:
+
+  - The values [OPEN,CLOSED,CANCELLED] on the enum `NegotiationStatus` will be removed. If these variants are still used in the database, this will fail.
+  - You are about to drop the column `closed_at` on the `negotiations` table. All the data in the column will be lost.
+  - You are about to drop the column `started_at` on the `negotiations` table. All the data in the column will be lost.
+  - You are about to drop the `negotiation_offer_items` table. If the table is not empty, all the data it contains will be lost.
+  - You are about to drop the `negotiation_offers` table. If the table is not empty, all the data it contains will be lost.
+
+*/
 -- CreateEnum
 CREATE TYPE "BackorderStatus" AS ENUM ('PENDING', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED');
 
@@ -9,6 +19,58 @@ CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'POSTED', 'PARTIALLY_PAID', 'PAID'
 
 -- CreateEnum
 CREATE TYPE "SalesOrderStatus" AS ENUM ('DRAFT', 'CONFIRMED', 'PROCESSING', 'PARTIALLY_DELIVERED', 'DELIVERED', 'CANCELLED');
+
+-- AlterEnum
+BEGIN;
+CREATE TYPE "NegotiationStatus_new" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+ALTER TABLE "public"."negotiations" ALTER COLUMN "status" DROP DEFAULT;
+ALTER TABLE "negotiations" ALTER COLUMN "status" TYPE "NegotiationStatus_new" USING ("status"::text::"NegotiationStatus_new");
+ALTER TYPE "NegotiationStatus" RENAME TO "NegotiationStatus_old";
+ALTER TYPE "NegotiationStatus_new" RENAME TO "NegotiationStatus";
+DROP TYPE "public"."NegotiationStatus_old";
+ALTER TABLE "negotiations" ALTER COLUMN "status" SET DEFAULT 'PENDING';
+COMMIT;
+
+-- DropForeignKey
+ALTER TABLE "negotiation_offer_items" DROP CONSTRAINT "negotiation_offer_items_negotiation_offer_id_fkey";
+
+-- DropForeignKey
+ALTER TABLE "negotiation_offer_items" DROP CONSTRAINT "negotiation_offer_items_product_id_fkey";
+
+-- DropForeignKey
+ALTER TABLE "negotiation_offer_items" DROP CONSTRAINT "negotiation_offer_items_quotation_item_id_fkey";
+
+-- DropForeignKey
+ALTER TABLE "negotiation_offers" DROP CONSTRAINT "negotiation_offers_base_revision_id_fkey";
+
+-- DropForeignKey
+ALTER TABLE "negotiation_offers" DROP CONSTRAINT "negotiation_offers_negotiation_id_fkey";
+
+-- AlterTable
+ALTER TABLE "negotiations" DROP COLUMN "closed_at",
+DROP COLUMN "started_at",
+ADD COLUMN     "approved_at" TIMESTAMP(3),
+ADD COLUMN     "approved_by" UUID,
+ADD COLUMN     "message" TEXT,
+ADD COLUMN     "rejected_at" TIMESTAMP(3),
+ADD COLUMN     "rejected_by" UUID,
+ADD COLUMN     "rejection_reason" TEXT,
+ADD COLUMN     "required_role" TEXT,
+ADD COLUMN     "risk_level" TEXT,
+ADD COLUMN     "risk_score" DECIMAL(5,2),
+ALTER COLUMN "status" SET DEFAULT 'PENDING';
+
+-- DropTable
+DROP TABLE "negotiation_offer_items";
+
+-- DropTable
+DROP TABLE "negotiation_offers";
+
+-- DropEnum
+DROP TYPE "OfferParty";
+
+-- DropEnum
+DROP TYPE "OfferStatus";
 
 -- CreateTable
 CREATE TABLE "backorders" (
@@ -42,27 +104,6 @@ CREATE TABLE "backorder_items" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "backorder_items_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "categories" (
-    "id" UUID NOT NULL,
-    "company_id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "category_products" (
-    "product_id" UUID NOT NULL,
-    "category_id" UUID NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "category_products_pkey" PRIMARY KEY ("product_id","category_id")
 );
 
 -- CreateTable
@@ -141,6 +182,21 @@ CREATE TABLE "invoice_items" (
 );
 
 -- CreateTable
+CREATE TABLE "negotiation_items" (
+    "id" UUID NOT NULL,
+    "negotiation_id" UUID NOT NULL,
+    "quotation_item_id" UUID,
+    "product_id" UUID NOT NULL,
+    "requested_quantity" DECIMAL(12,2) NOT NULL,
+    "requested_unit_price" DECIMAL(12,2) NOT NULL,
+    "requested_discount_type" "DiscountType" NOT NULL DEFAULT 'PERCENTAGE',
+    "requested_discount_value" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "requested_line_total" DECIMAL(12,2) NOT NULL,
+
+    CONSTRAINT "negotiation_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "sales_orders" (
     "id" UUID NOT NULL,
     "company_id" UUID NOT NULL,
@@ -206,18 +262,6 @@ CREATE INDEX "backorder_items_sales_order_item_id_idx" ON "backorder_items"("sal
 CREATE INDEX "backorder_items_product_id_idx" ON "backorder_items"("product_id");
 
 -- CreateIndex
-CREATE INDEX "categories_company_id_idx" ON "categories"("company_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "categories_company_id_name_key" ON "categories"("company_id", "name");
-
--- CreateIndex
-CREATE INDEX "category_products_product_id_idx" ON "category_products"("product_id");
-
--- CreateIndex
-CREATE INDEX "category_products_category_id_idx" ON "category_products"("category_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "deliveries_delivery_no_key" ON "deliveries"("delivery_no");
 
 -- CreateIndex
@@ -269,6 +313,15 @@ CREATE INDEX "invoice_items_sales_order_item_id_idx" ON "invoice_items"("sales_o
 CREATE INDEX "invoice_items_product_id_idx" ON "invoice_items"("product_id");
 
 -- CreateIndex
+CREATE INDEX "negotiation_items_negotiation_id_idx" ON "negotiation_items"("negotiation_id");
+
+-- CreateIndex
+CREATE INDEX "negotiation_items_quotation_item_id_idx" ON "negotiation_items"("quotation_item_id");
+
+-- CreateIndex
+CREATE INDEX "negotiation_items_product_id_idx" ON "negotiation_items"("product_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "sales_orders_order_no_key" ON "sales_orders"("order_no");
 
 -- CreateIndex
@@ -311,15 +364,6 @@ ALTER TABLE "backorder_items" ADD CONSTRAINT "backorder_items_sales_order_item_i
 ALTER TABLE "backorder_items" ADD CONSTRAINT "backorder_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "categories" ADD CONSTRAINT "categories_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "category_products" ADD CONSTRAINT "category_products_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "category_products" ADD CONSTRAINT "category_products_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -357,6 +401,21 @@ ALTER TABLE "invoice_items" ADD CONSTRAINT "invoice_items_sales_order_item_id_fk
 
 -- AddForeignKey
 ALTER TABLE "invoice_items" ADD CONSTRAINT "invoice_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "negotiations" ADD CONSTRAINT "negotiations_approved_by_fkey" FOREIGN KEY ("approved_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "negotiations" ADD CONSTRAINT "negotiations_rejected_by_fkey" FOREIGN KEY ("rejected_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "negotiation_items" ADD CONSTRAINT "negotiation_items_negotiation_id_fkey" FOREIGN KEY ("negotiation_id") REFERENCES "negotiations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "negotiation_items" ADD CONSTRAINT "negotiation_items_quotation_item_id_fkey" FOREIGN KEY ("quotation_item_id") REFERENCES "quotation_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "negotiation_items" ADD CONSTRAINT "negotiation_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
