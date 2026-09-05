@@ -137,54 +137,50 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <Navbar variant="company" user={mockUser} />
-
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
-        {notification && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-            <span>{notification}</span>
-          </div>
-        )}
-
-        {/* Top Page Header */}
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
-            Customers
-          </h1>
-          <p className="text-sm text-text-secondary">
-            Manage customer profiles, contact information, and associated quotation history.
-          </p>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {notification && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+          <span>{notification}</span>
         </div>
+      )}
 
-        {/* View Switcher */}
-        {viewMode === "list" ? (
-          <CustomerListTable
-            customers={customers}
-            onViewCustomer={handleViewCustomer}
-            onCreateCustomer={() => setIsCreateModalOpen(true)}
-          />
-        ) : (
-          selectedCustomer && (
-            <CustomerDetailView
-              customer={selectedCustomer}
-              onBack={() => {
-                setViewMode("list");
-                setSelectedCustomer(null);
-              }}
-              onSelectQuotation={handleSelectQuotation}
-            />
-          )
-        )}
+      {/* Top Page Header */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">
+          Customers
+        </h1>
+        <p className="text-sm text-text-secondary">
+          Manage customer profiles, contact information, and associated quotation history.
+        </p>
+      </div>
 
-        {/* Create Customer Modal */}
-        <CreateCustomerModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onCreateCustomer={handleCreateCustomer}
+      {/* View Switcher */}
+      {viewMode === "list" ? (
+        <CustomerListTable
+          customers={customers}
+          onViewCustomer={handleViewCustomer}
+          onCreateCustomer={() => setIsCreateModalOpen(true)}
         />
-      </main>
+      ) : (
+        selectedCustomer && (
+          <CustomerDetailView
+            customer={selectedCustomer}
+            onBack={() => {
+              setViewMode("list");
+              setSelectedCustomer(null);
+            }}
+            onSelectQuotation={handleSelectQuotation}
+          />
+        )
+      )}
+
+      {/* Create Customer Modal */}
+      <CreateCustomerModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreateCustomer={handleCreateCustomer}
+      />
     </div>
   );
 }

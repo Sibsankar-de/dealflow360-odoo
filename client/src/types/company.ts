@@ -31,6 +31,35 @@ export interface CompanyResponseType {
   settings?: CompanySettingType;
 }
 
+export interface PaginatedCompaniesResponse {
+  docs: CompanyResponseType[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type UserCompaniesData =
+  | { companies: CompanyResponseType[] }
+  | PaginatedCompaniesResponse
+  | CompanyResponseType[];
+
+export interface CompanyMemberType {
+  id: string;
+  companyId: string;
+  userId: string;
+  role: BackendCompanyRole;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    userName: string;
+    email: string;
+    avatar: string | null;
+    role: string;
+  };
+}
+
 export interface CreateCompanyRequest {
   name: string;
   country: string;
@@ -38,3 +67,14 @@ export interface CreateCompanyRequest {
   addressLine: string;
   currency?: string;
 }
+
+export interface AddCompanyUserRequest {
+  userEmail: string;
+  role: BackendCompanyRole;
+}
+
+export interface UpdateCompanyUserRoleRequest {
+  userEmail: string;
+  role: BackendCompanyRole;
+}
+

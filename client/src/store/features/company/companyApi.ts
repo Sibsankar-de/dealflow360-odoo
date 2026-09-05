@@ -1,15 +1,46 @@
 import { baseApi } from "@/store/baseApi";
 import { ApiResponse } from "@/types/auth";
-import { CompanyResponseType, CreateCompanyRequest } from "@/types/company";
+import {
+  CompanyResponseType,
+  CompanyMemberType,
+  CreateCompanyRequest,
+  UserCompaniesData,
+} from "@/types/company";
+
 
 export const companyApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getUserCompanies: builder.query<ApiResponse<{ companies: CompanyResponseType[] }>, void>({
+    getUserCompanies: builder.query<
+      ApiResponse<UserCompaniesData>,
+      void
+    >({
       query: () => ({
-        url: "/companies/my",
+        url: "/companies",
         method: "GET",
       }),
       providesTags: ["Company"],
+    }),
+
+    getCompanyById: builder.query<
+      ApiResponse<{ company: CompanyResponseType }>,
+      string
+    >({
+      query: (companyId) => ({
+        url: `/companies/${companyId}`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, id) => [{ type: "Company", id }],
+    }),
+
+    getCompanyMembers: builder.query<
+      ApiResponse<{ members: CompanyMemberType[] }>,
+      string
+    >({
+      query: (companyId) => ({
+        url: `/companies/${companyId}/users`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, id) => [{ type: "Company", id: `members-${id}` }],
     }),
 
     createCompany: builder.mutation<
@@ -27,4 +58,10 @@ export const companyApi = baseApi.injectEndpoints({
   overrideExisting: false,
 });
 
-export const { useGetUserCompaniesQuery, useCreateCompanyMutation } = companyApi;
+export const {
+  useGetUserCompaniesQuery,
+  useGetCompanyByIdQuery,
+  useGetCompanyMembersQuery,
+  useCreateCompanyMutation,
+} = companyApi;
+

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { UserProfile, CompanyAffiliation, mapCompanyResponseToAffiliation } from "@/types/profile";
+import { CompanyResponseType } from "@/types/company";
 import { ProfileInfoCard } from "@/components/modules/profile/ProfileInfoCard";
 import { CompanyList } from "@/components/modules/profile/CompanyList";
 import { EditProfileModal } from "@/components/modules/profile/EditProfileModal";
@@ -25,9 +27,22 @@ export default function ProfilePage() {
   const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
+  const router = useRouter();
+
   const companies: CompanyAffiliation[] = React.useMemo(() => {
-    if (!companiesData?.data?.companies) return [];
-    return companiesData.data.companies.map(mapCompanyResponseToAffiliation);
+    if (!companiesData?.data) return [];
+    const rawData = companiesData.data;
+
+    let companyList: CompanyResponseType[] = [];
+    if (Array.isArray(rawData)) {
+      companyList = rawData;
+    } else if ("docs" in rawData && Array.isArray(rawData.docs)) {
+      companyList = rawData.docs;
+    } else if ("companies" in rawData && Array.isArray(rawData.companies)) {
+      companyList = rawData.companies;
+    }
+
+    return companyList.map(mapCompanyResponseToAffiliation);
   }, [companiesData]);
 
   const displayUser: UserProfile = {
@@ -69,7 +84,7 @@ export default function ProfilePage() {
   };
 
   const handleViewCompany = (company: CompanyAffiliation) => {
-    showNotification(`Switched to company context: ${company.name}`);
+    router.push(`/company/${company.id}/app/quotations`);
   };
 
   return (

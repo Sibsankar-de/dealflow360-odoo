@@ -3,11 +3,13 @@ import { setupListeners } from "@reduxjs/toolkit/query";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import { baseApi } from "./baseApi";
 import userReducer from "./features/user/userSlice";
+import companyReducer from "./features/company/companySlice";
 
 export const store = configureStore({
   reducer: {
     [baseApi.reducerPath]: baseApi.reducer,
     user: userReducer,
+    company: companyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(baseApi.middleware),
