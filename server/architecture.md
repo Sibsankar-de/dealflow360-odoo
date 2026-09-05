@@ -161,7 +161,9 @@ Persistence models must not become the public API contract automatically.
 Responsibilities:
 
 - Store company records with owner reference, currency, address, country, postal code, and status (ACTIVE, SUSPENDED, DELETED).
-- Map users to companies using the `company_users` table with role assignments (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
+- Map users to companies using the `company_users` table with role assignments (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER) and optional customer tier classification (`customer_tier` enum: BRONZE, SILVER, GOLD).
+- Store company settings (`company_settings`) created automatically on company creation, storing `customer_discount_tier` as JSONB and converted using safe Zod schemas.
+- Execute multi-step company and relation creation within database transactions via `prismaTransaction`.
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
 - Ensure soft-delete support with `deletedAt` timestamps.
 
@@ -172,6 +174,7 @@ Responsibilities:
 - Store warehouse records (`warehouses`) scoped to a company, containing name, country, postal code (`postal_code`), address line (`address_line`), and soft delete support (`deletedAt`).
 - Store product records (`products`) scoped to a company, containing name, description, monetary price stored as decimal, base unit (`base_unit`), product type (`ProductType` enum: ONE_TIME, RECURRING), and soft delete support (`deletedAt`).
 - Store product inventory levels per warehouse (`product_stocks`) linking products and warehouses with decimal stock quantity (`stock_qty`) and a unique constraint across product and warehouse.
+- Store product discount tiers per customer tier (`product_discount_tiers`) linking products with customer tiers (BRONZE, SILVER, GOLD) and percentage discounts stored as decimal (`discount_percent`).
 
 
 ## 5. Core Domain Model

@@ -4,9 +4,11 @@ import {
   Company,
   CompanyUser,
   CompanyUserRole,
+  CompanySetting,
   User,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
+import { prismaTransaction, TransactionClient } from "../utils/transactionHandler";
 
 export class CompanyRepository {
   private prisma: PrismaClient;
@@ -25,9 +27,10 @@ export class CompanyRepository {
       addressLine: string;
     },
     adminUserId: string,
-  ): Promise<Company & { owner?: User }> {
-    return this.prisma.$transaction(async (tx) => {
-      const company = await tx.company.create({
+    tx?: TransactionClient,
+  ): Promise<Company & { owner?: User; settings?: CompanySetting | null }> {
+    const execute = async (client: TransactionClient | PrismaClient) => {
+      const company = await client.company.create({
         data: {
           name: companyData.name,
           ownerId: companyData.ownerId,
@@ -41,7 +44,7 @@ export class CompanyRepository {
         },
       });
 
-      await tx.companyUser.create({
+      await client.companyUser.create({
         data: {
           companyId: company.id,
           userId: adminUserId,
@@ -49,14 +52,29 @@ export class CompanyRepository {
         },
       });
 
-      return company;
-    });
+      const settings = await client.companySetting.create({
+        data: {
+          companyId: company.id,
+          customerDiscountTier: {},
+        },
+      });
+
+      return {
+        ...company,
+        settings,
+      };
+    };
+
+    if (tx) {
+      return execute(tx);
+    }
+    return prismaTransaction(async (transactionClient) => execute(transactionClient));
   }
 
   public async findById(
     id: string,
     includeDeleted: boolean = false,
-  ): Promise<(Company & { owner?: User }) | null> {
+  ): Promise<(Company & { owner?: User; settings?: CompanySetting | null }) | null> {
     return this.prisma.company.findFirst({
       where: {
         id,
@@ -64,13 +82,14 @@ export class CompanyRepository {
       },
       include: {
         owner: true,
+        settings: true,
       },
     });
   }
 
   public async findUserCompanies(userId: string): Promise<
     Array<{
-      company: Company & { owner?: User };
+      company: Company & { owner?: User; settings?: CompanySetting | null };
       role: CompanyUserRole;
     }>
   > {
@@ -85,6 +104,7 @@ export class CompanyRepository {
         company: {
           include: {
             owner: true,
+            settings: true,
           },
         },
       },
@@ -102,12 +122,13 @@ export class CompanyRepository {
   public async update(
     id: string,
     data: Prisma.CompanyUpdateInput,
-  ): Promise<Company & { owner?: User }> {
+  ): Promise<Company & { owner?: User; settings?: CompanySetting | null }> {
     return this.prisma.company.update({
       where: { id },
       data,
       include: {
         owner: true,
+        settings: true,
       },
     });
   }
@@ -188,6 +209,32 @@ export class CompanyRepository {
           companyId,
           userId,
         },
+      },
+    });
+  }
+
+  public async findSettings(
+    companyId: string,
+    tx?: TransactionClient,
+  ): Promise<CompanySetting | null> {
+    const client = tx || this.prisma;
+    return client.companySetting.findUnique({
+      where: { companyId },
+    });
+  }
+
+  public async updateSettings(
+    companyId: string,
+    data: Prisma.CompanySettingUpdateInput,
+    tx?: TransactionClient,
+  ): Promise<CompanySetting> {
+    const client = tx || this.prisma;
+    return client.companySetting.upsert({
+      where: { companyId },
+      update: data,
+      create: {
+        companyId,
+        customerDiscountTier: (data.customerDiscountTier as Prisma.InputJsonValue) || {},
       },
     });
   }

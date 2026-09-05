@@ -14,6 +14,7 @@ import {
   addCompanyUserSchema,
   updateCompanyUserRoleSchema,
 } from "../schemas/company.schema";
+import { updateCompanySettingSchema } from "../schemas/companySetting.schema";
 
 export class CompanyController {
   private companyService: CompanyService;
@@ -219,6 +220,59 @@ export class CompanyController {
           StatusCodes.OK,
           null,
           "Member removed from company successfully",
+        ),
+      );
+  });
+
+  public getSettings = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
+    }
+
+    const settings = await this.companyService.getCompanySettings(id as string, userId);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { settings },
+          "Company settings fetched successfully",
+        ),
+      );
+  });
+
+  public updateSettings = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
+    }
+
+    const validated = validateBody(updateCompanySettingSchema, req.body);
+    const settings = await this.companyService.updateCompanySettings(
+      id as string,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { settings },
+          "Company settings updated successfully",
         ),
       );
   });

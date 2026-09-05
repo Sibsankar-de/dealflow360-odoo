@@ -13,6 +13,11 @@ router.get("/:id", companyController.getById);
 router.patch("/:id", companyController.update);
 router.put("/:id", companyController.update);
 
+// Company settings
+router.get("/:id/settings", companyController.getSettings);
+router.patch("/:id/settings", companyController.updateSettings);
+router.put("/:id/settings", companyController.updateSettings);
+
 // Company members management
 router.get("/:id/users", companyController.listMembers);
 router.post("/:id/users", companyController.addMember);

@@ -1,5 +1,21 @@
-import { Company, CompanyUser, CompanyStatus, CompanyUserRole } from "@prisma/client";
+import {
+  Company,
+  CompanyUser,
+  CompanyStatus,
+  CompanyUserRole,
+  CompanySetting,
+} from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
+import { customerDiscountTierConverter } from "../converters/companySetting.converter";
+import { CustomerDiscountTierMap } from "../schemas/companySetting.schema";
+
+export interface CompanySettingResponseDto {
+  id: string;
+  companyId: string;
+  customerDiscountTier: CustomerDiscountTierMap;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface CompanyResponseDto {
   id: string;
@@ -15,6 +31,7 @@ export interface CompanyResponseDto {
   deletedAt: Date | null;
   owner?: UserResponseDto;
   userRole?: CompanyUserRole;
+  settings?: CompanySettingResponseDto;
 }
 
 export interface CompanyUserResponseDto {
@@ -54,9 +71,22 @@ export interface UpdateCompanyUserRoleDto {
   role: CompanyUserRole;
 }
 
+export const toCompanySettingDto = (
+  setting: CompanySetting,
+): CompanySettingResponseDto => {
+  return {
+    id: setting.id,
+    companyId: setting.companyId,
+    customerDiscountTier: customerDiscountTierConverter(setting.customerDiscountTier),
+    createdAt: setting.createdAt,
+    updatedAt: setting.updatedAt,
+  };
+};
+
 export const toCompanyDto = (
   company: Company & {
     owner?: Parameters<typeof toUserDto>[0];
+    settings?: CompanySetting | null;
   },
   userRole?: CompanyUserRole,
 ): CompanyResponseDto => {
@@ -74,6 +104,7 @@ export const toCompanyDto = (
     deletedAt: company.deletedAt,
     owner: company.owner ? toUserDto(company.owner) : undefined,
     userRole,
+    settings: company.settings ? toCompanySettingDto(company.settings) : undefined,
   };
 };
 
