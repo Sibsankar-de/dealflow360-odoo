@@ -25,6 +25,10 @@ model User {
   authTokens         AuthToken[]
   verificationTokens VerificationToken[]
 
+  // Company Relations
+  ownedCompanies     Company[]           @relation("CompanyOwner")
+  companyUsers       CompanyUser[]
+
   @@index([email])
   @@map("users")
 }

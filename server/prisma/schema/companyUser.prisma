@@ -1,0 +1,25 @@
+enum CompanyUserRole {
+  ADMIN
+  SALES_REP
+  SALES_MANAGER
+  FINANCE_MANAGER
+  CUSTOMER
+}
+
+model CompanyUser {
+  id        String          @id @default(uuid()) @db.Uuid
+  companyId String          @db.Uuid
+  userId    String          @db.Uuid
+  role      CompanyUserRole @default(CUSTOMER)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+  @@map("company_users")
+}

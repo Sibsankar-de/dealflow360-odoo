@@ -125,6 +125,7 @@ Core modules:
 
 ```text
 Identity
+Company
 Customer
 Product
 Pricing
@@ -154,6 +155,15 @@ Responsibilities:
 - Database migrations.
 
 Persistence models must not become the public API contract automatically.
+
+### 4.6 Company and Multi-Tenancy Context
+
+Responsibilities:
+
+- Store company records with owner reference, currency, address, country, postal code, and status (ACTIVE, SUSPENDED, DELETED).
+- Map users to companies using the `company_users` table with role assignments (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
+- Enforce company-level role-based authorization for administrative, sales, and financial operations.
+- Ensure soft-delete support with `deletedAt` timestamps.
 
 ## 5. Core Domain Model
 
