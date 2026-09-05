@@ -20,6 +20,8 @@ model Company {
   // Relations
   owner        User          @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   companyUsers CompanyUser[]
+  warehouses   Warehouse[]
+  products     Product[]
 
   @@index([ownerId])
   @@index([status])
