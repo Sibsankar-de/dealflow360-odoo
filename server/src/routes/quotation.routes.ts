@@ -23,6 +23,9 @@ router.post(
 
 router.get("/", quotationController.list);
 router.get("/:id", quotationController.getById);
+router.get("/:id/items", quotationController.getItems);
+router.post("/:id/items", quotationController.addItem);
+router.delete("/:id/items/:itemId", quotationController.removeItem);
 router.get("/:id/revisions", quotationController.getRevisions);
 router.patch("/:id", quotationController.update);
 router.post("/:id/send", quotationController.send);

@@ -27,15 +27,20 @@ import {
 } from "../utils/transactionHandler";
 import {
   CreateQuotationDto,
+  CreateQuotationItemDto,
   UpdateQuotationDto,
+  AddQuotationItemDto,
   QuotationResponseDto,
+  QuotationItemResponseDto,
   QuotationRevisionResponseDto,
   QuotationFilterDto,
   CancelQuotationDto,
   RejectQuotationDto,
   toQuotationDto,
+  toQuotationItemDto,
   toQuotationRevisionDto,
 } from "../dto/quotation.dto";
+import { customerDiscountTierConverter } from "../converters/companySetting.converter";
 
 export class QuotationService {
   private quotationRepo: QuotationRepository;
@@ -57,112 +62,292 @@ export class QuotationService {
     dto: CreateQuotationDto,
   ): Promise<QuotationResponseDto> {
     return prismaTransaction(async (tx: TransactionClient) => {
-      const salesRep = await this.userRepo.findById(salesRepUserId, tx);
+      const dealId = dto.dealId || dto.deal_id;
+      if (!dealId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
+      }
+
+      const customerId = dto.customerId || dto.customer_id;
+      if (!customerId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Customer ID is required");
+      }
+
+      const salesRepId = dto.salesRepId || dto.sales_rep_id || salesRepUserId;
+      const salesRep = await this.userRepo.findById(salesRepId, tx);
       if (!salesRep) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Sales representative user not found");
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          "Sales representative user not found",
+        );
       }
 
-      const company = await this.companyRepo.findById(dto.companyId, false, tx);
-      if (!company) {
-        throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-      }
-
-      const customer = await this.userRepo.findById(dto.customerId, tx);
+      const customer = await this.userRepo.findById(customerId, tx);
       if (!customer) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Customer not found");
       }
 
       // Verify deal exists
-      const deal = await tx.deal.findFirst({
-        where: {
-          id: dto.dealId,
-          companyId: dto.companyId,
-        },
+      const deal = await tx.deal.findUnique({
+        where: { id: dealId },
       });
       if (!deal) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Deal not found");
+      }
+
+      const companyId = dto.companyId || dto.company_id || deal.companyId;
+      if (deal.companyId !== companyId) {
         throw new ApiError(
-          StatusCodes.NOT_FOUND,
-          "Deal not found or does not belong to the specified company",
+          StatusCodes.BAD_REQUEST,
+          "Deal does not belong to the specified company",
         );
       }
 
-      // Fetch and validate all products
-      const productIds = dto.items.map((item) => item.productId);
-      const products = await this.quotationRepo.findProductsByIds(
-        productIds,
-        dto.companyId,
-        tx,
-      );
-
-      const productMap = new Map(products.map((p) => [p.id, p]));
-      for (const item of dto.items) {
-        if (!productMap.has(item.productId)) {
-          throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            `Product ${item.productId} not found or does not belong to the company`,
-          );
-        }
+      const company = await this.companyRepo.findById(companyId, false, tx);
+      if (!company) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
       }
-
-      // Calculate line items and totals
-      const { itemsToCreate, subtotal, totalDiscount, taxAmount, total } =
-        this.calculateQuotationTotals(dto.items, productMap, dto.discountAmount);
-
-      const count = await this.quotationRepo.countCompanyQuotations(
-        dto.companyId,
-        tx,
-      );
 
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const seq = String(count + 1).padStart(4, "0");
-      const quotationNo = `QT-${year}${month}-${seq}`;
+      const quotationNo = await this.generateQuotationNo(tx);
 
-      const validUntil = dto.validUntil
-        ? new Date(dto.validUntil)
+      const validUntilRaw = dto.validUntil || dto.valid_until;
+      const validUntil = validUntilRaw
+        ? new Date(validUntilRaw)
         : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      const initialStatus = dto.status || QuotationStatus.DRAFT;
+      const currency = dto.currency || company.currency || "USD";
 
-      const quotation = await this.quotationRepo.create(
+      // If items are provided in creation payload, calculate and create with items
+      if (dto.items && dto.items.length > 0) {
+        const productIds = dto.items.map((item) => item.productId);
+        const products = await this.quotationRepo.findProductsByIds(
+          productIds,
+          companyId,
+          tx,
+        );
+
+        const productMap = new Map(products.map((p) => [p.id, p]));
+        for (const item of dto.items) {
+          if (!productMap.has(item.productId)) {
+            throw new ApiError(
+              StatusCodes.BAD_REQUEST,
+              `Product ${item.productId} not found or does not belong to the company`,
+            );
+          }
+        }
+
+        const { itemsToCreate, subtotal, totalDiscount, taxAmount, total } =
+          this.calculateQuotationTotals(
+            dto.items,
+            productMap,
+            dto.discountAmount,
+          );
+
+        const quotation = await this.quotationRepo.create(
+          {
+            companyId,
+            dealId,
+            salesRepId,
+            customerId,
+            quotationNo,
+            status: QuotationStatus.DRAFT,
+            validUntil,
+            currency,
+          },
+          itemsToCreate,
+          {
+            subtotal,
+            discountAmount: totalDiscount,
+            taxAmount,
+            totalAmount: total,
+            customerNote: dto.customerNote || dto.customer_note || null,
+            internalNote: dto.internalNote || dto.internal_note || null,
+          },
+          tx,
+        );
+
+        return toQuotationDto(quotation);
+      }
+
+      // Default: create draft quotation with no items initially
+      const quotation = await this.quotationRepo.createDraft(
         {
-          companyId: dto.companyId,
-          dealId: dto.dealId,
-          salesRepId: salesRepUserId,
-          customerId: dto.customerId,
+          companyId,
+          dealId,
+          salesRepId,
+          customerId,
           quotationNo,
-          status: initialStatus,
           validUntil,
-          currency: dto.currency || company.currency || "USD",
-        },
-        itemsToCreate,
-        {
-          subtotal,
-          discountAmount: totalDiscount,
-          taxAmount,
-          totalAmount: total,
-          customerNote: dto.customerNote || null,
-          internalNote: dto.internalNote || null,
+          currency,
         },
         tx,
       );
-
-      if (initialStatus === QuotationStatus.SENT) {
-        if (
-          deal.stage === DealStage.NEW ||
-          deal.stage === DealStage.QUALIFICATION ||
-          deal.stage === DealStage.REQUIREMENT
-        ) {
-          await tx.deal.update({
-            where: { id: deal.id },
-            data: { stage: DealStage.QUOTATION },
-          });
-        }
-      }
 
       return toQuotationDto(quotation);
     });
+  }
+
+  public async addQuotationItem(
+    quotationId: string,
+    requestingUserId: string,
+    dto: AddQuotationItemDto,
+  ): Promise<QuotationItemResponseDto> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      await this.assertQuotationManageAccess(quotation, requestingUserId);
+
+      if (quotation.status !== QuotationStatus.DRAFT) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot add items to a quotation that is not in DRAFT status",
+        );
+      }
+
+      const productId = dto.productId || dto.product_id;
+      if (!productId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Product ID is required");
+      }
+
+      const product = await this.quotationRepo.findProductById(
+        productId,
+        quotation.companyId,
+        tx,
+      );
+      if (!product) {
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          "Product not found or does not belong to the company",
+        );
+      }
+
+      const quantity = Number(dto.quantity);
+      if (!quantity || quantity <= 0) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Quantity must be greater than 0",
+        );
+      }
+
+      // Customer tier discount lookup
+      const companyUser = await this.companyRepo.findCompanyUser(
+        quotation.companyId,
+        quotation.customerId,
+        tx,
+      );
+
+      let discountPercent = 0;
+      if (companyUser?.customerTier) {
+        const productTier = await this.quotationRepo.findProductDiscountTier(
+          productId,
+          companyUser.customerTier,
+          tx,
+        );
+
+        if (productTier) {
+          discountPercent = Number(productTier.discountPercent);
+        } else {
+          const settings = await this.companyRepo.findSettings(
+            quotation.companyId,
+            tx,
+          );
+          if (settings?.customerDiscountTier) {
+            const tierMap = customerDiscountTierConverter(
+              settings.customerDiscountTier,
+            );
+            if (tierMap[companyUser.customerTier] !== undefined) {
+              discountPercent = tierMap[companyUser.customerTier] ?? 0;
+            }
+          }
+        }
+      }
+
+      const unitPriceNum = Number(product.price);
+      const grossLine = unitPriceNum * quantity;
+      const discountAmt = grossLine * (discountPercent / 100);
+      const finalUnitPriceNum = Math.max(
+        0,
+        unitPriceNum - (discountAmt / quantity),
+      );
+      const lineTotalNum = Math.max(0, grossLine - discountAmt);
+
+      const item = await this.quotationRepo.addItem(
+        {
+          quotationId,
+          productId,
+          quantity: new Prisma.Decimal(quantity.toFixed(2)),
+          unitPrice: new Prisma.Decimal(unitPriceNum.toFixed(2)),
+          discountType: DiscountType.PERCENTAGE,
+          discountValue: new Prisma.Decimal(discountPercent.toFixed(2)),
+          discountAmount: new Prisma.Decimal(discountAmt.toFixed(2)),
+          taxRate: new Prisma.Decimal("0.00"),
+          finalUnitPrice: new Prisma.Decimal(finalUnitPriceNum.toFixed(2)),
+          lineTotal: new Prisma.Decimal(lineTotalNum.toFixed(2)),
+        },
+        tx,
+      );
+
+      return toQuotationItemDto(item);
+    });
+  }
+
+  public async removeQuotationItem(
+    quotationId: string,
+    itemId: string,
+    requestingUserId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return prismaTransaction(async (tx: TransactionClient) => {
+      const quotation = await this.quotationRepo.findById(quotationId, tx);
+      if (!quotation) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+      }
+
+      await this.assertQuotationManageAccess(quotation, requestingUserId);
+
+      if (quotation.status !== QuotationStatus.DRAFT) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot remove items from a quotation that is not in DRAFT status",
+        );
+      }
+
+      const item = await this.quotationRepo.findItemById(
+        quotationId,
+        itemId,
+        tx,
+      );
+      if (!item) {
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          "Quotation item not found",
+        );
+      }
+
+      await this.quotationRepo.removeItem(quotationId, itemId, tx);
+
+      return {
+        success: true,
+        message: "Quotation item removed successfully",
+      };
+    });
+  }
+
+  public async getQuotationItems(
+    quotationId: string,
+    requestingUserId: string,
+  ): Promise<QuotationItemResponseDto[]> {
+    const quotation = await this.quotationRepo.findById(quotationId);
+    if (!quotation) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
+    }
+
+    await this.assertQuotationAccess(quotation, requestingUserId);
+
+    const items = await this.quotationRepo.findItemsByQuotationId(quotationId);
+    return items.map(toQuotationItemDto);
   }
 
   public async sendQuotation(
@@ -191,6 +376,23 @@ export class QuotationService {
         );
       }
 
+      if (!quotation.items || quotation.items.length === 0) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot send a quotation with no items. Please add at least one item.",
+        );
+      }
+
+      if (
+        quotation.validUntil &&
+        new Date(quotation.validUntil).getTime() < Date.now()
+      ) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Cannot send an expired quotation. Please update valid until date.",
+        );
+      }
+
       if (quotation.currentRevisionId) {
         await tx.quotationRevision.update({
           where: { id: quotation.currentRevisionId },
@@ -214,9 +416,9 @@ export class QuotationService {
         });
       }
 
-      const updated = await this.quotationRepo.update(
+      const updated = await this.quotationRepo.updateStatus(
         quotationId,
-        { status: QuotationStatus.SENT },
+        QuotationStatus.SENT,
         tx,
       );
 
@@ -674,7 +876,7 @@ export class QuotationService {
   }
 
   private calculateQuotationTotals(
-    items: CreateQuotationDto["items"],
+    items: CreateQuotationItemDto[] = [],
     productMap: Map<string, { id: string; price: Prisma.Decimal }>,
     extraDiscountAmount: number = 0,
   ): {
@@ -699,7 +901,7 @@ export class QuotationService {
     let taxAmountSum = 0;
     let totalNum = 0;
 
-    const itemsToCreate = items.map((item) => {
+    const itemsToCreate = (items || []).map((item) => {
       const product = productMap.get(item.productId)!;
       const unitPriceNum =
         item.unitPrice !== undefined
@@ -826,6 +1028,22 @@ export class QuotationService {
     }
 
     return membership.role;
+  }
+
+  private async generateQuotationNo(tx: TransactionClient): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const count = await this.quotationRepo.countQuotations(tx);
+    let seqNum = count + 1;
+    let quotationNo = `QT-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+
+    while (await this.quotationRepo.findByQuotationNo(quotationNo, tx)) {
+      seqNum += 1;
+      quotationNo = `QT-${year}${month}-${String(seqNum).padStart(4, "0")}`;
+    }
+
+    return quotationNo;
   }
 }
 

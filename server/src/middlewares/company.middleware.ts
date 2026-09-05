@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { CompanyStatus, CompanyUserRole } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { ApiError } from "../utils/apiErrorHandler";
+import { prisma as defaultPrisma } from "../lib/prisma";
 import {
   CompanyRepository,
   companyRepository as defaultCompanyRepo,
@@ -28,13 +29,24 @@ export class CompanyMiddleware {
         ? req.headers["x-company-id"][0]
         : req.headers["x-company-id"];
 
-      const rawCompanyId =
+      let rawCompanyId =
         req.params?.companyId ||
         headerCompanyId ||
         req.body?.companyId ||
+        req.body?.company_id ||
         (typeof req.query?.companyId === "string" ? req.query.companyId : undefined) ||
+        (typeof req.query?.company_id === "string" ? req.query.company_id : undefined) ||
         req.params?.id;
 
+      if (!rawCompanyId && (req.body?.dealId || req.body?.deal_id)) {
+        const dealId = req.body.dealId || req.body.deal_id;
+        const deal = await defaultPrisma.deal.findUnique({
+          where: { id: dealId },
+        });
+        if (deal) {
+          rawCompanyId = deal.companyId;
+        }
+      }
 
       if (
         !rawCompanyId ||

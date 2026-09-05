@@ -175,7 +175,7 @@ Responsibilities:
 - Execute multi-step company and relation creation within database transactions via `prismaTransaction`.
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
 - Provide paginated company listing (GET /api/v1/companies) scoped to the authenticated user's memberships and ownerships with assigned userRole, search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
-- Provide company role definition endpoints (GET /api/v1/companies/roles and GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
+- Provide company role definition endpoint (GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context
@@ -339,16 +339,32 @@ Client supplied prices must not override server side pricing rules.
 
 A quotation is created from the selected products and applicable commercial rules, linked to a parent Deal.
 
-Initial status can be explicitly specified as DRAFT (default) or SENT:
-- DRAFT: Proposal remains internal to sales/management team for review and adjustments.
-- SENT: Proposal is published to the target customer account.
-
-When a quotation is created, the system automatically creates an initial immutable snapshot revision (revision_no = 1, revision_type = INITIAL) with matching status (DRAFT or SENT).
-
-When a quotation is created as SENT or sent later via the send endpoint (POST/PATCH /api/v1/quotations/:id/send):
-- Quotation status transitions to SENT.
-- Current active revision status transitions to SENT.
-- If the parent Deal stage is NEW, QUALIFICATION, or REQUIREMENT, Deal stage automatically advances to QUOTATION.
+Quotation Creation and Item Management Flow:
+1. Create Quotation in DRAFT state (POST /api/v1/quotations):
+   - Created with initial status DRAFT determined by the backend.
+   - Initial quotation contains no items.
+   - Requires deal_id, customer_id, optional sales_rep_id, currency, and valid_until.
+   - Protected by company RBAC (ADMIN, SALES_REP, SALES_MANAGER).
+2. Add Quotation Item (POST /api/v1/quotations/:id/items or /api/v1/quotations/:quotationId/items):
+   - Adds a single product line item to a DRAFT quotation.
+   - Determines product base price and customer tier discount:
+     a. Checks product specific tier discount in product_discount_tiers.
+     b. Falls back to company setting customer_discount_tier.
+     c. Calculates unit price, discount amount, final unit price, and line total.
+   - Adding items is rejected if quotation is not in DRAFT status.
+3. Remove Quotation Item (DELETE /api/v1/quotations/:id/items/:itemId):
+   - Removes a line item from a DRAFT quotation.
+   - Removing items is rejected if quotation is not in DRAFT status.
+4. List Quotation Items (GET /api/v1/quotations/:id/items):
+   - Lists all active items with product information and calculated commercial values.
+5. Get Quotation Details (GET /api/v1/quotations/:id):
+   - Returns quotation header, linked deal, customer, sales rep, company, items, and calculated totals (subtotal, discountAmount, taxAmount, totalAmount).
+6. Send Quotation (POST /api/v1/quotations/:id/send):
+   - Validates that the quotation contains at least 1 item.
+   - Validates that validity date (validUntil) is not expired.
+   - Transitions quotation status from DRAFT to SENT.
+   - Advances parent Deal stage to QUOTATION if currently in NEW, QUALIFICATION, or REQUIREMENT.
+   - Prevents further item additions or deletions once sent.
 
 Typical quotation data:
 
@@ -365,7 +381,7 @@ Quotation
 ```
 
 Revisions capture versioned history:
-- When a draft or negotiating quotation is updated with new items or pricing, previous items are replaced on the active quotation and a new versioned QuotationRevision (revision_type = SALES_COUNTER) is created.
+- When a draft or negotiating quotation is updated with revised proposal lines or pricing, previous items are replaced on the active quotation and a versioned QuotationRevision (revision_type = SALES_COUNTER) is recorded.
 - Revisions can be retrieved via GET /api/v1/quotations/:id/revisions.
 
 ### Step 5: Quotation Approval

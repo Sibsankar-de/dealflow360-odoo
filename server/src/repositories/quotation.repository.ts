@@ -10,6 +10,8 @@ import {
   RevisionType,
   RevisionStatus,
   Product,
+  ProductDiscountTier,
+  CustomerTier,
   User,
   Company,
   Deal,
@@ -48,6 +50,23 @@ export class QuotationRepository {
     });
   }
 
+  public async countQuotations(
+    tx?: TransactionClient,
+  ): Promise<number> {
+    const client = tx || this.prisma;
+    return client.quotation.count();
+  }
+
+  public async findByQuotationNo(
+    quotationNo: string,
+    tx?: TransactionClient,
+  ): Promise<Quotation | null> {
+    const client = tx || this.prisma;
+    return client.quotation.findUnique({
+      where: { quotationNo },
+    });
+  }
+
   public async findProductsByIds(
     productIds: string[],
     companyId: string,
@@ -58,6 +77,167 @@ export class QuotationRepository {
       where: {
         id: { in: productIds },
         companyId,
+      },
+    });
+  }
+
+  public async findProductById(
+    productId: string,
+    companyId: string,
+    tx?: TransactionClient,
+  ): Promise<Product | null> {
+    const client = tx || this.prisma;
+    return client.product.findFirst({
+      where: {
+        id: productId,
+        companyId,
+      },
+    });
+  }
+
+  public async findProductDiscountTier(
+    productId: string,
+    customerTier: CustomerTier,
+    tx?: TransactionClient,
+  ): Promise<ProductDiscountTier | null> {
+    const client = tx || this.prisma;
+    return client.productDiscountTier.findUnique({
+      where: {
+        productId_customerTier: {
+          productId,
+          customerTier,
+        },
+      },
+    });
+  }
+
+  public async createDraft(
+    data: {
+      companyId: string;
+      dealId: string;
+      salesRepId: string;
+      customerId: string;
+      quotationNo: string;
+      validUntil: Date | null;
+      currency: string;
+    },
+    tx?: TransactionClient,
+  ): Promise<QuotationWithRelations> {
+    const client = tx || this.prisma;
+    return client.quotation.create({
+      data: {
+        companyId: data.companyId,
+        dealId: data.dealId,
+        salesRepId: data.salesRepId,
+        customerId: data.customerId,
+        quotationNo: data.quotationNo,
+        status: QuotationStatus.DRAFT,
+        validUntil: data.validUntil,
+        currency: data.currency,
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        currentRevision: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            creator: true,
+          },
+        },
+        deal: true,
+        salesRep: true,
+        customer: true,
+        company: true,
+      },
+    });
+  }
+
+  public async addItem(
+    data: {
+      quotationId: string;
+      productId: string;
+      quantity: Prisma.Decimal;
+      unitPrice: Prisma.Decimal;
+      discountType: DiscountType;
+      discountValue: Prisma.Decimal;
+      discountAmount: Prisma.Decimal;
+      taxRate: Prisma.Decimal;
+      finalUnitPrice: Prisma.Decimal;
+      lineTotal: Prisma.Decimal;
+    },
+    tx?: TransactionClient,
+  ): Promise<QuotationItem & { product: Product }> {
+    const client = tx || this.prisma;
+    return client.quotationItem.create({
+      data: {
+        quotationId: data.quotationId,
+        productId: data.productId,
+        quantity: data.quantity,
+        unitPrice: data.unitPrice,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        discountAmount: data.discountAmount,
+        taxRate: data.taxRate,
+        finalUnitPrice: data.finalUnitPrice,
+        lineTotal: data.lineTotal,
+      },
+      include: {
+        product: true,
+      },
+    });
+  }
+
+  public async findItemById(
+    quotationId: string,
+    itemId: string,
+    tx?: TransactionClient,
+  ): Promise<(QuotationItem & { product: Product }) | null> {
+    const client = tx || this.prisma;
+    return client.quotationItem.findFirst({
+      where: {
+        id: itemId,
+        quotationId,
+      },
+      include: {
+        product: true,
+      },
+    });
+  }
+
+  public async findItemsByQuotationId(
+    quotationId: string,
+    tx?: TransactionClient,
+  ): Promise<(QuotationItem & { product: Product })[]> {
+    const client = tx || this.prisma;
+    return client.quotationItem.findMany({
+      where: {
+        quotationId,
+      },
+      include: {
+        product: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+  }
+
+  public async removeItem(
+    quotationId: string,
+    itemId: string,
+    tx?: TransactionClient,
+  ): Promise<QuotationItem> {
+    const client = tx || this.prisma;
+    return client.quotationItem.delete({
+      where: {
+        id: itemId,
       },
     });
   }

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   Quotation,
   QuotationItem,
@@ -21,6 +22,23 @@ import {
   Company,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
+import {
+  addQuotationItemSchema,
+  createQuotationItemSchema,
+  createQuotationSchema,
+  updateQuotationSchema,
+  quotationFilterSchema,
+  cancelQuotationSchema,
+  rejectQuotationSchema,
+} from "../schemas/quotation.schema";
+
+export type AddQuotationItemDto = z.infer<typeof addQuotationItemSchema>;
+export type CreateQuotationItemDto = z.infer<typeof createQuotationItemSchema>;
+export type CreateQuotationDto = z.infer<typeof createQuotationSchema>;
+export type UpdateQuotationDto = z.infer<typeof updateQuotationSchema>;
+export type QuotationFilterDto = z.infer<typeof quotationFilterSchema>;
+export type CancelQuotationDto = z.infer<typeof cancelQuotationSchema>;
+export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
 
 export interface QuotationItemResponseDto {
   id: string;
@@ -85,6 +103,10 @@ export interface QuotationResponseDto {
   currentRevisionId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  subtotal?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  totalAmount?: number;
   items?: QuotationItemResponseDto[];
   currentRevision?: QuotationRevisionResponseDto;
   revisions?: QuotationRevisionResponseDto[];
@@ -153,58 +175,6 @@ export interface NegotiationResponseDto {
   createdAt: Date;
   updatedAt: Date;
   offers?: NegotiationOfferResponseDto[];
-}
-
-export interface CreateQuotationItemDto {
-  productId: string;
-  quantity: number;
-  unitPrice?: number;
-  discountType?: DiscountType;
-  discountValue?: number;
-  taxRate?: number;
-}
-
-export interface CreateQuotationDto {
-  companyId: string;
-  dealId: string;
-  customerId: string;
-  items: CreateQuotationItemDto[];
-  validUntil?: string | Date | null;
-  currency?: string;
-  customerNote?: string | null;
-  internalNote?: string | null;
-  discountAmount?: number;
-  status?: QuotationStatus;
-}
-
-export interface UpdateQuotationDto {
-  customerId?: string;
-  items?: CreateQuotationItemDto[];
-  validUntil?: string | Date | null;
-  currency?: string;
-  customerNote?: string | null;
-  internalNote?: string | null;
-  discountAmount?: number;
-  status?: QuotationStatus;
-}
-
-export interface QuotationFilterDto {
-  companyId?: string;
-  dealId?: string;
-  customerId?: string;
-  salesRepId?: string;
-  status?: QuotationStatus;
-  search?: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface CancelQuotationDto {
-  reason?: string;
-}
-
-export interface RejectQuotationDto {
-  reason?: string;
 }
 
 export const toQuotationItemDto = (
@@ -383,6 +353,20 @@ export const toQuotationDto = (
     company?: Company;
   },
 ): QuotationResponseDto => {
+  const items = quotation.items ? quotation.items.map(toQuotationItemDto) : [];
+  let subtotal = 0;
+  let discountAmount = 0;
+  let taxAmount = 0;
+  let totalAmount = 0;
+
+  for (const item of items) {
+    subtotal += item.unitPrice * item.quantity;
+    discountAmount += item.discountAmount;
+    const taxable = item.unitPrice * item.quantity - item.discountAmount;
+    taxAmount += taxable * (item.taxRate / 100);
+    totalAmount += item.lineTotal;
+  }
+
   return {
     id: quotation.id,
     companyId: quotation.companyId,
@@ -396,7 +380,11 @@ export const toQuotationDto = (
     currentRevisionId: quotation.currentRevisionId,
     createdAt: quotation.createdAt,
     updatedAt: quotation.updatedAt,
-    items: quotation.items ? quotation.items.map(toQuotationItemDto) : undefined,
+    subtotal: Number(subtotal.toFixed(2)),
+    discountAmount: Number(discountAmount.toFixed(2)),
+    taxAmount: Number(taxAmount.toFixed(2)),
+    totalAmount: Number(totalAmount.toFixed(2)),
+    items: quotation.items ? items : undefined,
     currentRevision: quotation.currentRevision
       ? toQuotationRevisionDto(quotation.currentRevision)
       : undefined,
@@ -414,4 +402,5 @@ export const toQuotationDto = (
       : undefined,
   };
 };
+
 
