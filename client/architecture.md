@@ -51,7 +51,8 @@ src/
 │   ├── profile/          # User profile and company workspace selector
 │   └── company/
 │       └── [company-id]/
-│           ├── (customer)/ # Customer quotation signoff portal
+│           ├── (customer)/ # Customer portal route group (Customer layout)
+│           │   └── customer/ # Active deals overview, proposal tracking & quotations
 │           └── app/        # Company member authenticated application layout
 │               ├── access-control/
 │               ├── dashboard/
@@ -151,7 +152,7 @@ Routes are structured around user roles and core platform workflows:
   * `/company/[company-id]/app/invoices`: Invoice management based on delivered items.
   * `/company/[company-id]/app/deal-health`: Deal health alerts and stalled quotation indicators.
   * `/company/[company-id]/app/settings`: Company settings, base currency, and billing rules.
-* `/company/[company-id]/(customer)`: Customer quotation review, negotiation, and sign-off portal.
+* `/company/[company-id]/customer` (under route group `(customer)`): Customer portal showing active deals header, proposal metrics, and deals list.
 
 ---
 

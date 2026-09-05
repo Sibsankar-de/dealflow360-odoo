@@ -109,7 +109,7 @@ export const CustomerListTable: React.FC<CustomerListTableProps> = ({
             ) : filteredCustomers.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-8 text-center text-xs text-text-muted">
-                  No customers found in directory. Click "Add Customer" to add one.
+                  No customers found in directory. Click Add Customer to add one.
                 </td>
               </tr>
             ) : (
