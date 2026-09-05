@@ -1,0 +1,27 @@
+enum ProductType {
+  ONE_TIME
+  RECURRING
+}
+
+model Product {
+  id          String      @id @default(uuid()) @db.Uuid
+  companyId   String      @db.Uuid
+  name        String
+  description String?
+  price       Decimal     @db.Decimal(12, 2)
+  baseUnit    String      @default("UNIT") @map("base_unit")
+  type        ProductType @default(ONE_TIME)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productStocks  ProductStock[]
+  quotationItems QuotationItem[]
+  discountTiers  ProductDiscountTier[]
+  quotationNegotiations QuotationNegotiation[]
+
+  @@index([companyId])
+  @@index([type])
+  @@map("products")
+}

@@ -18,8 +18,13 @@ model Company {
   deletedAt   DateTime?
 
   // Relations
-  owner        User          @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  owner        User            @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   companyUsers CompanyUser[]
+  warehouses   Warehouse[]
+  products     Product[]
+  quotations   Quotation[]
+  settings     CompanySetting?
+  configs      CompanyConfig[]
 
   @@index([ownerId])
   @@index([status])

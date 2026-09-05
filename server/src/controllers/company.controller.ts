@@ -14,6 +14,7 @@ import {
   addCompanyUserSchema,
   updateCompanyUserRoleSchema,
 } from "../schemas/company.schema";
+import { updateCompanySettingSchema } from "../schemas/companySetting.schema";
 
 export class CompanyController {
   private companyService: CompanyService;
@@ -43,17 +44,14 @@ export class CompanyController {
   });
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
     }
 
-    const { id } = req.params;
-    if (!id) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
-    }
-
-    const company = await this.companyService.getCompanyById(id as string, userId);
+    const company = this.companyService.getCompanyDetails(
+      req.company,
+      req.companyRole,
+    );
 
     return res
       .status(StatusCodes.OK)
@@ -66,41 +64,37 @@ export class CompanyController {
       );
   });
 
-  public getUserCompanies = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
+  public getUserCompanies = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+      }
 
-    const companies = await this.companyService.getUserCompanies(userId);
+      const companies = await this.companyService.getUserCompanies(userId);
 
-    return res
-      .status(StatusCodes.OK)
-      .json(
-        new ApiResponse(
-          StatusCodes.OK,
-          { companies },
-          "User companies fetched successfully",
-        ),
-      );
-  });
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { companies },
+            "User companies fetched successfully",
+          ),
+        );
+    },
+  );
 
   public update = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
-    const { id } = req.params;
-    if (!id) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
     }
 
     const validated = validateBody(updateCompanySchema, req.body);
     const updatedCompany = await this.companyService.updateCompany(
-      id as string,
-      userId,
+      req.company,
       validated,
+      req.companyRole,
     );
 
     return res
@@ -115,17 +109,11 @@ export class CompanyController {
   });
 
   public listMembers = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
     }
 
-    const { id } = req.params;
-    if (!id) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
-    }
-
-    const members = await this.companyService.listCompanyUsers(id as string, userId);
+    const members = await this.companyService.listCompanyUsers(req.company.id);
 
     return res
       .status(StatusCodes.OK)
@@ -139,20 +127,13 @@ export class CompanyController {
   });
 
   public addMember = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
-
-    const { id } = req.params;
-    if (!id) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
     }
 
     const validated = validateBody(addCompanyUserSchema, req.body);
     const member = await this.companyService.addCompanyUser(
-      id as string,
-      userId,
+      req.company.id,
       validated,
     );
 
@@ -167,34 +148,29 @@ export class CompanyController {
       );
   });
 
-  public updateMemberRole = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
-    }
+  public updateMemberRole = asyncHandler(
+    async (req: Request, res: Response) => {
+      if (!req.company) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+      }
 
-    const { id } = req.params;
-    if (!id) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Company ID is required");
-    }
-
-    const validated = validateBody(updateCompanyUserRoleSchema, req.body);
-    const updatedMember = await this.companyService.updateCompanyUserRole(
-      id as string,
-      userId,
-      validated,
-    );
-
-    return res
-      .status(StatusCodes.OK)
-      .json(
-        new ApiResponse(
-          StatusCodes.OK,
-          { member: updatedMember },
-          "Member role updated successfully",
-        ),
+      const validated = validateBody(updateCompanyUserRoleSchema, req.body);
+      const updatedMember = await this.companyService.updateCompanyUserRole(
+        req.company,
+        validated,
       );
-  });
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { member: updatedMember },
+            "Member role updated successfully",
+          ),
+        );
+    },
+  );
 
   public removeMember = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
@@ -202,15 +178,24 @@ export class CompanyController {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
     }
 
-    const { id, userId: targetUserId } = req.params;
-    if (!id || !targetUserId) {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const { userId: targetUserId } = req.params;
+    if (!targetUserId) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         "Company ID and User ID are required",
       );
     }
 
-    await this.companyService.removeCompanyUser(id as string, targetUserId as string, userId);
+    await this.companyService.removeCompanyUser(
+      req.company,
+      targetUserId as string,
+      userId,
+      req.companyRole,
+    );
 
     return res
       .status(StatusCodes.OK)
@@ -219,6 +204,49 @@ export class CompanyController {
           StatusCodes.OK,
           null,
           "Member removed from company successfully",
+        ),
+      );
+  });
+
+  public getSettings = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const settings = await this.companyService.getCompanySettings(
+      req.company.id,
+      req.company.settings,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { settings },
+          "Company settings fetched successfully",
+        ),
+      );
+  });
+
+  public updateSettings = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const validated = validateBody(updateCompanySettingSchema, req.body);
+    const settings = await this.companyService.updateCompanySettings(
+      req.company.id,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { settings },
+          "Company settings updated successfully",
         ),
       );
   });

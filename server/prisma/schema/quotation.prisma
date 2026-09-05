@@ -1,0 +1,40 @@
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  UNDER_NEGOTIATION
+}
+
+model Quotation {
+  id              String          @id @default(uuid()) @db.Uuid
+  companyId       String          @db.Uuid
+  creatorId       String          @db.Uuid
+  customerId      String          @db.Uuid
+  quotationNumber String          @map("quotation_number")
+  status          QuotationStatus @default(DRAFT)
+  quotationDate   DateTime        @default(now()) @map("quotation_date")
+  expiresAt       DateTime?       @map("expires_at")
+  currency        String          @default("USD")
+  discountAmount  Decimal         @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  subtotal        Decimal         @default(0) @db.Decimal(12, 2)
+  total           Decimal         @default(0) @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator      User                   @relation("QuotationCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  customer     User                   @relation("QuotationCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  items        QuotationItem[]
+  negotiations QuotationNegotiation[]
+
+  @@unique([companyId, quotationNumber])
+  @@index([companyId])
+  @@index([creatorId])
+  @@index([customerId])
+  @@index([status])
+  @@map("quotations")
+}

@@ -1,4 +1,4 @@
-import { CompanyStatus, CompanyUserRole } from "@prisma/client";
+import { CompanyStatus, CompanyUserRole, CompanySetting } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
   CompanyRepository,
@@ -11,14 +11,20 @@ import {
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   CompanyResponseDto,
+  CompanySettingResponseDto,
   CompanyUserResponseDto,
   CreateCompanyDto,
   UpdateCompanyDto,
   AddCompanyUserDto,
   UpdateCompanyUserRoleDto,
   toCompanyDto,
+  toCompanySettingDto,
   toCompanyUserDto,
 } from "../dto/company.dto";
+import { UpdateCompanySettingInput } from "../schemas/companySetting.schema";
+import { customerDiscountTierConverter } from "../converters/companySetting.converter";
+import { prismaTransaction } from "../utils/transactionHandler";
+import { CompanyWithRelations } from "../types/express";
 
 export class CompanyService {
   private companyRepo: CompanyRepository;
@@ -36,24 +42,36 @@ export class CompanyService {
     userId: string,
     dto: CreateCompanyDto,
   ): Promise<CompanyResponseDto> {
-    const user = await this.userRepo.findById(userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
+    return prismaTransaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      }
 
-    const company = await this.companyRepo.createWithAdmin(
-      {
-        name: dto.name,
-        ownerId: userId,
-        currency: dto.currency || "USD",
-        country: dto.country,
-        postalCode: dto.postalCode,
-        addressLine: dto.addressLine,
-      },
-      userId,
-    );
+      const company = await this.companyRepo.createWithAdmin(
+        {
+          name: dto.name,
+          ownerId: userId,
+          currency: dto.currency || "USD",
+          country: dto.country,
+          postalCode: dto.postalCode,
+          addressLine: dto.addressLine,
+        },
+        userId,
+        tx,
+      );
 
-    return toCompanyDto(company, CompanyUserRole.ADMIN);
+      return toCompanyDto(company, CompanyUserRole.ADMIN);
+    });
+  }
+
+  public getCompanyDetails(
+    company: CompanyWithRelations,
+    userRole?: CompanyUserRole,
+  ): CompanyResponseDto {
+    return toCompanyDto(company, userRole);
   }
 
   public async getCompanyById(
@@ -77,94 +95,70 @@ export class CompanyService {
       );
     }
 
-    const role = membership?.role || (company.ownerId === requestingUserId ? CompanyUserRole.ADMIN : undefined);
+    const role =
+      membership?.role ||
+      (company.ownerId === requestingUserId
+        ? CompanyUserRole.ADMIN
+        : undefined);
     return toCompanyDto(company, role);
   }
 
-  public async getUserCompanies(
-    userId: string,
-  ): Promise<CompanyResponseDto[]> {
+  public async getUserCompanies(userId: string): Promise<CompanyResponseDto[]> {
     const results = await this.companyRepo.findUserCompanies(userId);
     return results.map((item) => toCompanyDto(item.company, item.role));
   }
 
   public async updateCompany(
-    companyId: string,
-    requestingUserId: string,
+    company: CompanyWithRelations,
     dto: UpdateCompanyDto,
+    userRole: CompanyUserRole = CompanyUserRole.ADMIN,
   ): Promise<CompanyResponseDto> {
-    const company = await this.companyRepo.findById(companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
-    await this.assertCompanyAdmin(companyId, requestingUserId, company.ownerId);
-
     let deletedAt = company.deletedAt;
-    if (dto.status === CompanyStatus.DELETED && company.status !== CompanyStatus.DELETED) {
+    if (
+      dto.status === CompanyStatus.DELETED &&
+      company.status !== CompanyStatus.DELETED
+    ) {
       deletedAt = new Date();
-    } else if (dto.status && dto.status !== CompanyStatus.DELETED && company.status === CompanyStatus.DELETED) {
+    } else if (
+      dto.status &&
+      dto.status !== CompanyStatus.DELETED &&
+      company.status === CompanyStatus.DELETED
+    ) {
       deletedAt = null;
     }
 
-    const updatedCompany = await this.companyRepo.update(companyId, {
+    const updatedCompany = await this.companyRepo.update(company.id, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
       ...(dto.country !== undefined ? { country: dto.country } : {}),
       ...(dto.postalCode !== undefined ? { postalCode: dto.postalCode } : {}),
-      ...(dto.addressLine !== undefined ? { addressLine: dto.addressLine } : {}),
+      ...(dto.addressLine !== undefined
+        ? { addressLine: dto.addressLine }
+        : {}),
       deletedAt,
     });
 
-    const membership = await this.companyRepo.findCompanyUser(
-      companyId,
-      requestingUserId,
-    );
-
-    return toCompanyDto(updatedCompany, membership?.role || CompanyUserRole.ADMIN);
+    return toCompanyDto(updatedCompany, userRole);
   }
 
   public async listCompanyUsers(
     companyId: string,
-    requestingUserId: string,
   ): Promise<CompanyUserResponseDto[]> {
-    const company = await this.companyRepo.findById(companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
-    const membership = await this.companyRepo.findCompanyUser(
-      companyId,
-      requestingUserId,
-    );
-
-    if (!membership && company.ownerId !== requestingUserId) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "You do not have access to this company",
-      );
-    }
-
     const members = await this.companyRepo.listCompanyUsers(companyId);
     return members.map(toCompanyUserDto);
   }
 
   public async addCompanyUser(
     companyId: string,
-    requestingUserId: string,
     dto: AddCompanyUserDto,
   ): Promise<CompanyUserResponseDto> {
-    const company = await this.companyRepo.findById(companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
-    await this.assertCompanyAdmin(companyId, requestingUserId, company.ownerId);
-
     const targetUser = await this.userRepo.findByEmail(dto.userEmail);
     if (!targetUser) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User with this email not found");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "User with this email not found",
+      );
     }
 
     const existingMembership = await this.companyRepo.findCompanyUser(
@@ -188,24 +182,19 @@ export class CompanyService {
   }
 
   public async updateCompanyUserRole(
-    companyId: string,
-    requestingUserId: string,
+    company: CompanyWithRelations,
     dto: UpdateCompanyUserRoleDto,
   ): Promise<CompanyUserResponseDto> {
-    const company = await this.companyRepo.findById(companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
-    await this.assertCompanyAdmin(companyId, requestingUserId, company.ownerId);
-
     const targetUser = await this.userRepo.findByEmail(dto.userEmail);
     if (!targetUser) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User with this email not found");
+      throw new ApiError(
+        StatusCodes.NOT_FOUND,
+        "User with this email not found",
+      );
     }
 
     const membership = await this.companyRepo.findCompanyUser(
-      companyId,
+      company.id,
       targetUser.id,
     );
     if (!membership) {
@@ -215,7 +204,10 @@ export class CompanyService {
       );
     }
 
-    if (company.ownerId === targetUser.id && dto.role !== CompanyUserRole.ADMIN) {
+    if (
+      company.ownerId === targetUser.id &&
+      dto.role !== CompanyUserRole.ADMIN
+    ) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         "Cannot change role of company owner from ADMIN",
@@ -223,7 +215,7 @@ export class CompanyService {
     }
 
     const updated = await this.companyRepo.updateCompanyUserRole(
-      companyId,
+      company.id,
       targetUser.id,
       dto.role,
     );
@@ -232,15 +224,11 @@ export class CompanyService {
   }
 
   public async removeCompanyUser(
-    companyId: string,
+    company: CompanyWithRelations,
     targetUserId: string,
     requestingUserId: string,
+    userRole?: CompanyUserRole,
   ): Promise<void> {
-    const company = await this.companyRepo.findById(companyId);
-    if (!company) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
-    }
-
     if (company.ownerId === targetUserId) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
@@ -248,12 +236,18 @@ export class CompanyService {
       );
     }
 
-    if (requestingUserId !== targetUserId) {
-      await this.assertCompanyAdmin(companyId, requestingUserId, company.ownerId);
+    if (
+      requestingUserId !== targetUserId &&
+      userRole !== CompanyUserRole.ADMIN
+    ) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Only company admins can remove other members",
+      );
     }
 
     const membership = await this.companyRepo.findCompanyUser(
-      companyId,
+      company.id,
       targetUserId,
     );
     if (!membership) {
@@ -263,29 +257,43 @@ export class CompanyService {
       );
     }
 
-    await this.companyRepo.removeCompanyUser(companyId, targetUserId);
+    await this.companyRepo.removeCompanyUser(company.id, targetUserId);
   }
 
-  private async assertCompanyAdmin(
+  public async getCompanySettings(
     companyId: string,
-    userId: string,
-    ownerId: string,
-  ): Promise<void> {
-    if (userId === ownerId) {
-      return;
+    initialSettings?: CompanySetting | null,
+  ): Promise<CompanySettingResponseDto> {
+    let settings =
+      initialSettings || (await this.companyRepo.findSettings(companyId));
+    if (!settings) {
+      settings = await this.companyRepo.updateSettings(companyId, {
+        customerDiscountTier: {},
+      });
     }
 
-    const membership = await this.companyRepo.findCompanyUser(
-      companyId,
-      userId,
-    );
+    return toCompanySettingDto(settings);
+  }
 
-    if (!membership || membership.role !== CompanyUserRole.ADMIN) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Only company admins can perform this action",
-      );
-    }
+  public async updateCompanySettings(
+    companyId: string,
+    dto: UpdateCompanySettingInput,
+  ): Promise<CompanySettingResponseDto> {
+    const existingSettings = await this.companyRepo.findSettings(companyId);
+    const existingTierMap = existingSettings
+      ? customerDiscountTierConverter(existingSettings.customerDiscountTier)
+      : {};
+
+    const mergedTierMap = {
+      ...existingTierMap,
+      ...(dto.customerDiscountTier || {}),
+    };
+
+    const updated = await this.companyRepo.updateSettings(companyId, {
+      customerDiscountTier: mergedTierMap,
+    });
+
+    return toCompanySettingDto(updated);
   }
 }
 

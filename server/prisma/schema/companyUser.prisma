@@ -6,13 +6,20 @@ enum CompanyUserRole {
   CUSTOMER
 }
 
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
 model CompanyUser {
-  id        String          @id @default(uuid()) @db.Uuid
-  companyId String          @db.Uuid
-  userId    String          @db.Uuid
-  role      CompanyUserRole @default(CUSTOMER)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id           String          @id @default(uuid()) @db.Uuid
+  companyId    String          @db.Uuid
+  userId       String          @db.Uuid
+  role         CompanyUserRole @default(CUSTOMER)
+  customerTier CustomerTier?   @map("customer_tier")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   // Relations
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -21,5 +28,6 @@ model CompanyUser {
   @@unique([companyId, userId])
   @@index([companyId])
   @@index([userId])
+  @@index([customerTier])
   @@map("company_users")
 }

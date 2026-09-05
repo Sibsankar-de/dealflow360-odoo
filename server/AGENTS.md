@@ -49,7 +49,7 @@ Keep the server independent from client presentation concerns.
 
 1. A customer requirement is the starting point of the sales flow.
 2. Products are selected based on the customer requirement.
-3. A quotation is created from the selected products and applicable commercial rules.
+3. A quotation is created from the selected products and applicable commercial rules, with status explicitly specified as DRAFT or SENT at creation. Quotation creation routes are protected by company-scoped RBAC middleware (requiring ADMIN, SALES_REP, or SALES_MANAGER roles).
 4. Upsell and cross sell recommendations belong during product selection and quotation preparation. They are recommendations and must not silently modify the customer order.
 5. The customer must explicitly accept the final commercial offer before it becomes a confirmed sales order.
 6. Prices and discounts must be calculated by server side rules. The client may display calculated values but must not be the authority for them.

@@ -8,6 +8,7 @@ import {
   VerificationTokenType,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
+import { TransactionClient } from "../utils/transactionHandler";
 
 export class UserRepository {
   private prisma: PrismaClient;
@@ -16,31 +17,52 @@ export class UserRepository {
     this.prisma = prismaClient;
   }
 
-  public async create(data: Prisma.UserCreateInput): Promise<User> {
-    return this.prisma.user.create({ data });
+  public async create(
+    data: Prisma.UserCreateInput,
+    tx?: TransactionClient,
+  ): Promise<User> {
+    const client = tx || this.prisma;
+    return client.user.create({ data });
   }
 
-  public async findById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
+  public async findById(
+    id: string,
+    tx?: TransactionClient,
+  ): Promise<User | null> {
+    const client = tx || this.prisma;
+    return client.user.findUnique({
       where: { id },
     });
   }
 
-  public async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
+  public async findByEmail(
+    email: string,
+    tx?: TransactionClient,
+  ): Promise<User | null> {
+    const client = tx || this.prisma;
+    return client.user.findUnique({
       where: { email },
     });
   }
 
-  public async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
-    return this.prisma.user.update({
+  public async update(
+    id: string,
+    data: Prisma.UserUpdateInput,
+    tx?: TransactionClient,
+  ): Promise<User> {
+    const client = tx || this.prisma;
+    return client.user.update({
       where: { id },
       data,
     });
   }
 
-  public async delete(id: string): Promise<User> {
-    return this.prisma.user.delete({
+  public async delete(
+    id: string,
+    tx?: TransactionClient,
+  ): Promise<User> {
+    const client = tx || this.prisma;
+    return client.user.delete({
       where: { id },
     });
   }

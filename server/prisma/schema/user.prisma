@@ -29,6 +29,11 @@ model User {
   ownedCompanies     Company[]           @relation("CompanyOwner")
   companyUsers       CompanyUser[]
 
+  // Quotation Relations
+  createdQuotations     Quotation[]            @relation("QuotationCreator")
+  receivedQuotations    Quotation[]            @relation("QuotationCustomer")
+  quotationNegotiations QuotationNegotiation[] @relation("NegotiationCreator")
+
   @@index([email])
   @@map("users")
 }

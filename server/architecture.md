@@ -78,22 +78,31 @@ The API layer must remain thin. It must not contain complex pricing, discount, f
 
 Responsibilities:
 
-- Authenticate users.
-- Resolve the current user and company or tenant context.
-- Enforce role and permission checks.
-- Verify resource ownership and scope.
-- Prevent unauthorized access to commercial and financial data.
+- Authenticate users via bearer tokens or session cookies (`verifyAuth` middleware).
+- Resolve the current user (`req.user`) and validate active session tokens.
+- Resolve company context via `verifyCompanyAccess` middleware:
+  - Extracts company ID from route parameters (`:companyId`, `:id`), `x-company-id` header, request body, or query parameters.
+  - Validates company existence and active state (rejects suspended or deleted companies).
+  - Verifies the user is either the company owner or an active member of `company_users`.
+  - Attaches `req.company`, `req.companyUser`, and `req.companyRole` to the request object.
+  - Eliminates redundant company database queries across downstream controllers and application services.
+- Enforce Role-Based Access Control (RBAC) via `rbac.middleware.ts`:
+  - `requireRole` / `requireCompanyRole`: Validates that `req.companyRole` matches required company roles (`ADMIN`, `SALES_REP`, `SALES_MANAGER`, `FINANCE_MANAGER`, `CUSTOMER`). Company owners and users with the `ADMIN` role are always permitted through company-level RBAC checks.
+  - `requirePlatformRole`: Validates platform-level user roles (`USER`, `ADMIN`). Platform administrators are always permitted through platform-level RBAC checks.
+- Prevent unauthorized access to commercial, catalog, configuration, and financial data.
 
-Typical roles can include:
+Typical roles include:
 
-- Customer.
-- Sales representative.
-- Sales manager.
-- Operations or warehouse user.
-- Finance user.
-- Administrator.
+- Platform roles:
+  - User (`USER`)
+  - Platform Admin (`ADMIN`)
+- Company roles:
+  - Company Admin (`ADMIN`)
+  - Sales Representative (`SALES_REP`)
+  - Sales Manager (`SALES_MANAGER`)
+  - Finance Manager (`FINANCE_MANAGER`)
+  - Customer (`CUSTOMER`)
 
-Actual roles and permissions must be defined by the implemented authorization model.
 
 ### 4.3 Application Services
 
@@ -161,9 +170,39 @@ Persistence models must not become the public API contract automatically.
 Responsibilities:
 
 - Store company records with owner reference, currency, address, country, postal code, and status (ACTIVE, SUSPENDED, DELETED).
-- Map users to companies using the `company_users` table with role assignments (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
+- Map users to companies using the `company_users` table with role assignments (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER) and optional customer tier classification (`customer_tier` enum: BRONZE, SILVER, GOLD).
+- Store company settings (`company_settings`) created automatically on company creation, storing `customer_discount_tier` as JSONB and converted using safe Zod schemas.
+- Execute multi-step company and relation creation within database transactions via `prismaTransaction`.
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
 - Ensure soft-delete support with `deletedAt` timestamps.
+
+### 4.7 Warehouse, Product, and Stock Persistence Context
+
+Responsibilities:
+
+- Store warehouse records (`warehouses`) scoped to a company, containing name, country, postal code (`postal_code`), address line (`address_line`), and soft delete support (`deletedAt`).
+- Store product records (`products`) scoped to a company, containing name, description, monetary price stored as decimal, base unit (`base_unit`), product type (`ProductType` enum: ONE_TIME, RECURRING), and soft delete support (`deletedAt`).
+- Store product inventory levels per warehouse (`product_stocks`) linking products and warehouses with decimal stock quantity (`stock_qty`) and a unique constraint across product and warehouse.
+- Store product discount tiers per customer tier (`product_discount_tiers`) linking products with customer tiers (BRONZE, SILVER, GOLD) and percentage discounts stored as decimal (`discount_percent`).
+
+### 4.8 Quotation and Negotiation Persistence Context
+
+Responsibilities:
+
+- Store quotation records (`quotations`) linking company, creator (sales representative or admin), and registered customer account.
+- Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`), allowing DRAFT or SENT at creation.
+- Protect quotation creation routes using company-level RBAC middleware (`verifyCompanyAccess`, `requireRole`) restricted to ADMIN, SALES_REP, and SALES_MANAGER roles.
+- Provide dedicated cancellation (`/:id/cancel`) and rejection (`/:id/reject`) endpoints with transactional state updates and optional reason logging.
+- Store line items (`quotation_items`) with decimal quantities, unit prices, discount percentages, tax percentages, and line totals.
+- Track negotiations (`quotation_negotiations`) with proposed discounts, proposed totals, customer messages, admin messages, and `NegotiationStatus` enum (`APPROVED`, `UNDER_REVIEW`, `REJECTED`).
+- Ensure atomic creation and modification of quotations and line items using database transactions.
+
+### 4.9 Company Configuration Context
+
+Responsibilities:
+
+- Store company key-value configurations (`company_configs`) with unique constraints per company and config key (`companyId`, `config_key`).
+
 
 ## 5. Core Domain Model
 
