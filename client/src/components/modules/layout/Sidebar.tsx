@@ -19,6 +19,7 @@ import {
   HelpCircle,
   Settings,
   PanelLeftClose,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface SidebarProps {
@@ -122,6 +123,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: "Deal Health",
           href: `/company/${companyId}/app/deal-health`,
           icon: <Activity className="w-4 h-4" />,
+        },
+      ],
+    },
+    {
+      title: "TEAM",
+      items: [
+        {
+          label: "Access Control",
+          href: `/access-control`,
+          icon: <ShieldCheck className="w-4 h-4" />,
         },
       ],
     },

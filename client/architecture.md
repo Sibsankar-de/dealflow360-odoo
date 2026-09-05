@@ -77,9 +77,13 @@ src/
 │       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard, CreateQuotationModal, ReQuotationModal
 │       ├── fulfillment/  # Delivery tracking, backorders
 │       ├── finance/      # Invoices, financial approvals
-│       ├── customer/     # Customer directory and interaction history
-│       └── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
-├── context/              # React Context Providers (AuthContext.tsx, AuthProvider)
+│       ├── customers/    # Customer directory and interaction history
+│       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
+│       ├── settings/     # Store name, currency, discount tiers & address configuration
+│       ├── accesscontrol/ # Team member listing, role assignment, invite modal
+│       └── company/      # Team, roles, product management
+├── services/             # Centralized API clients and endpoint definitions
+│   └── api/              # Base API configuration and domain services
 ├── hooks/                # Reusable custom React hooks
 ├── schemas/              # Zod validation schemas (auth.schema.ts, company.schema.ts, product.schema.ts, warehouse.schema.ts, deal.schema.ts)
 ├── store/                # Global state management (Redux Toolkit store, StoreProvider)
