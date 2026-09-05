@@ -1,0 +1,207 @@
+import { Prisma, ProductType } from "@prisma/client";
+import { StatusCodes } from "http-status-codes";
+import {
+  ProductRepository,
+  productRepository as defaultProductRepository,
+} from "../repositories/product.repository";
+import {
+  WarehouseRepository,
+  warehouseRepository as defaultWarehouseRepository,
+} from "../repositories/warehouse.repository";
+import { ApiError } from "../utils/apiErrorHandler";
+import { prismaTransaction } from "../utils/transactionHandler";
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductListDto,
+  ProductResponseDto,
+  toProductDto,
+} from "../dto/product.dto";
+
+export class ProductService {
+  private productRepo: ProductRepository;
+  private warehouseRepo: WarehouseRepository;
+
+  public constructor(
+    productRepo: ProductRepository = defaultProductRepository,
+    warehouseRepo: WarehouseRepository = defaultWarehouseRepository,
+  ) {
+    this.productRepo = productRepo;
+    this.warehouseRepo = warehouseRepo;
+  }
+
+  public async createProduct(
+    companyId: string,
+    dto: CreateProductDto,
+  ): Promise<ProductResponseDto> {
+    return prismaTransaction(async (tx) => {
+      const stocks: Array<{ warehouseId: string; stockQty: Prisma.Decimal }> = [];
+
+      if (dto.stocks && dto.stocks.length > 0) {
+        for (const entry of dto.stocks) {
+          const warehouse = await this.warehouseRepo.findById(
+            entry.warehouseId,
+            companyId,
+            tx,
+          );
+          if (!warehouse) {
+            throw new ApiError(
+              StatusCodes.BAD_REQUEST,
+              `Warehouse ${entry.warehouseId} not found in this company`,
+            );
+          }
+          stocks.push({
+            warehouseId: entry.warehouseId,
+            stockQty: new Prisma.Decimal(entry.stockQty),
+          });
+        }
+      }
+
+      const product = await this.productRepo.create(
+        {
+          companyId,
+          name: dto.name,
+          description: dto.description ?? null,
+          price: new Prisma.Decimal(dto.price),
+          baseUnit: dto.baseUnit ?? "UNIT",
+          type: dto.type ?? ProductType.ONE_TIME,
+        },
+        stocks,
+        tx,
+      );
+
+      return toProductDto(product);
+    });
+  }
+
+  public async getProduct(
+    productId: string,
+    companyId: string,
+  ): Promise<ProductResponseDto> {
+    const product = await this.productRepo.findById(productId, companyId);
+    if (!product) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+    }
+    return toProductDto(product);
+  }
+
+  public async listProducts(
+    companyId: string,
+    filters: { type?: ProductType; search?: string; page?: number; limit?: number },
+  ): Promise<ProductListDto> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+
+    const { products, total } = await this.productRepo.findMany(
+      companyId,
+      { type: filters.type, search: filters.search },
+      page,
+      limit,
+    );
+
+    return {
+      products: products.map(toProductDto),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  public async updateProduct(
+    productId: string,
+    companyId: string,
+    dto: UpdateProductDto,
+  ): Promise<ProductResponseDto> {
+    return prismaTransaction(async (tx) => {
+      const existing = await this.productRepo.findById(productId, companyId, tx);
+      if (!existing) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      }
+
+      const updated = await this.productRepo.update(
+        productId,
+        {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.price !== undefined
+            ? { price: new Prisma.Decimal(dto.price) }
+            : {}),
+          ...(dto.baseUnit !== undefined ? { baseUnit: dto.baseUnit } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+        },
+        tx,
+      );
+
+      return toProductDto(updated);
+    });
+  }
+
+  public async deleteProduct(
+    productId: string,
+    companyId: string,
+  ): Promise<void> {
+    return prismaTransaction(async (tx) => {
+      const existing = await this.productRepo.findById(productId, companyId, tx);
+      if (!existing) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      }
+      await this.productRepo.delete(productId, tx);
+    });
+  }
+
+  public async upsertProductStock(
+    productId: string,
+    companyId: string,
+    warehouseId: string,
+    stockQty: number,
+  ): Promise<void> {
+    return prismaTransaction(async (tx) => {
+      const product = await this.productRepo.findById(productId, companyId, tx);
+      if (!product) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      }
+
+      const warehouse = await this.warehouseRepo.findById(
+        warehouseId,
+        companyId,
+        tx,
+      );
+      if (!warehouse) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Warehouse not found");
+      }
+
+      await this.productRepo.upsertStock(
+        productId,
+        warehouseId,
+        new Prisma.Decimal(stockQty),
+        tx,
+      );
+    });
+  }
+
+  public async deleteProductStock(
+    productId: string,
+    companyId: string,
+    warehouseId: string,
+  ): Promise<void> {
+    return prismaTransaction(async (tx) => {
+      const product = await this.productRepo.findById(productId, companyId, tx);
+      if (!product) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Product not found");
+      }
+
+      const warehouse = await this.warehouseRepo.findById(
+        warehouseId,
+        companyId,
+        tx,
+      );
+      if (!warehouse) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Warehouse not found");
+      }
+
+      await this.productRepo.deleteStock(productId, warehouseId, tx);
+    });
+  }
+}
+
+export const productService = new ProductService();
