@@ -47,29 +47,51 @@ The project follows a modular, feature-oriented structure under `src/`:
 ```text
 src/
 ├── app/                  # Next.js App Router (pages, layouts, route handlers)
+│   ├── (auth)/           # Authentication routes (login, signup)
+│   ├── profile/          # User profile and company workspace selector
+│   └── company/
+│       └── [company-id]/
+│           ├── (customer)/ # Customer quotation signoff portal
+│           └── app/        # Company member authenticated application layout
+│               ├── dashboard/
+│               ├── deals/ & deals/[deal-id]/
+│               ├── quotations/
+│               ├── products/
+│               ├── warehouses/
+│               ├── customers/
+│               ├── fulfillment/ & fulfillment/[id]/
+│               ├── subscriptions/
+│               ├── invoices/
+│               ├── deal-health/
+│               └── settings/
 ├── components/           # Reusable shared UI and layout components
 │   ├── ui/               # Base primitives (Avatar, AppLogo, Select, CurrencySelector, FilterSelector, SearchableInput, Button, Input, Modal, Card, Badge, Tabs)
 │   ├── shared/           # Shared compound components (navbar, sidebar, tables)
 │   └── modules/          # Feature module UI components
 │       ├── auth/         # LoginForm, SignupForm, AuthBrandingPanel
-│       ├── layout/       # Collapsible Sidebar, Navbar: profile vs company view, StoreInfo, UserAvatarMenu
+│       ├── layout/       # Collapsible Sidebar, Navbar, StoreInfo, UserAvatarMenu
 │       ├── profile/      # ProfileInfoCard, CompanyCard, CompanyList, EditProfileModal, ChangePasswordModal, CreateCompanyModal
-│       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard
+│       ├── deals/        # DealList, DealModal, DeleteDealModal
+│       ├── products/     # ProductList, ProductModal, DeleteProductModal
+│       ├── warehouses/   # WarehouseList, WarehouseModal, DeleteWarehouseModal
+│       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard, CreateQuotationModal, ReQuotationModal
 │       ├── fulfillment/  # Delivery tracking, backorders
 │       ├── finance/      # Invoices, financial approvals
-│       ├── customers/    # Customer directory and interaction history
-│       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
-│       └── company/      # Team, roles, product management
+│       ├── customer/     # Customer directory and interaction history
+│       └── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
 ├── context/              # React Context Providers (AuthContext.tsx, AuthProvider)
 ├── hooks/                # Reusable custom React hooks
-├── schemas/              # Zod validation schemas (auth.schema.ts, company.schema.ts)
+├── schemas/              # Zod validation schemas (auth.schema.ts, company.schema.ts, product.schema.ts, warehouse.schema.ts, deal.schema.ts)
 ├── store/                # Global state management (Redux Toolkit store, StoreProvider)
-│   ├── baseApi.ts        # Base RTK Query API configuration with re-auth interceptor
+│   ├── baseApi.ts        # Base RTK Query API configuration with re-auth interceptor & tags
 │   ├── features/         # Feature slices & injected endpoints
 │   │   ├── user/         # userSlice.ts, userApi.ts
-│   │   └── company/      # companyApi.ts (user company affiliations, company creation)
+│   │   ├── company/      # companySlice.ts, companyApi.ts (user company affiliations, members, lookup)
+│   │   ├── product/      # productApi.ts (product catalog & stock allocation)
+│   │   ├── warehouse/    # warehouseApi.ts (warehouses and distribution hubs)
+│   │   └── deal/         # dealApi.ts (deals lifecycle, quotations generation & revisions)
 │   └── index.ts          # Central Redux store configuration
-├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, SelectType.ts)
+├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, product.ts, warehouse.ts, deal.ts, quotation.ts, SelectType.ts)
 ├── utils/                # Pure helper functions and formatters
 └── assets/               # Static assets, icons, and media
 ```
@@ -81,14 +103,14 @@ src/
 State is strictly divided into two categories:
 
 ### 1. Server State
-* **Examples**: Quotations, Deals, Products, Invoices, Delivery Batches, Users, Notifications.
-* **Management**: Centralized RTK Query caching (`store/baseApi.ts`) with feature endpoints (e.g. `store/features/user/userApi.ts`) and tag invalidation (`User`, `Company`, `Quotation`).
+* **Examples**: Quotations, Deals, Products, Warehouses, Invoices, Delivery Batches, Users, Notifications.
+* **Management**: Centralized RTK Query caching (`store/baseApi.ts`) with feature endpoints (`userApi.ts`, `companyApi.ts`, `productApi.ts`, `warehouseApi.ts`, `dealApi.ts`) and tag invalidation (`User`, `Company`, `Quotation`, `Product`, `Warehouse`, `Deal`).
 * **Authentication**: Automatic session recovery via `baseQueryWithReauth` in `baseApi.ts` on `401 Unauthorized` responses by calling `/auth/refresh`.
 * **Rules**: Do not duplicate server data in local client state. Rely on normalized query caching.
 
 ### 2. Client State
 * **Examples**: Modal open/close state, active filters, form draft steps, temporary selection IDs.
-* **Management**: React local state (`useState`, `useReducer`), `AuthContext` (`useAuth()` hook for user session lifecycle), and Redux Toolkit feature slices (`store/features/user/userSlice.ts`).
+* **Management**: React local state (`useState`, `useReducer`), `AuthContext` (`useAuth()` hook for user session lifecycle), and Redux Toolkit feature slices (`userSlice.ts`, `companySlice.ts`).
 
 ---
 
@@ -97,8 +119,9 @@ State is strictly divided into two categories:
 * All API calls must go through RTK Query services under `src/store/features/`.
 * Feature APIs inject endpoints directly into `src/store/baseApi.ts`.
 * `credentials: "include"` is configured by default for httpOnly cookie authentication (`accessToken`, `refreshToken`).
+* Tenant requests supply active company context via the `x-company-id` header.
 * Direct `fetch` or `axios` calls inside UI components are prohibited.
-* Requests and responses must use strictly typed interfaces defined in `src/types/auth.ts`.
+* Requests and responses must use strictly typed interfaces.
 * Standardized loading, empty, and error handling must be implemented across all views.
 
 ---
@@ -109,16 +132,20 @@ Routes are structured around user roles and core platform workflows:
 
 * `/(auth)`: Authentication routes (Login, Register).
 * `/profile`: User profile, credentials, and company memberships (Profile Navbar layout).
-* `/company/[company-id]/(dashboard)`: Company tenant dashboard workspace (Company Navbar layout).
-  * `/company/[company-id]/dashboard`: Company metrics and KPIs.
-  * `/company/[company-id]/quotations`: Quotation Kanban pipeline board and table views.
-  * `/company/[company-id]/approvals`: Managerial and finance approval workflows.
-  * `/company/[company-id]/fulfillment`: Delivery and backorder fulfillment tracking.
-  * `/company/[company-id]/subscriptions`: Recurring billing and subscription contracts.
-  * `/company/[company-id]/invoices`: Invoice management based on delivered items.
-  * `/company/[company-id]/deal-health`: Deal health alerts and stalled quotation indicators.
-  * `/company/[company-id]/reports`: Analytics and exportable business reports.
-  * `/company/[company-id]/products`: Product catalog, pricing constraints, and risk limits.
+* `/company/[company-id]/app`: Company tenant workspace (Company Navbar + Sidebar layout).
+  * `/company/[company-id]/app/dashboard`: Company metrics and KPIs.
+  * `/company/[company-id]/app/deals`: Deals pipeline management and opportunity tracking.
+  * `/company/[company-id]/app/deals/[deal-id]`: Deal detail view, nested commercial quotations and revision iteration cycle.
+  * `/company/[company-id]/app/quotations`: Quotation Kanban pipeline board and table views.
+  * `/company/[company-id]/app/products`: Product catalog, pricing models, and warehouse stock allocation.
+  * `/company/[company-id]/app/warehouses`: Warehouses and inventory distribution hubs.
+  * `/company/[company-id]/app/customers`: Customer directory and quotation history.
+  * `/company/[company-id]/app/fulfillment`: Delivery and backorder fulfillment tracking.
+  * `/company/[company-id]/app/fulfillment/[id]`: Fulfillment plan detail and order items.
+  * `/company/[company-id]/app/subscriptions`: Recurring billing and subscription contracts.
+  * `/company/[company-id]/app/invoices`: Invoice management based on delivered items.
+  * `/company/[company-id]/app/deal-health`: Deal health alerts and stalled quotation indicators.
+  * `/company/[company-id]/app/settings`: Company settings, base currency, and billing rules.
 * `/company/[company-id]/(customer)`: Customer quotation review, negotiation, and sign-off portal.
 
 ---

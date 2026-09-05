@@ -80,33 +80,29 @@ export default function DealHealthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <Navbar variant="company" user={mockUser} />
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header Section */}
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">
+          Deal Health
+        </h1>
+        <p className="text-sm text-text-secondary mt-1">
+          Identify deals that need immediate intervention before they stall or deteriorate.
+        </p>
+      </div>
 
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-8">
-        {/* Header Section */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
-            Deal Health
-          </h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Identify deals that need immediate intervention before they stall or deteriorate.
-          </p>
+      {notification && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+          <span>{notification}</span>
         </div>
+      )}
 
-        {notification && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-            <span>{notification}</span>
-          </div>
-        )}
+      {/* Summary Risk KPI Cards */}
+      <DealHealthSummaryCards kpi={kpi} />
 
-        {/* Summary Risk KPI Cards */}
-        <DealHealthSummaryCards kpi={kpi} />
-
-        {/* Attention Required Table */}
-        <AttentionRequiredTable alerts={alerts} onActionClick={handleActionClick} />
-      </main>
+      {/* Attention Required Table */}
+      <AttentionRequiredTable alerts={alerts} onActionClick={handleActionClick} />
     </div>
   );
 }

@@ -6,14 +6,31 @@ import { Sidebar } from "@/components/modules/layout/Sidebar";
 import { Navbar } from "@/components/modules/layout/Navbar";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 
+import { useGetCompanyByIdQuery } from "@/store/features/company/companyApi";
+import { useAppDispatch } from "@/store";
+import { setCurrentCompany } from "@/store/features/company/companySlice";
+
 export default function CompanyDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const params = useParams();
-  const companyId = typeof params["company-id"] === "string" ? params["company-id"] : "12983hufiu42";
+  const companyId = typeof params["company-id"] === "string" ? params["company-id"] : "";
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const dispatch = useAppDispatch();
+
+  const { data: companyData } = useGetCompanyByIdQuery(companyId, {
+    skip: !companyId,
+  });
+
+  const company = companyData?.data?.company;
+
+  React.useEffect(() => {
+    if (company) {
+      dispatch(setCurrentCompany(company));
+    }
+  }, [company, dispatch]);
 
   return (
     <ProtectedRoute>
@@ -21,9 +38,9 @@ export default function CompanyDashboardLayout({
         {/* Dark Categorized Sidebar on the left with StoreInfo at bottom */}
         <Sidebar
           companyId={companyId}
-          companyName="Acme Industrial Supplies"
-          userRole="Sales Representative"
-          companyStatus="Online"
+          companyName={company?.name || "DealFlow360"}
+          userRole={company?.userRole || "Company Member"}
+          companyStatus={company?.status || "Active"}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         />
