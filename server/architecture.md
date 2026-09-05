@@ -174,6 +174,7 @@ Responsibilities:
 - Store company settings (`company_settings`) created automatically on company creation, storing `customer_discount_tier` as JSONB and converted using safe Zod schemas.
 - Execute multi-step company and relation creation within database transactions via `prismaTransaction`.
 - Enforce company-level role-based authorization for administrative, sales, and financial operations.
+- Provide paginated company listing (GET /api/v1/companies) with search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context
@@ -185,17 +186,26 @@ Responsibilities:
 - Store product inventory levels per warehouse (`product_stocks`) linking products and warehouses with decimal stock quantity (`stock_qty`) and a unique constraint across product and warehouse.
 - Store product discount tiers per customer tier (`product_discount_tiers`) linking products with customer tiers (BRONZE, SILVER, GOLD) and percentage discounts stored as decimal (`discount_percent`).
 
-### 4.8 Quotation and Negotiation Persistence Context
+### 4.8 Deal, Quotation, Revision, and Negotiation Persistence Context
 
 Responsibilities:
 
-- Store quotation records (`quotations`) linking company, creator (sales representative or admin), and registered customer account.
-- Track quotation status using `QuotationStatus` enum (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`, `EXPIRED`, `UNDER_NEGOTIATION`), allowing DRAFT or SENT at creation.
-- Protect quotation creation routes using company-level RBAC middleware (`verifyCompanyAccess`, `requireRole`) restricted to ADMIN, SALES_REP, and SALES_MANAGER roles.
-- Provide dedicated cancellation (`/:id/cancel`) and rejection (`/:id/reject`) endpoints with transactional state updates and optional reason logging.
-- Store line items (`quotation_items`) with decimal quantities, unit prices, discount percentages, tax percentages, and line totals.
-- Track negotiations (`quotation_negotiations`) with proposed discounts, proposed totals, customer messages, admin messages, and `NegotiationStatus` enum (`APPROVED`, `UNDER_REVIEW`, `REJECTED`).
-- Ensure atomic creation and modification of quotations and line items using database transactions.
+- Store sales opportunity records (`deals`) scoped to a company, linking customer and sales representative.
+  - Track opportunity progress via `DealStage` enum (`NEW`, `QUALIFICATION`, `REQUIREMENT`, `QUOTATION`, `NEGOTIATION`, `WON`, `LOST`).
+  - Track overall outcome via `DealStatus` enum (`OPEN`, `WON`, `LOST`, `CANCELLED`).
+  - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
+- Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
+  - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
+  - Maintain link to the active commercial revision (`current_revision_id`).
+  - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
+- Store active quotation line items (`quotation_items`) representing current products, quantities, unit prices, discount types (`PERCENTAGE`, `FIXED`), discount values, discount amounts, tax rates, final unit prices, and line totals.
+- Store immutable, versioned quotation revisions (`quotation_revisions`) capturing the proposal state at every commercial iteration.
+  - Track revision metadata: `revision_no`, author (`created_by`), `revision_type` (`INITIAL`, `SALES_COUNTER`, `CUSTOMER_COUNTER`, `FINAL`), and `status` (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`).
+  - Store financial totals: `subtotal`, `discount_amount`, `tax_amount`, `total_amount`, and customer/internal notes.
+- Store historical snapshot line items (`quotation_revision_items`) preserving exact commercial values for each revision, independent of subsequent product price changes.
+- Store negotiation sessions (`negotiations`) per quotation with `NegotiationStatus` enum (`OPEN`, `CLOSED`, `CANCELLED`).
+- Store negotiation offers (`negotiation_offers`) representing distinct offers and counter-offers made by either party (`OfferParty`: `CUSTOMER`, `SALES_REP`) with `OfferStatus` (`PENDING`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`, `WITHDRAWN`) and base revision references.
+- Store line-level negotiation requests (`negotiation_offer_items`) specifying requested quantities, unit prices, discount types, discount values, and line totals.
 
 ### 4.9 Company Configuration Context
 
@@ -204,31 +214,42 @@ Responsibilities:
 - Store company key-value configurations (`company_configs`) with unique constraints per company and config key (`companyId`, `config_key`).
 
 
+
 ## 5. Core Domain Model
 
-The following relationships describe the intended business traceability.
+The following relationships describe the intended commercial traceability.
 
 ```text
 Customer
    |
    v
-Requirement
+Deal (Sales Opportunity)
    |
    v
-Product Selection
+Quotation (Commercial Proposal)
    |
-   +------> Upsell Recommendations
+   +----> Quotation Items (Active Products)
    |
-   +------> Cross Sell Recommendations
+   +----> Quotation Revision 1 (Versioned Snapshot)
+   |        |
+   |        +----> Revision Items
+   |
+   +----> Quotation Revision 2 (Versioned Snapshot)
+   |        |
+   |        +----> Revision Items
+   |
+   +----> Negotiation (Negotiation Session)
+            |
+            +----> Offer 1 (Customer/Sales Offer)
+            |        |
+            |        +----> Offer Items (Requested Lines)
+            |
+            +----> Offer 2 (Counter Offer)
+                     |
+                     +----> Offer Items (Requested Lines)
    |
    v
-Quotation
-   |
-   v
-Quotation Lines
-   |
-   v
-Accepted Quotation
+Accepted Quotation Revision
    |
    v
 Sales Order
@@ -248,6 +269,7 @@ Invoice 1            Invoice 2
 ```
 
 The exact database normalization can differ, but the traceability between these business records must remain intact.
+
 
 ## 6. Customer Sales Workflow
 
@@ -312,34 +334,38 @@ The server returns the calculated price and discount information.
 
 Client supplied prices must not override server side pricing rules.
 
-### Step 4: Quotation Creation
+### Step 4: Quotation Creation and Lifecycle
 
-A quotation is created from the selected products.
+A quotation is created from the selected products and applicable commercial rules, linked to a parent Deal.
+
+Initial status can be explicitly specified as DRAFT (default) or SENT:
+- DRAFT: Proposal remains internal to sales/management team for review and adjustments.
+- SENT: Proposal is published to the target customer account.
+
+When a quotation is created, the system automatically creates an initial immutable snapshot revision (revision_no = 1, revision_type = INITIAL) with matching status (DRAFT or SENT).
+
+When a quotation is created as SENT or sent later via the send endpoint (POST/PATCH /api/v1/quotations/:id/send):
+- Quotation status transitions to SENT.
+- Current active revision status transitions to SENT.
+- If the parent Deal stage is NEW, QUALIFICATION, or REQUIREMENT, Deal stage automatically advances to QUOTATION.
 
 Typical quotation data:
 
 ```text
 Quotation
+  - company
+  - deal
   - customer
-  - sales owner
+  - sales representative
   - currency
   - validity period
-  - status
-  - subtotal
-  - discount
-  - tax
-  - total
-
-Quotation Line
-  - product
-  - quantity
-  - unit price
-  - discount
-  - tax
-  - line total
+  - status (DRAFT, SENT, NEGOTIATING, ACCEPTED, REJECTED, EXPIRED, CANCELLED)
+  - current revision
 ```
 
-The quotation can be revised while it remains in an editable state.
+Revisions capture versioned history:
+- When a draft or negotiating quotation is updated with new items or pricing, previous items are replaced on the active quotation and a new versioned QuotationRevision (revision_type = SALES_COUNTER) is created.
+- Revisions can be retrieved via GET /api/v1/quotations/:id/revisions.
 
 ### Step 5: Quotation Approval
 

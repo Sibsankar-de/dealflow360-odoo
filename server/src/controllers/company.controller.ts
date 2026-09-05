@@ -13,6 +13,7 @@ import {
   updateCompanySchema,
   addCompanyUserSchema,
   updateCompanyUserRoleSchema,
+  listCompaniesQuerySchema,
 } from "../schemas/company.schema";
 import { updateCompanySettingSchema } from "../schemas/companySetting.schema";
 
@@ -60,6 +61,37 @@ export class CompanyController {
           StatusCodes.OK,
           { company },
           "Company fetched successfully",
+        ),
+      );
+  });
+
+  public list = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const filterResult = listCompaniesQuerySchema.safeParse(req.query);
+    if (!filterResult.success) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid query parameters",
+        filterResult.error.errors,
+      );
+    }
+
+    const result = await this.companyService.listCompanies(
+      userId,
+      filterResult.data,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Companies fetched successfully",
         ),
       );
   });

@@ -30,10 +30,11 @@ export class CompanyMiddleware {
 
       const rawCompanyId =
         req.params?.companyId ||
-        req.params?.id ||
         headerCompanyId ||
         req.body?.companyId ||
-        (typeof req.query?.companyId === "string" ? req.query.companyId : undefined);
+        (typeof req.query?.companyId === "string" ? req.query.companyId : undefined) ||
+        req.params?.id;
+
 
       if (
         !rawCompanyId ||

@@ -9,3 +9,4 @@ export * from "./date-utils";
 export * from "./validate.utils";
 export * from "./transactionHandler";
 export * from "./jsonConverter";
+export * from "./paginate";

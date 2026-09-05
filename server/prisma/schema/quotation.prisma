@@ -1,40 +1,41 @@
 enum QuotationStatus {
   DRAFT
   SENT
+  NEGOTIATING
   ACCEPTED
   REJECTED
+  EXPIRED
   CANCELLED
-  UNDER_NEGOTIATION
 }
 
 model Quotation {
-  id              String          @id @default(uuid()) @db.Uuid
-  companyId       String          @db.Uuid
-  creatorId       String          @db.Uuid
-  customerId      String          @db.Uuid
-  quotationNumber String          @map("quotation_number")
-  status          QuotationStatus @default(DRAFT)
-  quotationDate   DateTime        @default(now()) @map("quotation_date")
-  expiresAt       DateTime?       @map("expires_at")
-  currency        String          @default("USD")
-  discountAmount  Decimal         @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  subtotal        Decimal         @default(0) @db.Decimal(12, 2)
-  total           Decimal         @default(0) @db.Decimal(12, 2)
-  notes           String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                String          @id @default(uuid()) @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  quotationNo       String          @unique @map("quotation_no")
+  dealId            String          @map("deal_id") @db.Uuid
+  customerId        String          @map("customer_id") @db.Uuid
+  salesRepId        String          @map("sales_rep_id") @db.Uuid
+  status            QuotationStatus @default(DRAFT)
+  currency          String          @default("USD")
+  validUntil        DateTime?       @map("valid_until")
+  currentRevisionId String?         @unique @map("current_revision_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creator      User                   @relation("QuotationCreator", fields: [creatorId], references: [id], onDelete: Restrict)
-  customer     User                   @relation("QuotationCustomer", fields: [customerId], references: [id], onDelete: Restrict)
-  items        QuotationItem[]
-  negotiations QuotationNegotiation[]
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deal            Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  customer        User                @relation("QuotationCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  salesRep        User                @relation("QuotationSalesRep", fields: [salesRepId], references: [id], onDelete: Restrict)
+  currentRevision QuotationRevision?  @relation("CurrentQuotationRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  items           QuotationItem[]
+  revisions       QuotationRevision[] @relation("QuotationRevisions")
+  negotiations    Negotiation[]
 
-  @@unique([companyId, quotationNumber])
   @@index([companyId])
-  @@index([creatorId])
+  @@index([dealId])
   @@index([customerId])
+  @@index([salesRepId])
   @@index([status])
   @@map("quotations")
 }

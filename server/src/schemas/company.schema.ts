@@ -87,8 +87,22 @@ export const updateCompanyUserRoleSchema = z.object({
   }),
 });
 
+export const listCompaniesQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+  search: z.string().trim().optional(),
+  status: z.nativeEnum(CompanyStatus).optional(),
+  sortBy: z.enum(["name", "createdAt", "updatedAt", "status", "country"]).default("createdAt").optional(),
+  sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
+  myCompanies: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((val) => (typeof val === "boolean" ? val : val === "true"))
+    .optional(),
+});
+
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type AddCompanyUserInput = z.infer<typeof addCompanyUserSchema>;
 export type UpdateCompanyUserRoleInput = z.infer<typeof updateCompanyUserRoleSchema>;
+export type ListCompaniesQueryInput = z.infer<typeof listCompaniesQuerySchema>;
 

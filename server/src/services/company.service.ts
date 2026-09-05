@@ -1,4 +1,9 @@
-import { CompanyStatus, CompanyUserRole, CompanySetting } from "@prisma/client";
+import {
+  Prisma,
+  CompanyStatus,
+  CompanyUserRole,
+  CompanySetting,
+} from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
   CompanyRepository,
@@ -17,6 +22,7 @@ import {
   UpdateCompanyDto,
   AddCompanyUserDto,
   UpdateCompanyUserRoleDto,
+  ListCompaniesDto,
   toCompanyDto,
   toCompanySettingDto,
   toCompanyUserDto,
@@ -24,6 +30,7 @@ import {
 import { UpdateCompanySettingInput } from "../schemas/companySetting.schema";
 import { customerDiscountTierConverter } from "../converters/companySetting.converter";
 import { prismaTransaction } from "../utils/transactionHandler";
+import { PaginatedResult } from "../utils/paginate";
 import { CompanyWithRelations } from "../types/express";
 
 export class CompanyService {
@@ -106,6 +113,69 @@ export class CompanyService {
   public async getUserCompanies(userId: string): Promise<CompanyResponseDto[]> {
     const results = await this.companyRepo.findUserCompanies(userId);
     return results.map((item) => toCompanyDto(item.company, item.role));
+  }
+
+  public async listCompanies(
+    userId: string,
+    query: ListCompaniesDto,
+  ): Promise<PaginatedResult<CompanyResponseDto>> {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const sortBy = query.sortBy || "createdAt";
+    const sortOrder = query.sortOrder || "desc";
+
+    const where: Prisma.CompanyWhereInput = {
+      ...(query.status ? { status: query.status } : { deletedAt: null }),
+    };
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: "insensitive" } },
+        { country: { contains: query.search, mode: "insensitive" } },
+        { postalCode: { contains: query.search, mode: "insensitive" } },
+        { addressLine: { contains: query.search, mode: "insensitive" } },
+      ];
+    }
+
+    if (query.myCompanies) {
+      where.OR = [
+        { ownerId: userId },
+        { companyUsers: { some: { userId } } },
+      ];
+    }
+
+    const orderBy: Prisma.CompanyOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    const paginated = await this.companyRepo.findPaginated(
+      where,
+      orderBy,
+      { page, limit },
+    );
+
+    const companyIds = paginated.docs.map((doc) => doc.id);
+    const userMemberships = await this.companyRepo.findUserCompanyMemberships(
+      userId,
+      companyIds,
+    );
+
+    const membershipMap = new Map(
+      userMemberships.map((m) => [m.companyId, m.role]),
+    );
+
+    const docs = paginated.docs.map((company) => {
+      const isOwner = company.ownerId === userId;
+      const role = isOwner
+        ? CompanyUserRole.ADMIN
+        : membershipMap.get(company.id);
+      return toCompanyDto(company, role);
+    });
+
+    return {
+      ...paginated,
+      docs,
+    };
   }
 
   public async updateCompany(

@@ -3,17 +3,30 @@ import {
   PrismaClient,
   Quotation,
   QuotationItem,
+  QuotationRevision,
+  QuotationRevisionItem,
   QuotationStatus,
+  DiscountType,
+  RevisionType,
+  RevisionStatus,
   Product,
   User,
   Company,
+  Deal,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
 
 export type QuotationWithRelations = Quotation & {
   items: (QuotationItem & { product: Product })[];
-  creator: User;
+  currentRevision?:
+    | (QuotationRevision & {
+        items: (QuotationRevisionItem & { product: Product })[];
+        creator: User;
+      })
+    | null;
+  deal: Deal;
+  salesRep: User;
   customer: User;
   company: Company;
 };
@@ -52,26 +65,33 @@ export class QuotationRepository {
   public async create(
     data: {
       companyId: string;
-      creatorId: string;
+      dealId: string;
+      salesRepId: string;
       customerId: string;
-      quotationNumber: string;
+      quotationNo: string;
       status: QuotationStatus;
-      quotationDate: Date;
-      expiresAt: Date | null;
+      validUntil: Date | null;
       currency: string;
-      discountAmount: Prisma.Decimal;
-      subtotal: Prisma.Decimal;
-      total: Prisma.Decimal;
-      notes: string | null;
     },
     items: Array<{
       productId: string;
       quantity: Prisma.Decimal;
       unitPrice: Prisma.Decimal;
-      discountPercentage: Prisma.Decimal;
-      taxPercentage: Prisma.Decimal;
+      discountType: DiscountType;
+      discountValue: Prisma.Decimal;
+      discountAmount: Prisma.Decimal;
+      taxRate: Prisma.Decimal;
+      finalUnitPrice: Prisma.Decimal;
       lineTotal: Prisma.Decimal;
     }>,
+    revisionData: {
+      subtotal: Prisma.Decimal;
+      discountAmount: Prisma.Decimal;
+      taxAmount: Prisma.Decimal;
+      totalAmount: Prisma.Decimal;
+      customerNote?: string | null;
+      internalNote?: string | null;
+    },
     tx?: TransactionClient,
   ): Promise<QuotationWithRelations> {
     const client = tx || this.prisma;
@@ -79,41 +99,88 @@ export class QuotationRepository {
     const quotation = await client.quotation.create({
       data: {
         companyId: data.companyId,
-        creatorId: data.creatorId,
+        dealId: data.dealId,
+        salesRepId: data.salesRepId,
         customerId: data.customerId,
-        quotationNumber: data.quotationNumber,
+        quotationNo: data.quotationNo,
         status: data.status,
-        quotationDate: data.quotationDate,
-        expiresAt: data.expiresAt,
+        validUntil: data.validUntil,
         currency: data.currency,
-        discountAmount: data.discountAmount,
-        subtotal: data.subtotal,
-        total: data.total,
-        notes: data.notes,
         items: {
           create: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            discountPercentage: item.discountPercentage,
-            taxPercentage: item.taxPercentage,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            finalUnitPrice: item.finalUnitPrice,
             lineTotal: item.lineTotal,
           })),
         },
       },
+    });
+
+    const revision = await client.quotationRevision.create({
+      data: {
+        quotationId: quotation.id,
+        revisionNo: 1,
+        createdById: data.salesRepId,
+        revisionType: RevisionType.INITIAL,
+        status:
+          data.status === QuotationStatus.SENT
+            ? RevisionStatus.SENT
+            : RevisionStatus.DRAFT,
+        subtotal: revisionData.subtotal,
+        discountAmount: revisionData.discountAmount,
+        taxAmount: revisionData.taxAmount,
+        totalAmount: revisionData.totalAmount,
+        customerNote: revisionData.customerNote || null,
+        internalNote: revisionData.internalNote || null,
+        items: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            finalUnitPrice: item.finalUnitPrice,
+            lineTotal: item.lineTotal,
+          })),
+        },
+      },
+    });
+
+    const updatedQuotation = await client.quotation.update({
+      where: { id: quotation.id },
+      data: { currentRevisionId: revision.id },
       include: {
         items: {
           include: {
             product: true,
           },
         },
-        creator: true,
+        currentRevision: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            creator: true,
+          },
+        },
+        deal: true,
+        salesRep: true,
         customer: true,
         company: true,
       },
     });
 
-    return quotation;
+    return updatedQuotation;
   }
 
   public async findById(
@@ -129,7 +196,18 @@ export class QuotationRepository {
             product: true,
           },
         },
-        creator: true,
+        currentRevision: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            creator: true,
+          },
+        },
+        deal: true,
+        salesRep: true,
         customer: true,
         company: true,
       },
@@ -157,7 +235,18 @@ export class QuotationRepository {
               product: true,
             },
           },
-          creator: true,
+          currentRevision: {
+            include: {
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+              creator: true,
+            },
+          },
+          deal: true,
+          salesRep: true,
           customer: true,
           company: true,
         },
@@ -183,7 +272,18 @@ export class QuotationRepository {
             product: true,
           },
         },
-        creator: true,
+        currentRevision: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            creator: true,
+          },
+        },
+        deal: true,
+        salesRep: true,
         customer: true,
         company: true,
       },
@@ -205,7 +305,18 @@ export class QuotationRepository {
             product: true,
           },
         },
-        creator: true,
+        currentRevision: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            creator: true,
+          },
+        },
+        deal: true,
+        salesRep: true,
         customer: true,
         company: true,
       },
@@ -219,6 +330,107 @@ export class QuotationRepository {
     const client = tx || this.prisma;
     await client.quotationItem.deleteMany({
       where: { quotationId },
+    });
+  }
+
+  public async createRevision(
+    quotationId: string,
+    createdById: string,
+    revisionType: RevisionType,
+    status: RevisionStatus,
+    totals: {
+      subtotal: Prisma.Decimal;
+      discountAmount: Prisma.Decimal;
+      taxAmount: Prisma.Decimal;
+      totalAmount: Prisma.Decimal;
+      customerNote?: string | null;
+      internalNote?: string | null;
+    },
+    items: Array<{
+      productId: string;
+      quantity: Prisma.Decimal;
+      unitPrice: Prisma.Decimal;
+      discountType: DiscountType;
+      discountValue: Prisma.Decimal;
+      discountAmount: Prisma.Decimal;
+      taxRate: Prisma.Decimal;
+      finalUnitPrice: Prisma.Decimal;
+      lineTotal: Prisma.Decimal;
+    }>,
+    tx?: TransactionClient,
+  ): Promise<
+    QuotationRevision & {
+      items: (QuotationRevisionItem & { product: Product })[];
+      creator: User;
+    }
+  > {
+    const client = tx || this.prisma;
+
+    const count = await client.quotationRevision.count({
+      where: { quotationId },
+    });
+
+    const revision = await client.quotationRevision.create({
+      data: {
+        quotationId,
+        revisionNo: count + 1,
+        createdById,
+        revisionType,
+        status,
+        subtotal: totals.subtotal,
+        discountAmount: totals.discountAmount,
+        taxAmount: totals.taxAmount,
+        totalAmount: totals.totalAmount,
+        customerNote: totals.customerNote || null,
+        internalNote: totals.internalNote || null,
+        items: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            finalUnitPrice: item.finalUnitPrice,
+            lineTotal: item.lineTotal,
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        creator: true,
+      },
+    });
+
+    return revision;
+  }
+
+  public async findRevisions(
+    quotationId: string,
+    tx?: TransactionClient,
+  ): Promise<
+    (QuotationRevision & {
+      items: (QuotationRevisionItem & { product: Product })[];
+      creator: User;
+    })[]
+  > {
+    const client = tx || this.prisma;
+    return client.quotationRevision.findMany({
+      where: { quotationId },
+      orderBy: { revisionNo: "asc" },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        creator: true,
+      },
     });
   }
 }

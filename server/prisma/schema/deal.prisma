@@ -1,0 +1,46 @@
+enum DealStage {
+  NEW
+  QUALIFICATION
+  REQUIREMENT
+  QUOTATION
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+  CANCELLED
+}
+
+model Deal {
+  id                String     @id @default(uuid()) @db.Uuid
+  companyId         String     @map("company_id") @db.Uuid
+  dealNo            String     @unique @map("deal_no")
+  customerId        String     @map("customer_id") @db.Uuid
+  salesRepId        String     @map("sales_rep_id") @db.Uuid
+  name              String
+  stage             DealStage  @default(NEW)
+  status            DealStatus @default(OPEN)
+  expectedValue     Decimal    @default(0) @map("expected_value") @db.Decimal(12, 2)
+  probability       Decimal    @default(0) @db.Decimal(5, 2)
+  expectedCloseDate DateTime?  @map("expected_close_date")
+  source            String?
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer   User        @relation("DealCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  salesRep   User        @relation("DealSalesRep", fields: [salesRepId], references: [id], onDelete: Restrict)
+  quotations Quotation[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([salesRepId])
+  @@index([stage])
+  @@index([status])
+  @@map("deals")
+}

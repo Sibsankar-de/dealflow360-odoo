@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { prismaTransaction, TransactionClient } from "../utils/transactionHandler";
+import { paginate, PaginateOptions, PaginatedResult } from "../utils/paginate";
 
 export class CompanyRepository {
   private prisma: PrismaClient;
@@ -89,6 +90,37 @@ export class CompanyRepository {
     });
   }
 
+  public async findPaginated(
+    where: Prisma.CompanyWhereInput,
+    orderBy: Prisma.CompanyOrderByWithRelationInput | Prisma.CompanyOrderByWithRelationInput[],
+    options: PaginateOptions,
+    tx?: TransactionClient,
+  ): Promise<
+    PaginatedResult<
+      Company & {
+        owner?: User;
+        settings?: CompanySetting | null;
+      }
+    >
+  > {
+    const client = tx || this.prisma;
+    return paginate<
+      Company & {
+        owner?: User;
+        settings?: CompanySetting | null;
+      }
+    >(
+      client.company,
+      where,
+      orderBy,
+      options,
+      {
+        owner: true,
+        settings: true,
+      },
+    );
+  }
+
   public async findUserCompanies(userId: string): Promise<
     Array<{
       company: Company & { owner?: User; settings?: CompanySetting | null };
@@ -119,6 +151,23 @@ export class CompanyRepository {
       company: membership.company,
       role: membership.role,
     }));
+  }
+
+  public async findUserCompanyMemberships(
+    userId: string,
+    companyIds: string[],
+    tx?: TransactionClient,
+  ): Promise<CompanyUser[]> {
+    const client = tx || this.prisma;
+    if (companyIds.length === 0) {
+      return [];
+    }
+    return client.companyUser.findMany({
+      where: {
+        userId,
+        companyId: { in: companyIds },
+      },
+    });
   }
 
   public async update(

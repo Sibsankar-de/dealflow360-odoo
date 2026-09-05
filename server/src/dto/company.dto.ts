@@ -71,6 +71,16 @@ export interface UpdateCompanyUserRoleDto {
   role: CompanyUserRole;
 }
 
+export interface ListCompaniesDto {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: CompanyStatus;
+  sortBy?: "name" | "createdAt" | "updatedAt" | "status" | "country";
+  sortOrder?: "asc" | "desc";
+  myCompanies?: boolean;
+}
+
 export const toCompanySettingDto = (
   setting: CompanySetting,
 ): CompanySettingResponseDto => {
