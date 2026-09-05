@@ -78,6 +78,15 @@ export interface ListDealsQuery {
   limit?: number;
 }
 
+export interface ListCustomerDealsQuery {
+  companyId?: string;
+  stage?: DealStage;
+  status?: DealStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
 export interface ListDealQuotationsQuery {
   page?: number;
   limit?: number;

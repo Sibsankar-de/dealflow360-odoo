@@ -18,6 +18,7 @@ import {
   dealFilterSchema,
   customerDealFilterSchema,
 } from "../schemas/deal.schema";
+import { QuotationStatus } from "@prisma/client";
 import { dealQuotationsQuerySchema } from "../schemas/quotation.schema";
 import { CreateDealDto } from "../dto/deal.dto";
 
@@ -177,6 +178,109 @@ export class DealController {
         ),
       );
   });
+
+  public listCustomerDealQuotations = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+      }
+
+      const dealId = (req.params.dealId || req.params.id) as string;
+      if (!dealId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
+      }
+
+      const companyId = req.params.companyId as string | undefined;
+
+      // Verify the deal belongs to the requesting customer
+      const deal = await this.dealService.getDealById(dealId);
+      if (companyId && deal.companyId !== companyId) {
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          "Deal does not belong to the specified company",
+        );
+      }
+      if (deal.customerId !== userId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "You are not authorized to view quotations for this deal",
+        );
+      }
+
+      const filterResult = dealQuotationsQuerySchema.safeParse(req.query);
+      if (!filterResult.success) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Invalid query parameters",
+          filterResult.error.errors,
+        );
+      }
+
+      // Customers can only view quotations that have been sent
+      const queryFilters = {
+        ...filterResult.data,
+        status: QuotationStatus.SENT,
+      };
+
+      const result = await this.quotationService.listQuotationsByDeal(
+        dealId,
+        queryFilters,
+        companyId,
+      );
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            result,
+            "Customer deal quotations fetched successfully",
+          ),
+        );
+    },
+  );
+
+  public getCustomerDealById = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+      }
+
+      const id = (req.params.dealId || req.params.id) as string;
+      if (!id) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Deal ID is required");
+      }
+
+      const companyId = req.params.companyId as string | undefined;
+      const deal = await this.dealService.getDealById(id);
+
+      if (companyId && deal.companyId !== companyId) {
+        throw new ApiError(
+          StatusCodes.NOT_FOUND,
+          "Deal does not belong to the specified company",
+        );
+      }
+
+      if (deal.customerId !== userId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "You are not authorized to view this deal",
+        );
+      }
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { deal },
+            "Customer deal fetched successfully",
+          ),
+        );
+    },
+  );
 }
 
 export const dealController = new DealController();

@@ -228,9 +228,11 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
             <h1 className="text-2xl font-bold text-text-primary tracking-tight">
               Quotation {quotation.quotationNo}
             </h1>
-            <Badge variant={STATUS_BADGES[quotation.status] || "secondary"}>
-              {quotation.status}
-            </Badge>
+            {quotation.status !== "SENT" && quotation.status !== "DRAFT" && STATUS_BADGES[quotation.status] && (
+              <Badge variant={STATUS_BADGES[quotation.status]}>
+                {quotation.status}
+              </Badge>
+            )}
             {isNegotiating && (
               <Badge variant="warning" className="animate-pulse">
                 Negotiation Mode Active
@@ -244,15 +246,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
 
         {/* Top Actions for Customer */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            variant="outline"
-            size="md"
-            onClick={() => setShowHistory(!showHistory)}
-            leftIcon={<History className="w-4 h-4" />}
-          >
-            {showHistory ? "Hide Timeline" : "Negotiation History"}
-          </Button>
-
           {!isFinalStatus && (
             <>
               {!isNegotiating ? (
@@ -262,25 +255,17 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
                     size="md"
                     onClick={() => setIsRejectModalOpen(true)}
                     disabled={isLoading}
-                    className="text-danger hover:bg-red-50 hover:border-red-200"
+                    className="text-white bg-danger! hover:brightness-90"
                     leftIcon={<XCircle className="w-4 h-4" />}
                   >
                     Reject
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="md"
-                    onClick={() => setIsNegotiating(true)}
-                    disabled={isLoading}
-                    leftIcon={<MessageSquareQuote className="w-4 h-4" />}
-                  >
-                    Negotiate
                   </Button>
                   <Button
                     variant="primary"
                     size="md"
                     onClick={() => onApprove()}
                     isLoading={isLoading}
+                    className="bg-success! text-white hover:brightness-90!"
                     leftIcon={<CheckCircle2 className="w-4 h-4" />}
                   >
                     Approve Quotation
@@ -376,62 +361,6 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
         </Card>
       </div>
 
-      {/* Negotiation History & Revisions Timeline Section */}
-      {showHistory && (
-        <Card className="rounded-2xl border border-border bg-card overflow-hidden">
-          <CardHeader className="px-6 py-4 border-b border-border bg-surface/30 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
-              <History className="w-4 h-4 text-brand-600" />
-              <span>Negotiation Offers & Revisions Timeline</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            {revisions.length === 0 && negotiations.length === 0 ? (
-              <p className="text-xs text-text-muted text-center py-4">
-                No past negotiation cycles recorded for this quotation yet.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {revisions.map((rev, i) => (
-                  <div
-                    key={rev.id || i}
-                    className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-text-primary">
-                          Revision #{rev.revisionNo}
-                        </span>
-                        <Badge variant="purple" className="text-[10px] px-1.5 py-0">
-                          {rev.revisionType}
-                        </Badge>
-                        <Badge variant={STATUS_BADGES[rev.status] || "secondary"} className="text-[10px] px-1.5 py-0">
-                          {rev.status}
-                        </Badge>
-                      </div>
-                      <span className="text-text-muted text-[11px]">
-                        {new Date(rev.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-border/60">
-                      <div className="text-text-secondary">
-                        {rev.customerNote && (
-                          <p className="italic text-text-primary">"{rev.customerNote}"</p>
-                        )}
-                      </div>
-                      <div className="font-bold text-text-primary">
-                        Total: ${Number(rev.totalAmount).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Negotiation Guidance Alert */}
       {isNegotiating && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2.5">
@@ -456,6 +385,17 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
               Itemized list of products with unit prices, requested quantities, and approved discounts.
             </p>
           </div>
+          {!isFinalStatus && !isNegotiating && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsNegotiating(true)}
+              disabled={isLoading}
+              leftIcon={<MessageSquareQuote className="w-4 h-4" />}
+            >
+              Negotiate
+            </Button>
+          )}
         </CardHeader>
 
         <CardContent className="p-0 overflow-x-auto">
@@ -630,7 +570,7 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Proposal / Terms Note */}
         <Card className="rounded-2xl border border-border bg-card p-5 space-y-2">
-          <CardTitle className="text-sm font-bold text-text-primary">
+          <CardTitle className="text-sm font-bold text-text-primary mb-2">
             Proposal Notes & Terms
           </CardTitle>
           <div className="p-3.5 rounded-xl bg-surface border border-border/70 text-xs text-text-secondary min-h-24">
@@ -642,7 +582,7 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
 
         {/* Customer Negotiation Note */}
         <Card className="rounded-2xl border border-border bg-card p-5 space-y-2">
-          <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+          <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5 mb-2">
             <MessageSquareQuote className="w-4 h-4 text-brand-600" />
             <span>Note for Negotiator / Sales Representative</span>
           </CardTitle>
@@ -664,6 +604,80 @@ export const CustomerQuotationReview: React.FC<CustomerQuotationReviewProps> = (
             )}
           />
         </Card>
+      </div>
+
+      {/* Negotiation History & Revisions Section */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-brand-600" />
+            <span className="text-sm font-bold text-text-primary">
+              Negotiation & Revision History
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowHistory(!showHistory)}
+            leftIcon={<History className="w-3.5 h-3.5" />}
+          >
+            {showHistory ? "Hide History" : "View Negotiation History"}
+          </Button>
+        </div>
+
+        {showHistory && (
+          <Card className="rounded-2xl border border-border bg-card overflow-hidden">
+            <CardHeader className="px-6 py-4 border-b border-border bg-surface/30">
+              <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <span>Negotiation Offers & Revisions Timeline</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {revisions.length === 0 && negotiations.length === 0 ? (
+                <p className="text-xs text-text-muted text-center py-4">
+                  No past negotiation cycles recorded for this quotation yet.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {revisions.map((rev, i) => (
+                    <div
+                      key={rev.id || i}
+                      className="p-4 rounded-xl bg-surface border border-border text-xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-text-primary">
+                            Revision #{rev.revisionNo}
+                          </span>
+                          <Badge variant="purple" className="text-[10px] px-1.5 py-0">
+                            {rev.revisionType}
+                          </Badge>
+                          <Badge variant={STATUS_BADGES[rev.status] || "secondary"} className="text-[10px] px-1.5 py-0">
+                            {rev.status}
+                          </Badge>
+                        </div>
+                        <span className="text-text-muted text-[11px]">
+                          {new Date(rev.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                        <div className="text-text-secondary">
+                          {rev.customerNote && (
+                            <p className="italic text-text-primary">"{rev.customerNote}"</p>
+                          )}
+                        </div>
+                        <div className="font-bold text-text-primary">
+                          Total: ${Number(rev.totalAmount).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Rejection Reason Modal */}

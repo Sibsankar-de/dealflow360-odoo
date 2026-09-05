@@ -3,12 +3,15 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useGetDealByIdQuery } from "@/store/features/deal/dealApi";
-import { useGetQuotationsQuery } from "@/store/features/quotation/quotationApi";
+import {
+  useGetCustomerDealByIdQuery,
+  useGetCustomerDealQuotationsQuery,
+} from "@/store/features/deal/dealApi";
 import { Card } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Pagination } from "@/components/ui/Pagination";
 import { QuotationResponse } from "@/types/quotation";
 import {
   ArrowLeft,
@@ -22,8 +25,6 @@ import {
 } from "lucide-react";
 
 const STATUS_BADGES: Record<string, BadgeVariant> = {
-  DRAFT: "secondary",
-  SENT: "primary",
   NEGOTIATING: "warning",
   ACCEPTED: "success",
   REJECTED: "danger",
@@ -40,30 +41,44 @@ export default function CustomerDealQuotationsPage() {
     typeof params?.["deal-id"] === "string" ? params["deal-id"] : "";
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  const { data: dealData, isLoading: isLoadingDeal } = useGetDealByIdQuery(
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data: dealData, isLoading: isLoadingDeal } = useGetCustomerDealByIdQuery(
     { companyId, id: dealId },
     { skip: !companyId || !dealId }
   );
   const deal = dealData?.data?.deal;
 
-  const { data: quoteData, isLoading: isLoadingQuotes } = useGetQuotationsQuery(
-    { companyId, params: { dealId } },
+  const {
+    data: quoteData,
+    isLoading: isLoadingQuotes,
+  } = useGetCustomerDealQuotationsQuery(
+    {
+      companyId,
+      dealId,
+      params: {
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+      },
+    },
     { skip: !companyId || !dealId }
   );
 
   const rawQuotations: QuotationResponse[] =
     quoteData?.data?.docs ?? [];
-
-  const customerQuotations = rawQuotations;
-
-  const filteredQuotations = customerQuotations.filter((q) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (q.quotationNo && q.quotationNo.toLowerCase().includes(term)) ||
-      (q.status && q.status.toLowerCase().includes(term))
-    );
-  });
+  const totalPages = quoteData?.data?.totalPages ?? 1;
+  const totalCount = quoteData?.data?.total ?? rawQuotations.length;
 
   const handleOpenQuotation = (quotationId: string) => {
     router.push(
@@ -130,14 +145,14 @@ export default function CustomerDealQuotationsPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <Input
-            placeholder="Search quotations by quote number or status..."
+            placeholder="Search quotations by quote number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
         </div>
         <div className="text-xs text-text-muted">
-          Found <strong>{filteredQuotations.length}</strong> quotation(s)
+          Found <strong>{totalCount}</strong> quotation(s)
         </div>
       </div>
 
@@ -151,21 +166,21 @@ export default function CustomerDealQuotationsPage() {
             />
           ))}
         </div>
-      ) : filteredQuotations.length === 0 ? (
+      ) : rawQuotations.length === 0 ? (
         <Card className="rounded-2xl border border-border bg-card p-12 text-center">
           <FileText className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-40" />
           <h3 className="text-base font-semibold text-text-primary">
             No quotations available
           </h3>
           <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-            {searchTerm
+            {debouncedSearch
               ? "No quotations match your search filter."
               : "No formal quotation proposals have been issued for this deal yet."}
           </p>
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredQuotations.map((quote) => {
+          {rawQuotations.map((quote) => {
             const activeRev = quote.currentRevision;
             const total = Number(activeRev?.totalAmount || quote.totalAmount || 0);
             const revisionCount = quote.revisions?.length || 1;
@@ -182,12 +197,9 @@ export default function CustomerDealQuotationsPage() {
                       <span className="font-bold text-base text-text-primary">
                         {quote.quotationNo || `Quote #${quote.id.substring(0, 8)}`}
                       </span>
-                      <Badge variant={STATUS_BADGES[quote.status] || "secondary"}>
-                        {quote.status}
-                      </Badge>
-                      {quote.status === "SENT" && (
-                        <Badge variant="primary" className="text-[10px] px-1.5 py-0">
-                          Pending Your Review
+                      {quote.status !== "SENT" && quote.status !== "DRAFT" && STATUS_BADGES[quote.status] && (
+                        <Badge variant={STATUS_BADGES[quote.status]}>
+                          {quote.status}
                         </Badge>
                       )}
                       {quote.status === "NEGOTIATING" && (
@@ -245,6 +257,16 @@ export default function CustomerDealQuotationsPage() {
               </Card>
             );
           })}
+
+          {totalPages > 1 && (
+            <div className="pt-4 flex justify-center">
+              <Pagination
+                currentPage={page}
+                totalPage={totalPages}
+                onPageChange={(p) => setPage(p)}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

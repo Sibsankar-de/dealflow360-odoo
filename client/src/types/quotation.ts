@@ -155,6 +155,14 @@ export interface UpdateQuotationRequest {
   status?: QuotationStatus;
 }
 
+export interface PaginatedQuotationsResponse {
+  docs: QuotationResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface QuotationItem {
   id: string;
   quotationNumber: string;

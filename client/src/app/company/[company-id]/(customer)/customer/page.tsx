@@ -2,7 +2,10 @@
 
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useGetDealsQuery, useUpdateDealMutation } from "@/store/features/deal/dealApi";
+import {
+  useGetCustomerDealsQuery,
+  useUpdateDealMutation,
+} from "@/store/features/deal/dealApi";
 import { useGetCompanyByIdQuery } from "@/store/features/company/companyApi";
 import { Card } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
@@ -48,7 +51,7 @@ export default function CustomerDealsPage() {
   });
   const company = companyData?.data?.company;
 
-  const { data: dealsData, isLoading } = useGetDealsQuery(
+  const { data: dealsData, isLoading } = useGetCustomerDealsQuery(
     { companyId },
     { skip: !companyId }
   );

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useGetDealByIdQuery } from "@/store/features/deal/dealApi";
+import { useGetCustomerDealByIdQuery } from "@/store/features/deal/dealApi";
 import {
   useGetQuotationByIdQuery,
   useSubmitCounterOfferMutation,
@@ -28,7 +28,7 @@ export default function CustomerQuotationDetailPage() {
   const [notification, setNotification] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: dealData, isLoading: isLoadingDeal } = useGetDealByIdQuery(
+  const { data: dealData, isLoading: isLoadingDeal } = useGetCustomerDealByIdQuery(
     { companyId, id: dealId },
     { skip: !companyId || !dealId }
   );
