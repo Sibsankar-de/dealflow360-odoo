@@ -1,4 +1,4 @@
-# AGENT.md
+# AGENTS.md
 
 ## Purpose
 
@@ -43,7 +43,7 @@ Keep the server independent from client presentation concerns.
 4. Services encapsulate business workflows, commercial rules, state transitions, and transactions.
 5. Controllers handle HTTP requests, invoke services, and return standard API responses without implementing business logic.
 6. Maintain clean separation between transport (controllers), business logic (services), and persistence (repositories).
-
+7. Explicitly use `public` or `private` access modifiers for all class properties, constructors, and methods.
 
 ## DealFlow360 Business Rules
 

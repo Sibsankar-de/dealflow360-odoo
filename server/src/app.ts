@@ -4,6 +4,7 @@ import cors from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { env } from "./configs/env";
+import routes from "./routes";
 import { errorMiddleware } from "./middlewares/error.middleware";
 import { ApiResponse } from "./utils/apiResponseHandler";
 
@@ -27,11 +28,14 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(morgan("dev"));
 
 // Health check endpoint
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, { status: "ok" }, "Server is healthy"));
 });
+
+// Application API routes
+app.use(routes);
 
 // Global error handling middleware
 app.use(errorMiddleware);

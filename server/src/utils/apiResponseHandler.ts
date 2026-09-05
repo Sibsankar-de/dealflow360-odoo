@@ -1,10 +1,10 @@
 class ApiResponse<T = unknown> {
-  statusCode: number;
-  data: T;
-  message: string;
-  success: boolean;
+  public statusCode: number;
+  public data: T;
+  public message: string;
+  public success: boolean;
 
-  constructor(statusCode: number, data: T, message = "Success") {
+  public constructor(statusCode: number, data: T, message = "Success") {
     this.statusCode = statusCode;
     this.data = data;
     this.message = message;

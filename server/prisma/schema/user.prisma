@@ -1,0 +1,30 @@
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id              String       @id @default(uuid()) @db.Uuid
+  userName        String
+  email           String       @unique
+  password        String
+  avatar          String?
+  authBy          AuthProvider @default(LOCAL)
+  isEmailVerified Boolean      @default(false)
+  role            UserRole     @default(USER)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Auth Relations
+  refreshTokens      RefreshToken[]
+  authTokens         AuthToken[]
+  verificationTokens VerificationToken[]
+
+  @@index([email])
+  @@map("users")
+}
