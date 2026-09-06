@@ -6,6 +6,7 @@ import { createModuleLogger } from "./utils/logger";
 
 import { connectElasticsearch } from "./lib/elasticsearch";
 import { startElasticsearchWorker } from "./services/elasticsearchWorker.service";
+import { startEmailWorker } from "./services/emailPublisher.service";
 
 const log = createModuleLogger(import.meta.url);
 
@@ -15,6 +16,11 @@ connectDB()
   .then(() => {
     httpServer.listen(env.PORT, () => {
       log.info(`Server is running on port ${env.PORT}`);
+    });
+
+    // Start RabbitMQ Email worker consumer
+    startEmailWorker().catch((err) => {
+      log.error("Failed to start Email worker: " + err);
     });
 
     // Connect to Elasticsearch and start the indexing worker

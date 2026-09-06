@@ -218,6 +218,24 @@ export class CompanyRepository {
     });
   }
 
+  public async findCompanyUsersByRole(
+    companyId: string,
+    roles: CompanyUserRole | CompanyUserRole[],
+    tx?: TransactionClient,
+  ): Promise<Array<CompanyUser & { user: User }>> {
+    const client = tx || this.prisma;
+    const roleList = Array.isArray(roles) ? roles : [roles];
+    return client.companyUser.findMany({
+      where: {
+        companyId,
+        role: { in: roleList },
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+
   public async addCompanyUser(
     companyId: string,
     userId: string,

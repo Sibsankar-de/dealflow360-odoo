@@ -104,6 +104,9 @@ export async function getChannel(): Promise<Channel> {
 
           // Elasticsearch indexing queue
           await assertQueueTriplet("elasticsearch_queue_v1");
+
+          // Email queue
+          await assertQueueTriplet(`${env.RABBITMQ_EMAIL_QUEUE}_v1`);
         }
       }
 

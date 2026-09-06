@@ -38,6 +38,20 @@ export const env = {
 
   RABBITMQ_CONNECTION_URI:
     process.env.RABBITMQ_CONNECTION_URI || "amqp://admin:admin@localhost:5672",
+  RABBITMQ_EMAIL_QUEUE:
+    process.env.RABBITMQ_EMAIL_QUEUE || "dealflow_email_queue",
+  EMAIL_RETRY_COUNT: Number(process.env.EMAIL_RETRY_COUNT || 5),
+
+  CLIENT_URL:
+    process.env.CLIENT_URL || process.env.CORS_ORIGIN || "http://localhost:3000",
+
+  SMTP_HOST: process.env.SMTP_HOST || "localhost",
+  SMTP_PORT: Number(process.env.SMTP_PORT || 1025),
+  SMTP_SECURE: parseBoolean(process.env.SMTP_SECURE, false),
+  SMTP_USER: process.env.SMTP_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || "",
+  MAIL_FROM:
+    process.env.MAIL_FROM || "DealFlow360 <noreply@dealflow360.com>",
 
   ELASTICSEARCH_URL:
     process.env.ELASTICSEARCH_URL || "http://localhost:9200",

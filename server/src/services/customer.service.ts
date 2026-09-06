@@ -1,5 +1,5 @@
 import { StatusCodes } from "http-status-codes";
-import { CustomerTier, CompanyUserRole, CompanyUser, User } from "@prisma/client";
+import { CustomerTier, CompanyUserRole, CompanyUser } from "@prisma/client";
 import {
   CustomerRepository,
   customerRepository as defaultCustomerRepository,

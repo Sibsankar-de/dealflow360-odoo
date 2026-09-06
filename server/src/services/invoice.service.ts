@@ -6,6 +6,7 @@ import {
 } from "../repositories/invoice.repository";
 import {
   SalesOrderRepository,
+  SalesOrderWithRelations,
   salesOrderRepository as defaultSalesOrderRepository,
 } from "../repositories/salesOrder.repository";
 import {
@@ -85,7 +86,10 @@ export class InvoiceService {
       }
 
       const preparedItems: PreparedInvoiceItem[] = [];
-      let activeOrderItemsMap = new Map<string, any>();
+      let activeOrderItemsMap = new Map<
+        string,
+        SalesOrderWithRelations["items"][number]
+      >();
 
       if (dto.deliveryId) {
         const delivery = await this.deliveryRepo.findByIdWithRelations(

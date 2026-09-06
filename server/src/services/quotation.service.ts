@@ -105,6 +105,21 @@ import {
   DiscountViolationEvaluation,
   RiskLevel,
 } from "../utils/discount-violation.util";
+import {
+  sendQuotationSentToCustomerEmail,
+  sendQuotationApprovalRequiredEmail,
+  sendQuotationFinanceEscalationEmail,
+  sendCustomerNegotiationSubmittedEmail,
+  sendQuotationRevisedEmail,
+  sendQuotationAcceptedCustomerEmail,
+  sendQuotationStatusUpdateStaffEmail,
+  sendFulfillmentReadyEmail,
+  sendDeliveryDispatchedEmail,
+  sendInvoiceGeneratedEmail,
+} from "./transactionalEmail.service";
+import { createModuleLogger } from "../utils/logger";
+
+const log = createModuleLogger(import.meta.url);
 
 interface DeliverableLineItem {
   salesOrderItemId: string;
@@ -396,14 +411,26 @@ export class QuotationService {
   public async sendQuotation(
     quotationId: string,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
       }
 
       if (quotation.status === QuotationStatus.SENT) {
-        return toQuotationDto(quotation);
+        const defaultEvaluation: DiscountViolationEvaluation = {
+          lineViolations: [],
+          maxLineViolation: 0,
+          blendedViolationScore: 0,
+          totalPreDiscountValue: 0,
+          threshold: 0,
+          hasLineLevelViolation: false,
+          hasBlendedViolation: false,
+          requiresApproval: false,
+          riskLevel: RiskLevel.LOW,
+          requiredApprovalRole: null,
+        };
+        return { dto: toQuotationDto(quotation), quotation, discountEvaluation: defaultEvaluation };
       }
 
       if (quotation.status !== QuotationStatus.DRAFT) {
@@ -523,8 +550,94 @@ export class QuotationService {
 
       const dto = toQuotationDto(updated);
       dto.discountEvaluation = discountEvaluation;
-      return dto;
+      return { dto, quotation, discountEvaluation };
     });
+
+    try {
+      if (result.discountEvaluation.requiresApproval) {
+        if (result.discountEvaluation.riskLevel === RiskLevel.MID) {
+          const managers = await this.companyRepo.findCompanyUsersByRole(
+            result.quotation.companyId,
+            [CompanyUserRole.SALES_MANAGER, CompanyUserRole.ADMIN],
+          );
+          for (const m of managers) {
+            if (m.user?.email) {
+              sendQuotationApprovalRequiredEmail({
+                managerName: m.user.userName,
+                managerEmail: m.user.email,
+                companyName: result.quotation.company.name,
+                companyId: result.quotation.companyId,
+                dealId: result.quotation.dealId,
+                quotationId: result.quotation.id,
+                quotationNo: result.quotation.quotationNo,
+                dealTitle: result.quotation.deal.name,
+                customerName: result.quotation.customer.userName,
+                salesRepName: result.quotation.salesRep.userName,
+                totalAmount: result.dto.totalAmount ?? 0,
+                currency: result.quotation.currency,
+                maxViolation: result.discountEvaluation.maxLineViolation,
+                blendedViolation: result.discountEvaluation.blendedViolationScore,
+                riskLevel: result.discountEvaluation.riskLevel,
+              }).catch((err) =>
+                log.error(`Failed to dispatch manager approval email: ${err}`),
+              );
+            }
+          }
+        } else if (result.discountEvaluation.riskLevel === RiskLevel.HIGH) {
+          const financeManagers = await this.companyRepo.findCompanyUsersByRole(
+            result.quotation.companyId,
+            [CompanyUserRole.FINANCE_MANAGER, CompanyUserRole.ADMIN],
+          );
+          for (const fm of financeManagers) {
+            if (fm.user?.email) {
+              sendQuotationFinanceEscalationEmail({
+                managerName: fm.user.userName,
+                managerEmail: fm.user.email,
+                companyName: result.quotation.company.name,
+                companyId: result.quotation.companyId,
+                dealId: result.quotation.dealId,
+                quotationId: result.quotation.id,
+                quotationNo: result.quotation.quotationNo,
+                dealTitle: result.quotation.deal.name,
+                customerName: result.quotation.customer.userName,
+                salesRepName: result.quotation.salesRep.userName,
+                totalAmount: result.dto.totalAmount ?? 0,
+                currency: result.quotation.currency,
+                violationScore: result.discountEvaluation.blendedViolationScore,
+                riskLevel: "HIGH",
+              }).catch((err) =>
+                log.error(`Failed to dispatch finance escalation email: ${err}`),
+              );
+            }
+          }
+        }
+      } else {
+        if (result.quotation.customer?.email) {
+          sendQuotationSentToCustomerEmail({
+            customerName: result.quotation.customer.userName,
+            customerEmail: result.quotation.customer.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            dealId: result.quotation.dealId,
+            quotationId: result.quotation.id,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            totalAmount: result.dto.totalAmount ?? 0,
+            currency: result.quotation.currency,
+            validUntil: result.quotation.validUntil,
+            itemsCount: result.quotation.items?.length || 1,
+            salesRepName: result.quotation.salesRep?.userName,
+            salesRepEmail: result.quotation.salesRep?.email,
+          }).catch((err) =>
+            log.error(`Failed to dispatch customer quotation email: ${err}`),
+          );
+        }
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in sendQuotation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   public async evaluateDiscountViolations(
@@ -930,7 +1043,7 @@ export class QuotationService {
     requestingUserId: string,
     status: QuotationStatus,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1014,8 +1127,90 @@ export class QuotationService {
         status,
         tx,
       );
-      return toQuotationDto(updated);
+      return { dto: toQuotationDto(updated), quotation, status };
     });
+
+    try {
+      if (result.status === QuotationStatus.ACCEPTED) {
+        if (result.quotation.customer?.email) {
+          sendQuotationAcceptedCustomerEmail({
+            customerName: result.quotation.customer.userName,
+            customerEmail: result.quotation.customer.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            totalAmount: result.dto.totalAmount ?? 0,
+            currency: result.quotation.currency,
+          }).catch((err) =>
+            log.error(`Failed to send customer acceptance email: ${err}`),
+          );
+        }
+
+        if (result.quotation.salesRep?.email) {
+          sendQuotationStatusUpdateStaffEmail({
+            recipientName: result.quotation.salesRep.userName,
+            recipientEmail: result.quotation.salesRep.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            dealId: result.quotation.dealId,
+            quotationId: result.quotation.id,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            customerName: result.quotation.customer.userName,
+            status: "ACCEPTED",
+          }).catch((err) =>
+            log.error(`Failed to send sales rep status email: ${err}`),
+          );
+        }
+
+        const financeManagers = await this.companyRepo.findCompanyUsersByRole(
+          result.quotation.companyId,
+          [CompanyUserRole.FINANCE_MANAGER, CompanyUserRole.ADMIN],
+        );
+        for (const fm of financeManagers) {
+          if (fm.user?.email) {
+            sendFulfillmentReadyEmail({
+              managerName: fm.user.userName,
+              managerEmail: fm.user.email,
+              companyName: result.quotation.company.name,
+              companyId: result.quotation.companyId,
+              dealId: result.quotation.dealId,
+              quotationId: result.quotation.id,
+              quotationNo: result.quotation.quotationNo,
+              dealTitle: result.quotation.deal.name,
+              customerName: result.quotation.customer.userName,
+              salesRepName: result.quotation.salesRep.userName,
+              totalAmount: result.dto.totalAmount ?? 0,
+              currency: result.quotation.currency,
+            }).catch((err) =>
+              log.error(`Failed to send fulfillment ready email: ${err}`),
+            );
+          }
+        }
+      } else if (result.status === QuotationStatus.REJECTED) {
+        if (result.quotation.salesRep?.email) {
+          sendQuotationStatusUpdateStaffEmail({
+            recipientName: result.quotation.salesRep.userName,
+            recipientEmail: result.quotation.salesRep.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            dealId: result.quotation.dealId,
+            quotationId: result.quotation.id,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            customerName: result.quotation.customer.userName,
+            status: "REJECTED",
+          }).catch((err) =>
+            log.error(`Failed to send sales rep rejection email: ${err}`),
+          );
+        }
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in updateQuotationStatus: ${err}`);
+    }
+
+    return result.dto;
   }
 
   public async customerApproveQuotation(
@@ -1024,7 +1219,7 @@ export class QuotationService {
     requestingUserId: string,
     notes?: string,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation || quotation.companyId !== companyId) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1084,8 +1279,72 @@ export class QuotationService {
         tx,
       );
 
-      return toQuotationDto(updated);
+      return { dto: toQuotationDto(updated), quotation, notes };
     });
+
+    try {
+      if (result.quotation.customer?.email) {
+        sendQuotationAcceptedCustomerEmail({
+          customerName: result.quotation.customer.userName,
+          customerEmail: result.quotation.customer.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          quotationNo: result.quotation.quotationNo,
+          dealTitle: result.quotation.deal.name,
+          totalAmount: result.dto.totalAmount ?? 0,
+          currency: result.quotation.currency,
+        }).catch((err) =>
+          log.error(`Failed to send customer acceptance email: ${err}`),
+        );
+      }
+
+      if (result.quotation.salesRep?.email) {
+        sendQuotationStatusUpdateStaffEmail({
+          recipientName: result.quotation.salesRep.userName,
+          recipientEmail: result.quotation.salesRep.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          dealId: result.quotation.dealId,
+          quotationId: result.quotation.id,
+          quotationNo: result.quotation.quotationNo,
+          dealTitle: result.quotation.deal.name,
+          customerName: result.quotation.customer.userName,
+          status: "ACCEPTED",
+          reason: result.notes,
+        }).catch((err) =>
+          log.error(`Failed to send sales rep status update email: ${err}`),
+        );
+      }
+
+      const financeManagers = await this.companyRepo.findCompanyUsersByRole(
+        result.quotation.companyId,
+        [CompanyUserRole.FINANCE_MANAGER, CompanyUserRole.ADMIN],
+      );
+      for (const fm of financeManagers) {
+        if (fm.user?.email) {
+          sendFulfillmentReadyEmail({
+            managerName: fm.user.userName,
+            managerEmail: fm.user.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            dealId: result.quotation.dealId,
+            quotationId: result.quotation.id,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            customerName: result.quotation.customer.userName,
+            salesRepName: result.quotation.salesRep.userName,
+            totalAmount: result.dto.totalAmount ?? 0,
+            currency: result.quotation.currency,
+          }).catch((err) =>
+            log.error(`Failed to send fulfillment ready email: ${err}`),
+          );
+        }
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in customerApproveQuotation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   public async cancelQuotation(
@@ -1135,7 +1394,7 @@ export class QuotationService {
     requestingUserId: string,
     dto?: RejectQuotationDto,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1212,8 +1471,32 @@ export class QuotationService {
       );
 
       const refreshed = await this.quotationRepo.findById(quotationId, tx);
-      return toQuotationDto(refreshed!);
+      return { dto: toQuotationDto(refreshed!), quotation: refreshed!, reason: dto?.reason };
     });
+
+    try {
+      if (result.quotation.salesRep?.email) {
+        sendQuotationStatusUpdateStaffEmail({
+          recipientName: result.quotation.salesRep.userName,
+          recipientEmail: result.quotation.salesRep.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          dealId: result.quotation.dealId,
+          quotationId: result.quotation.id,
+          quotationNo: result.quotation.quotationNo,
+          dealTitle: result.quotation.deal.name,
+          customerName: result.quotation.customer.userName,
+          status: "REJECTED",
+          reason: result.reason,
+        }).catch((err) =>
+          log.error(`Failed to send sales rep rejection email: ${err}`),
+        );
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in rejectQuotation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   public async submitNegotiation(
@@ -1221,7 +1504,7 @@ export class QuotationService {
     requestingUserId: string,
     dto: SubmitNegotiationDto,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1579,8 +1862,58 @@ export class QuotationService {
       const refreshed = await this.quotationRepo.findById(quotationId, tx);
       const refreshedDto = toQuotationDto(refreshed!);
       refreshedDto.discountEvaluation = counterDiscountEvaluation;
-      return refreshedDto;
+      return { dto: refreshedDto, quotation: refreshed!, dtoParam: dto };
     });
+
+    try {
+      if (result.quotation.salesRep?.email) {
+        sendCustomerNegotiationSubmittedEmail({
+          recipientName: result.quotation.salesRep.userName,
+          recipientEmail: result.quotation.salesRep.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          dealId: result.quotation.dealId,
+          quotationId: result.quotation.id,
+          quotationNo: result.quotation.quotationNo,
+          dealTitle: result.quotation.deal.name,
+          customerName: result.quotation.customer.userName,
+          proposedAmount: result.dto.totalAmount ?? 0,
+          currency: result.quotation.currency,
+          reason: result.dtoParam.message || undefined,
+        }).catch((err) =>
+          log.error(`Failed to send sales rep negotiation email: ${err}`),
+        );
+      }
+
+      const managers = await this.companyRepo.findCompanyUsersByRole(
+        result.quotation.companyId,
+        [CompanyUserRole.SALES_MANAGER, CompanyUserRole.ADMIN],
+      );
+      for (const m of managers) {
+        if (m.user?.email && m.user.id !== result.quotation.salesRepId) {
+          sendCustomerNegotiationSubmittedEmail({
+            recipientName: m.user.userName,
+            recipientEmail: m.user.email,
+            companyName: result.quotation.company.name,
+            companyId: result.quotation.companyId,
+            dealId: result.quotation.dealId,
+            quotationId: result.quotation.id,
+            quotationNo: result.quotation.quotationNo,
+            dealTitle: result.quotation.deal.name,
+            customerName: result.quotation.customer.userName,
+            proposedAmount: result.dto.totalAmount ?? 0,
+            currency: result.quotation.currency,
+            reason: result.dtoParam.message || undefined,
+          }).catch((err) =>
+            log.error(`Failed to send manager negotiation email: ${err}`),
+          );
+        }
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in submitNegotiation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   // Alias for backward compatibility
@@ -1600,7 +1933,7 @@ export class QuotationService {
     reviewerRole: CompanyUserRole,
     dto?: ApproveNegotiationDto,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation || quotation.companyId !== companyId) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1709,8 +2042,39 @@ export class QuotationService {
       });
 
       const updated = await this.quotationRepo.findById(quotationId, tx);
-      return toQuotationDto(updated!);
+      return {
+        dto: toQuotationDto(updated!),
+        quotation: updated!,
+        revisionNo: updated?.currentRevision?.revisionNo || 2,
+        notes: dto?.notes,
+      };
     });
+
+    try {
+      if (result.quotation.customer?.email) {
+        sendQuotationRevisedEmail({
+          customerName: result.quotation.customer.userName,
+          customerEmail: result.quotation.customer.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          dealId: result.quotation.dealId,
+          quotationId: result.quotation.id,
+          quotationNo: result.quotation.quotationNo,
+          revisionNo: result.revisionNo,
+          dealTitle: result.quotation.deal.name,
+          totalAmount: result.dto.totalAmount ?? 0,
+          currency: result.quotation.currency,
+          validUntil: result.quotation.validUntil,
+          notes: result.notes,
+        }).catch((err) =>
+          log.error(`Failed to send revised quotation email: ${err}`),
+        );
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in approveNegotiation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   public async rejectNegotiation(
@@ -1721,7 +2085,7 @@ export class QuotationService {
     reviewerRole: CompanyUserRole,
     dto?: RejectNegotiationDto,
   ): Promise<QuotationResponseDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation || quotation.companyId !== companyId) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1782,8 +2146,32 @@ export class QuotationService {
       }
 
       const updated = await this.quotationRepo.findById(quotationId, tx);
-      return toQuotationDto(updated!);
+      return { dto: toQuotationDto(updated!), quotation: updated!, reason: dto?.reason };
     });
+
+    try {
+      if (result.quotation.customer?.email) {
+        sendQuotationStatusUpdateStaffEmail({
+          recipientName: result.quotation.customer.userName,
+          recipientEmail: result.quotation.customer.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          dealId: result.quotation.dealId,
+          quotationId: result.quotation.id,
+          quotationNo: result.quotation.quotationNo,
+          dealTitle: result.quotation.deal.name,
+          customerName: result.quotation.customer.userName,
+          status: "REJECTED",
+          reason: result.reason || "Negotiation counter-offer declined by staff.",
+        }).catch((err) =>
+          log.error(`Failed to send customer negotiation rejection email: ${err}`),
+        );
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in rejectNegotiation: ${err}`);
+    }
+
+    return result.dto;
   }
 
   private validateReviewerApprovalPermission(
@@ -1825,7 +2213,7 @@ export class QuotationService {
     _userId: string,
     dto: FulfillQuotationDto,
   ): Promise<FulfillmentResultDto> {
-    return prismaTransaction(async (tx: TransactionClient) => {
+    const result = await prismaTransaction(async (tx: TransactionClient) => {
       const quotation = await this.quotationRepo.findById(quotationId, tx);
       if (!quotation || quotation.companyId !== companyId) {
         throw new ApiError(StatusCodes.NOT_FOUND, "Quotation not found");
@@ -1913,7 +2301,7 @@ export class QuotationService {
         );
       }
 
-      return this.assembleFulfillmentResult(
+      const fulfillmentResult = await this.assembleFulfillmentResult(
         quotationId,
         salesOrder.id,
         quotation.dealId,
@@ -1924,7 +2312,51 @@ export class QuotationService {
         createdSubscription,
         tx,
       );
+
+      return {
+        fulfillmentResult,
+        quotation,
+        createdDelivery,
+        createdInvoice,
+        deliveredLines,
+      };
     });
+
+    try {
+      if (result.createdDelivery && result.quotation.customer?.email) {
+        sendDeliveryDispatchedEmail({
+          customerName: result.quotation.customer.userName,
+          customerEmail: result.quotation.customer.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          deliveryNo: result.createdDelivery.deliveryNo,
+          quotationNo: result.quotation.quotationNo,
+          trackingReference: result.createdDelivery.trackingNumber || undefined,
+          status: result.createdDelivery.status,
+          deliveredItemsCount: result.deliveredLines.length,
+          isPartial: Boolean(result.fulfillmentResult.backorder),
+        }).catch((err) => log.error(`Failed to send delivery email: ${err}`));
+      }
+
+      if (result.createdInvoice && result.quotation.customer?.email) {
+        sendInvoiceGeneratedEmail({
+          customerName: result.quotation.customer.userName,
+          customerEmail: result.quotation.customer.email,
+          companyName: result.quotation.company.name,
+          companyId: result.quotation.companyId,
+          invoiceNo: result.createdInvoice.invoiceNo,
+          quotationNo: result.quotation.quotationNo,
+          totalAmount: result.createdInvoice.total,
+          currency: result.createdInvoice.currency,
+          dueDate: result.createdInvoice.dueDate,
+          status: result.createdInvoice.status,
+        }).catch((err) => log.error(`Failed to send invoice email: ${err}`));
+      }
+    } catch (err) {
+      log.error(`Email dispatch error in fulfillQuotation: ${err}`);
+    }
+
+    return result.fulfillmentResult;
   }
 
   private validateQuotationCanBeFulfilled(quotation: {
