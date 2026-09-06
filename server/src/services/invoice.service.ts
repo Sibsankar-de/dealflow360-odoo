@@ -12,17 +12,23 @@ import {
   DeliveryRepository,
   deliveryRepository as defaultDeliveryRepository,
 } from "../repositories/delivery.repository";
+import {
+  StockService,
+  stockService as defaultStockService,
+} from "./stock.service";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   prismaTransaction,
   TransactionClient,
 } from "../utils/transactionHandler";
+import { prisma as defaultPrisma } from "../lib/prisma";
 import { PaginatedResult } from "../utils/paginate";
 import {
   CreateInvoiceDto,
   RecordInvoicePaymentDto,
   InvoiceFilterDto,
   InvoiceResponseDto,
+  InvoiceSummaryResponseDto,
   toInvoiceDto,
 } from "../dto/invoice.dto";
 
@@ -30,15 +36,18 @@ export class InvoiceService {
   private invoiceRepo: InvoiceRepository;
   private salesOrderRepo: SalesOrderRepository;
   private deliveryRepo: DeliveryRepository;
+  private stockService: StockService;
 
   public constructor(
     invoiceRepo: InvoiceRepository = defaultInvoiceRepository,
     salesOrderRepo: SalesOrderRepository = defaultSalesOrderRepository,
     deliveryRepo: DeliveryRepository = defaultDeliveryRepository,
+    stockService: StockService = defaultStockService,
   ) {
     this.invoiceRepo = invoiceRepo;
     this.salesOrderRepo = salesOrderRepo;
     this.deliveryRepo = deliveryRepo;
+    this.stockService = stockService;
   }
 
   private async generateInvoiceNo(tx?: TransactionClient): Promise<string> {
@@ -76,6 +85,7 @@ export class InvoiceService {
       }
 
       const preparedItems: PreparedInvoiceItem[] = [];
+      let activeOrderItemsMap = new Map<string, any>();
 
       if (dto.deliveryId) {
         const delivery = await this.deliveryRepo.findByIdWithRelations(
@@ -102,7 +112,7 @@ export class InvoiceService {
         customerId = salesOrder.customerId;
         currency = salesOrder.currency;
 
-        const orderItemsMap = new Map(
+        activeOrderItemsMap = new Map(
           salesOrder.items.map((item) => [item.id, item]),
         );
 
@@ -110,7 +120,7 @@ export class InvoiceService {
           if (!delItem.salesOrderItemId) {
             continue;
           }
-          const orderItem = orderItemsMap.get(delItem.salesOrderItemId);
+          const orderItem = activeOrderItemsMap.get(delItem.salesOrderItemId);
           if (!orderItem) {
             throw new ApiError(
               StatusCodes.BAD_REQUEST,
@@ -173,13 +183,13 @@ export class InvoiceService {
         customerId = salesOrder.customerId;
         currency = salesOrder.currency;
 
-        const orderItemsMap = new Map(
+        activeOrderItemsMap = new Map(
           salesOrder.items.map((item) => [item.id, item]),
         );
 
         if (dto.items && dto.items.length > 0) {
           for (const itemInput of dto.items) {
-            const orderItem = orderItemsMap.get(itemInput.salesOrderItemId);
+            const orderItem = activeOrderItemsMap.get(itemInput.salesOrderItemId);
             if (!orderItem) {
               throw new ApiError(
                 StatusCodes.BAD_REQUEST,
@@ -331,23 +341,49 @@ export class InvoiceService {
         },
         tx,
       );
+      const stockSplits: Array<{
+        productId: string;
+        warehouseId: string;
+        quantity: number;
+      }> = [];
 
-      for (const item of preparedItems) {
-        const currentItem = await tx.salesOrderItem.findUnique({
-          where: { id: item.salesOrderItemId },
-        });
-        if (currentItem) {
-          const newInvoiced =
-            Number(currentItem.invoicedQuantity) + item.deliveredQuantity;
-          await this.salesOrderRepo.updateItem(
-            item.salesOrderItemId,
-            {
-              invoicedQuantity: newInvoiced,
-            },
-            tx,
-          );
+      if (dto.items && !dto.deliveryId) {
+        for (const it of dto.items) {
+          if (it.warehouseId) {
+            const orderItem = activeOrderItemsMap.get(it.salesOrderItemId);
+            if (orderItem) {
+              stockSplits.push({
+                productId: orderItem.productId,
+                warehouseId: it.warehouseId,
+                quantity: it.deliveredQuantity,
+              });
+            }
+          }
         }
       }
+
+      if (stockSplits.length > 0) {
+        await this.stockService.deductStockSplits(companyId, stockSplits, tx);
+      }
+
+      await Promise.all(
+        preparedItems.map(async (item) => {
+          const currentItem = await tx.salesOrderItem.findUnique({
+            where: { id: item.salesOrderItemId },
+          });
+          if (currentItem) {
+            const newInvoiced =
+              Number(currentItem.invoicedQuantity) + item.deliveredQuantity;
+            await this.salesOrderRepo.updateItem(
+              item.salesOrderItemId,
+              {
+                invoicedQuantity: newInvoiced,
+              },
+              tx,
+            );
+          }
+        }),
+      );
 
       const loadedInvoice = await this.invoiceRepo.findByIdWithRelations(
         createdInvoice.id,
@@ -484,6 +520,55 @@ export class InvoiceService {
     return {
       ...paginated,
       docs: paginated.docs.map((inv) => toInvoiceDto(inv)),
+    };
+  }
+
+  public async getInvoiceSummary(
+    companyId: string,
+  ): Promise<InvoiceSummaryResponseDto> {
+    const [
+      totalCount,
+      paidCount,
+      partiallyPaidCount,
+      postedCount,
+      cancelledCount,
+      aggregates,
+    ] = await Promise.all([
+      defaultPrisma.invoice.count({ where: { companyId } }),
+      defaultPrisma.invoice.count({
+        where: { companyId, status: InvoiceStatus.PAID },
+      }),
+      defaultPrisma.invoice.count({
+        where: { companyId, status: InvoiceStatus.PARTIALLY_PAID },
+      }),
+      defaultPrisma.invoice.count({
+        where: { companyId, status: InvoiceStatus.POSTED },
+      }),
+      defaultPrisma.invoice.count({
+        where: {
+          companyId,
+          status: { in: [InvoiceStatus.CANCELLED, InvoiceStatus.VOID] },
+        },
+      }),
+      defaultPrisma.invoice.aggregate({
+        where: { companyId },
+        _sum: {
+          total: true,
+          paidAmount: true,
+          remainingAmount: true,
+        },
+      }),
+    ]);
+
+    return {
+      totalCount,
+      paidCount,
+      partiallyPaidCount,
+      postedCount,
+      cancelledCount,
+      totalAmount: Number(aggregates._sum.total || 0),
+      paidAmount: Number(aggregates._sum.paidAmount || 0),
+      remainingAmount: Number(aggregates._sum.remainingAmount || 0),
     };
   }
 }

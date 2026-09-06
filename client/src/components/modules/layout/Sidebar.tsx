@@ -15,6 +15,7 @@ import {
   ShoppingBag,
   RefreshCw,
   Receipt,
+  Layers,
   Activity,
   Settings,
   PanelLeftClose,
@@ -103,6 +104,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: "Fulfillment",
           href: `/company/${companyId}/app/fulfillment`,
           icon: <Package className="w-4 h-4" />,
+        },
+        {
+          label: "Backorders",
+          href: `/company/${companyId}/app/backorders`,
+          icon: <Layers className="w-4 h-4" />,
         },
         {
           label: "Subscriptions",

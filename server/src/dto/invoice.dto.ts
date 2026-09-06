@@ -33,6 +33,17 @@ export interface InvoiceItemResponseDto {
   updatedAt: Date;
 }
 
+export interface InvoiceSummaryResponseDto {
+  totalCount: number;
+  paidCount: number;
+  partiallyPaidCount: number;
+  postedCount: number;
+  cancelledCount: number;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+}
+
 export interface InvoiceResponseDto {
   id: string;
   companyId: string;

@@ -142,6 +142,25 @@ export class InvoiceController {
         ),
       );
   });
+
+  public getSummary = asyncHandler(async (req: Request, res: Response) => {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const summary = await this.invoiceService.getInvoiceSummary(companyId);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          summary,
+          "Invoice summary fetched successfully",
+        ),
+      );
+  });
 }
 
 export const invoiceController = new InvoiceController();

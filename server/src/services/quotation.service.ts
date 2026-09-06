@@ -54,6 +54,10 @@ import {
   ProductRepository,
   productRepository as defaultProductRepository,
 } from "../repositories/product.repository";
+import {
+  StockService,
+  stockService as defaultStockService,
+} from "./stock.service";
 import { ApiError } from "../utils/apiErrorHandler";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import {
@@ -126,6 +130,7 @@ export class QuotationService {
   private backorderRepo: BackorderRepository;
   private warehouseRepo: WarehouseRepository;
   private productRepo: ProductRepository;
+  private stockService: StockService;
 
   public constructor(
     quotationRepo: QuotationRepository = defaultQuotationRepository,
@@ -138,6 +143,7 @@ export class QuotationService {
     backorderRepo: BackorderRepository = defaultBackorderRepository,
     warehouseRepo: WarehouseRepository = defaultWarehouseRepository,
     productRepo: ProductRepository = defaultProductRepository,
+    stockService: StockService = defaultStockService,
   ) {
     this.quotationRepo = quotationRepo;
     this.companyRepo = companyRepo;
@@ -149,6 +155,7 @@ export class QuotationService {
     this.backorderRepo = backorderRepo;
     this.warehouseRepo = warehouseRepo;
     this.productRepo = productRepo;
+    this.stockService = stockService;
   }
 
   public async createQuotation(
@@ -2089,26 +2096,106 @@ export class QuotationService {
       }
     }
 
-    const evaluatedLines: DeliverableLineItem[] = [];
+    // Step 1: Concurrently evaluate lines across all sales order items using Promise.all
+    const lineEvaluations = await Promise.all(
+      salesOrder.items.map(async (orderItem) => {
+        const remainingToDeliver =
+          Number(orderItem.orderedQuantity) - Number(orderItem.deliveredQuantity);
+        if (remainingToDeliver <= 0) {
+          return [];
+        }
 
-    for (const orderItem of salesOrder.items) {
-      const remainingToDeliver =
-        Number(orderItem.orderedQuantity) - Number(orderItem.deliveredQuantity);
-      if (remainingToDeliver <= 0) {
-        continue;
-      }
+        const overrides = itemOverridesMap.get(orderItem.productId);
+        const itemLines: DeliverableLineItem[] = [];
 
-      const overrides = itemOverridesMap.get(orderItem.productId);
-      if (overrides && overrides.length > 0) {
-        let deliveredSoFar = 0;
-        for (const override of overrides) {
-          if (deliveredSoFar >= remainingToDeliver) break;
-          const targetWarehouseId = override.warehouseId || defaultWarehouseId;
-          const wh = await this.warehouseRepo.findById(
-            targetWarehouseId,
-            companyId,
-            tx,
+        if (overrides && overrides.length > 0) {
+          let deliveredSoFar = 0;
+
+          // Process warehouse splits for this item
+          for (const override of overrides) {
+            if (deliveredSoFar >= remainingToDeliver) break;
+            const targetWarehouseId = override.warehouseId || defaultWarehouseId;
+
+            // Fetch warehouse and stock record in parallel
+            const [wh, stockRecord] = await Promise.all([
+              this.warehouseRepo.findById(targetWarehouseId, companyId, tx),
+              tx.productStock.findUnique({
+                where: {
+                  productId_warehouseId: {
+                    productId: orderItem.productId,
+                    warehouseId: targetWarehouseId,
+                  },
+                },
+              }),
+            ]);
+
+            if (!wh) {
+              throw new ApiError(
+                StatusCodes.NOT_FOUND,
+                `Warehouse ${targetWarehouseId} not found`,
+              );
+            }
+
+            const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
+            const needed = remainingToDeliver - deliveredSoFar;
+            const requestedQty =
+              override.quantity !== undefined
+                ? Math.min(override.quantity, needed)
+                : needed;
+            const deliverableQuantity = Math.max(
+              0,
+              Math.min(availableStock, requestedQty),
+            );
+
+            if (deliverableQuantity > 0) {
+              deliveredSoFar += deliverableQuantity;
+              itemLines.push({
+                salesOrderItemId: orderItem.id,
+                productId: orderItem.productId,
+                orderedQuantity: remainingToDeliver,
+                deliverableQuantity,
+                backorderQuantity: 0,
+                warehouseId: targetWarehouseId,
+                unitPrice: Number(orderItem.unitPrice),
+                discount: Number(orderItem.discount),
+                taxRate: Number(orderItem.taxRate),
+                finalUnitPrice: Number(orderItem.finalUnitPrice),
+              });
+            }
+          }
+
+          const remainingBackorder = Math.max(
+            0,
+            remainingToDeliver - deliveredSoFar,
           );
+          if (remainingBackorder > 0) {
+            itemLines.push({
+              salesOrderItemId: orderItem.id,
+              productId: orderItem.productId,
+              orderedQuantity: remainingToDeliver,
+              deliverableQuantity: 0,
+              backorderQuantity: remainingBackorder,
+              warehouseId: defaultWarehouseId,
+              unitPrice: Number(orderItem.unitPrice),
+              discount: Number(orderItem.discount),
+              taxRate: Number(orderItem.taxRate),
+              finalUnitPrice: Number(orderItem.finalUnitPrice),
+            });
+          }
+        } else {
+          const targetWarehouseId = defaultWarehouseId;
+          const [wh, stockRecord] = await Promise.all([
+            this.warehouseRepo.findById(targetWarehouseId, companyId, tx),
+            tx.productStock.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: orderItem.productId,
+                  warehouseId: targetWarehouseId,
+                },
+              },
+            }),
+          ]);
+
           if (!wh) {
             throw new ApiError(
               StatusCodes.NOT_FOUND,
@@ -2116,132 +2203,51 @@ export class QuotationService {
             );
           }
 
-          const stockRecord = await tx.productStock.findUnique({
-            where: {
-              productId_warehouseId: {
-                productId: orderItem.productId,
-                warehouseId: targetWarehouseId,
-              },
-            },
-          });
-
           const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
-          const needed = remainingToDeliver - deliveredSoFar;
-          const requestedQty =
-            override.quantity !== undefined
-              ? Math.min(override.quantity, needed)
-              : needed;
           const deliverableQuantity = Math.max(
             0,
-            Math.min(availableStock, requestedQty),
+            Math.min(availableStock, remainingToDeliver),
+          );
+          const backorderQuantity = Math.max(
+            0,
+            remainingToDeliver - deliverableQuantity,
           );
 
-          if (deliverableQuantity > 0) {
-            deliveredSoFar += deliverableQuantity;
-            evaluatedLines.push({
-              salesOrderItemId: orderItem.id,
-              productId: orderItem.productId,
-              orderedQuantity: remainingToDeliver,
-              deliverableQuantity,
-              backorderQuantity: 0,
-              warehouseId: targetWarehouseId,
-              unitPrice: Number(orderItem.unitPrice),
-              discount: Number(orderItem.discount),
-              taxRate: Number(orderItem.taxRate),
-              finalUnitPrice: Number(orderItem.finalUnitPrice),
-            });
-
-            if (stockRecord) {
-              const newStockQty = Number(
-                (availableStock - deliverableQuantity).toFixed(4),
-              );
-              await tx.productStock.update({
-                where: { id: stockRecord.id },
-                data: { stockQty: new Prisma.Decimal(newStockQty) },
-              });
-            }
-          }
-        }
-
-        const remainingBackorder = Math.max(
-          0,
-          remainingToDeliver - deliveredSoFar,
-        );
-        if (remainingBackorder > 0) {
-          evaluatedLines.push({
+          itemLines.push({
             salesOrderItemId: orderItem.id,
             productId: orderItem.productId,
             orderedQuantity: remainingToDeliver,
-            deliverableQuantity: 0,
-            backorderQuantity: remainingBackorder,
-            warehouseId: defaultWarehouseId,
+            deliverableQuantity,
+            backorderQuantity,
+            warehouseId: targetWarehouseId,
             unitPrice: Number(orderItem.unitPrice),
             discount: Number(orderItem.discount),
             taxRate: Number(orderItem.taxRate),
             finalUnitPrice: Number(orderItem.finalUnitPrice),
           });
         }
-      } else {
-        const targetWarehouseId = defaultWarehouseId;
-        const wh = await this.warehouseRepo.findById(
-          targetWarehouseId,
-          companyId,
-          tx,
-        );
-        if (!wh) {
-          throw new ApiError(
-            StatusCodes.NOT_FOUND,
-            `Warehouse ${targetWarehouseId} not found`,
-          );
-        }
 
-        const stockRecord = await tx.productStock.findUnique({
-          where: {
-            productId_warehouseId: {
-              productId: orderItem.productId,
-              warehouseId: targetWarehouseId,
-            },
-          },
-        });
+        return itemLines;
+      }),
+    );
 
-        const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
-        const deliverableQuantity = Math.max(
-          0,
-          Math.min(availableStock, remainingToDeliver),
-        );
-        const backorderQuantity = Math.max(
-          0,
-          remainingToDeliver - deliverableQuantity,
-        );
+    const evaluatedLines = lineEvaluations.flat();
+    const deliveredLines = evaluatedLines.filter((l) => l.deliverableQuantity > 0);
+    const backorderLines = evaluatedLines.filter((l) => l.backorderQuantity > 0);
 
-        evaluatedLines.push({
-          salesOrderItemId: orderItem.id,
-          productId: orderItem.productId,
-          orderedQuantity: remainingToDeliver,
-          deliverableQuantity,
-          backorderQuantity,
-          warehouseId: targetWarehouseId,
-          unitPrice: Number(orderItem.unitPrice),
-          discount: Number(orderItem.discount),
-          taxRate: Number(orderItem.taxRate),
-          finalUnitPrice: Number(orderItem.finalUnitPrice),
-        });
-
-        if (deliverableQuantity > 0 && stockRecord) {
-          const newStockQty = Number(
-            (availableStock - deliverableQuantity).toFixed(4),
-          );
-          await tx.productStock.update({
-            where: { id: stockRecord.id },
-            data: { stockQty: new Prisma.Decimal(newStockQty) },
-          });
-        }
-      }
+    // Step 2: Concurrently deduct stock splits using stockService.deductStockSplits (which uses Promise.all within tx)
+    if (deliveredLines.length > 0) {
+      const stockSplits = deliveredLines.map((l) => ({
+        productId: l.productId,
+        warehouseId: l.warehouseId,
+        quantity: l.deliverableQuantity,
+      }));
+      await this.stockService.deductStockSplits(companyId, stockSplits, tx);
     }
 
     return {
-      deliveredLines: evaluatedLines.filter((l) => l.deliverableQuantity > 0),
-      backorderLines: evaluatedLines.filter((l) => l.backorderQuantity > 0),
+      deliveredLines,
+      backorderLines,
     };
   }
 

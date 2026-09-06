@@ -28,6 +28,17 @@ export interface BackorderItemResponseDto {
   updatedAt: Date;
 }
 
+export interface BackorderSummaryResponseDto {
+  totalCount: number;
+  pendingCount: number;
+  partiallyFulfilledCount: number;
+  fulfilledCount: number;
+  cancelledCount: number;
+  totalQuantity: number;
+  fulfilledQuantity: number;
+  remainingQuantity: number;
+}
+
 export interface BackorderResponseDto {
   id: string;
   companyId: string;

@@ -114,6 +114,25 @@ export class BackorderController {
         ),
       );
   });
+
+  public getSummary = asyncHandler(async (req: Request, res: Response) => {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const summary = await this.backorderService.getBackorderSummary(companyId);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          summary,
+          "Backorder summary fetched successfully",
+        ),
+      );
+  });
 }
 
 export const backorderController = new BackorderController();

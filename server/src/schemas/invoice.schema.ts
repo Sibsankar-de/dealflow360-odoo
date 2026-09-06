@@ -8,6 +8,7 @@ export const createInvoiceItemInputSchema = z.object({
   deliveredQuantity: z
     .number({ required_error: "Delivered quantity is required" })
     .positive("Delivered quantity must be greater than 0"),
+  warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
 });
 
 export const createInvoiceSchema = z
