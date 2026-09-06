@@ -1,3 +1,5 @@
+import { CategoryResponseType } from "./category";
+
 export type ProductType = "ONE_TIME" | "RECURRING";
 export type CustomerTier = "BRONZE" | "SILVER" | "GOLD";
 
@@ -27,8 +29,21 @@ export interface ProductResponseType {
   discountTiers?: ProductDiscountTier[];
   stocks?: ProductStock[];
   totalStock?: number;
+  categories?: CategoryResponseType[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductSummaryResponseType {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  baseUnit: string;
+  type: ProductType;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PaginatedProductsResponse {
@@ -47,6 +62,9 @@ export interface CreateProductRequest {
   baseUnit?: string;
   type?: ProductType;
   stocks?: { warehouseId: string; stockQty: number }[];
+  discountTiers?: { customerTier: CustomerTier; discountPercent: number }[];
+  categoryIds?: string[];
+  categoryIdList?: string[];
 }
 
 export interface UpdateProductRequest {
@@ -56,6 +74,9 @@ export interface UpdateProductRequest {
   baseUnit?: string;
   type?: ProductType;
   stocks?: { warehouseId: string; stockQty: number }[];
+  discountTiers?: { customerTier: CustomerTier; discountPercent: number }[];
+  categoryIds?: string[];
+  categoryIdList?: string[];
 }
 
 export interface UpsertProductStockRequest {
@@ -67,4 +88,5 @@ export interface ListProductsQuery {
   limit?: number;
   type?: ProductType;
   search?: string;
+  categoryId?: string;
 }

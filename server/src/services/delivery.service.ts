@@ -27,6 +27,10 @@ import {
   StockService,
   stockService as defaultStockService,
 } from "./stock.service";
+import {
+  SubscriptionService,
+  subscriptionService as defaultSubscriptionService,
+} from "./subscription.service";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   prismaTransaction,
@@ -47,6 +51,7 @@ export class DeliveryService {
   private backorderRepo: BackorderRepository;
   private invoiceRepo: InvoiceRepository;
   private stockService: StockService;
+  private subscriptionService: SubscriptionService;
 
   public constructor(
     deliveryRepo: DeliveryRepository = defaultDeliveryRepository,
@@ -54,12 +59,14 @@ export class DeliveryService {
     backorderRepo: BackorderRepository = defaultBackorderRepository,
     invoiceRepo: InvoiceRepository = defaultInvoiceRepository,
     stockService: StockService = defaultStockService,
+    subscriptionService: SubscriptionService = defaultSubscriptionService,
   ) {
     this.deliveryRepo = deliveryRepo;
     this.salesOrderRepo = salesOrderRepo;
     this.backorderRepo = backorderRepo;
     this.invoiceRepo = invoiceRepo;
     this.stockService = stockService;
+    this.subscriptionService = subscriptionService;
   }
 
   private async generateDeliveryNo(tx?: TransactionClient): Promise<string> {
@@ -360,6 +367,26 @@ export class DeliveryService {
           });
         }
       }
+
+      // Generate subscription if any delivered items are recurring products
+      await this.subscriptionService.generateSubscriptionFromFulfillment(
+        companyId,
+        order.customerId,
+        order.id,
+        order.quotationId,
+        order.currency,
+        dto.items.map((item) => {
+          const orderItem = orderItemsMap.get(item.salesOrderItemId)!;
+          return {
+            productId: orderItem.productId,
+            quantity: item.deliveredQuantity,
+            unitPrice: Number(orderItem.finalUnitPrice),
+            discount: Number(orderItem.discount),
+          };
+        }),
+        dto.subscriptionType,
+        tx,
+      );
 
       const loadedDelivery = await this.deliveryRepo.findByIdWithRelations(
         delivery.id,

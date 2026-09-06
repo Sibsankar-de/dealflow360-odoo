@@ -13,6 +13,7 @@ import {
   QuotationResponse,
   CreateQuotationRequest,
 } from "@/types/quotation";
+import { DealHealthResponse, DealHealthQuery } from "@/types/dealhealth";
 
 export const dealApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -26,6 +27,18 @@ export const dealApi = baseApi.injectEndpoints({
         params,
       }),
       providesTags: ["Deal"],
+    }),
+
+    getDealHealth: builder.query<
+      ApiResponse<DealHealthResponse>,
+      { companyId: string; params?: DealHealthQuery }
+    >({
+      query: ({ companyId, params }) => ({
+        url: `/deals/${companyId}/health`,
+        method: "GET",
+        params,
+      }),
+      providesTags: ["Deal", "Quotation", "Backorder"],
     }),
 
     getCustomerDeals: builder.query<
@@ -181,6 +194,8 @@ export const dealApi = baseApi.injectEndpoints({
 export const {
   useGetDealsQuery,
   useLazyGetDealsQuery,
+  useGetDealHealthQuery,
+  useLazyGetDealHealthQuery,
   useGetCustomerDealsQuery,
   useLazyGetCustomerDealsQuery,
   useGetDealByIdQuery,

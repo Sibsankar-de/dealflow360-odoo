@@ -142,7 +142,7 @@ export function InviteTeamMemberModal({
       description="Grant platform users access to this company workspace by specifying their registered email and role."
       size="md"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <ModalBody>
           <div className="space-y-4">
             {serverError && (

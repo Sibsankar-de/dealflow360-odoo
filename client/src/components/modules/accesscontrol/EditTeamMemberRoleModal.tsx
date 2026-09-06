@@ -107,7 +107,7 @@ export function EditTeamMemberRoleModal({
       description={`Update access level and responsibilities for ${targetName}.`}
       size="md"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <ModalBody>
           <div className="space-y-4">
             {serverError && (

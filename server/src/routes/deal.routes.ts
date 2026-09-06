@@ -34,6 +34,13 @@ router.get("/:companyId", requireRole(...salesRoles), dealController.list);
 // Create a new deal.
 router.post("/:companyId", requireRole(...salesRoles), dealController.create);
 
+// Deal health risk metrics & attention required endpoint
+router.get(
+  "/:companyId/health",
+  requireRole(...salesRoles),
+  dealController.getDealHealth,
+);
+
 // Read a single deal.
 router.get("/:companyId/:id", requireRole(...salesRoles), dealController.getById);
 

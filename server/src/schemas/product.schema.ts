@@ -1,9 +1,14 @@
 import { z } from "zod";
-import { ProductType } from "@prisma/client";
+import { ProductType, CustomerTier } from "@prisma/client";
 
 export const stockEntrySchema = z.object({
   warehouseId: z.string().uuid(),
   stockQty: z.number().nonnegative(),
+});
+
+export const productDiscountTierSchema = z.object({
+  customerTier: z.nativeEnum(CustomerTier),
+  discountPercent: z.number().min(0).max(100),
 });
 
 export const createProductSchema = z.object({
@@ -13,6 +18,7 @@ export const createProductSchema = z.object({
   baseUnit: z.string().min(1).max(20).trim().default("UNIT").optional(),
   type: z.nativeEnum(ProductType).default(ProductType.ONE_TIME).optional(),
   stocks: z.array(stockEntrySchema).optional(),
+  discountTiers: z.array(productDiscountTierSchema).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
   categoryIdList: z.array(z.string().uuid()).optional(),
 });
@@ -24,6 +30,7 @@ export const updateProductSchema = z.object({
   baseUnit: z.string().min(1).max(20).trim().optional(),
   type: z.nativeEnum(ProductType).optional(),
   stocks: z.array(stockEntrySchema).optional(),
+  discountTiers: z.array(productDiscountTierSchema).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
   categoryIdList: z.array(z.string().uuid()).optional(),
 });
@@ -33,6 +40,7 @@ export const productListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
   type: z.nativeEnum(ProductType).optional(),
   search: z.string().optional(),
+  categoryId: z.string().uuid().optional(),
 });
 
 export const upsertStockSchema = z.object({

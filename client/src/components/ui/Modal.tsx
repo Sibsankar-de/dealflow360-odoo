@@ -44,7 +44,7 @@ export const ModalHeader: React.FC<{
   return (
     <div
       className={clsx(
-        "flex items-start justify-between p-6 border-b border-border",
+        "flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0 bg-card z-10",
         className
       )}
     >
@@ -71,7 +71,7 @@ export const ModalHeader: React.FC<{
           type="button"
           onClick={onClose}
           aria-label="Close modal"
-          className="rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-border cursor-pointer"
+          className="rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-border cursor-pointer flex-shrink-0"
         >
           <X className="h-5 w-5" />
         </button>
@@ -85,7 +85,12 @@ export const ModalBody: React.FC<{
   className?: string;
 }> = ({ children, className }) => {
   return (
-    <div className={clsx("p-6 text-text-primary", className)}>
+    <div
+      className={clsx(
+        "p-5 sm:p-6 text-text-primary flex-1 overflow-y-auto min-h-0",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -98,7 +103,7 @@ export const ModalFooter: React.FC<{
   return (
     <div
       className={clsx(
-        "flex items-center justify-end gap-3 p-4 px-6 border-t border-border bg-surface/50 rounded-b-xl",
+        "flex items-center justify-end gap-3 p-4 px-6 border-t border-border bg-surface/50 rounded-b-xl flex-shrink-0 z-10",
         className
       )}
     >
@@ -166,7 +171,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div
       className={clsx(
-        "fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/60 backdrop-blur-xs overflow-y-auto",
+        "fixed inset-0 z-50 overflow-y-auto bg-navy-950/60 backdrop-blur-xs p-4 sm:p-6",
         overlayClassName
       )}
       onClick={handleOverlayClick}
@@ -175,27 +180,31 @@ export const Modal: React.FC<ModalProps> = ({
       aria-labelledby={title ? titleId : undefined}
       aria-describedby={description ? descriptionId : undefined}
     >
-      <div
-        className={clsx(
-          "relative w-full rounded-xl bg-card shadow-2xl transition-all border border-border my-8 overflow-hidden",
-          sizeClasses[size],
-          className
-        )}
-      >
-        {(title || description || showCloseButton) && (
-          <ModalHeader
-            title={title}
-            description={description}
-            onClose={onClose}
-            showCloseButton={showCloseButton}
-            titleId={titleId}
-            descriptionId={descriptionId}
-          />
-        )}
+      <div className="flex min-h-full items-center justify-center text-center">
+        <div
+          className={clsx(
+            "relative w-full rounded-xl bg-card shadow-2xl transition-all border border-border text-left",
+            "flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3.5rem)] my-auto overflow-hidden",
+            sizeClasses[size],
+            className
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(title || description || showCloseButton) && (
+            <ModalHeader
+              title={title}
+              description={description}
+              onClose={onClose}
+              showCloseButton={showCloseButton}
+              titleId={titleId}
+              descriptionId={descriptionId}
+            />
+          )}
 
-        {children && <ModalBody>{children}</ModalBody>}
+          {children}
 
-        {footer && <ModalFooter>{footer}</ModalFooter>}
+          {footer && <ModalFooter>{footer}</ModalFooter>}
+        </div>
       </div>
     </div>
   );

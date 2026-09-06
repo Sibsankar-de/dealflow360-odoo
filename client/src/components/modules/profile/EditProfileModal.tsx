@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { User } from "lucide-react";
@@ -59,30 +59,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       description="Update your personal details"
       size="sm"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="p-3 bg-red-50 border border-border rounded-lg text-xs font-medium text-danger">
-            {error}
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-border rounded-lg text-xs font-medium text-danger">
+              {error}
+            </div>
+          )}
 
-        <Input
-          label="Full Name"
-          required
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          leftIcon={<User className="w-4 h-4" />}
-          placeholder="e.g. John Doe"
-        />
+          <Input
+            label="Full Name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            leftIcon={<User className="w-4 h-4" />}
+            placeholder="e.g. John Doe"
+          />
+        </ModalBody>
 
-        <div className="pt-3 flex items-center justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={onClose}>
+        <ModalFooter>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" type="submit">
+          <Button variant="primary" size="sm" type="submit" isLoading={isLoading}>
             Save Changes
           </Button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

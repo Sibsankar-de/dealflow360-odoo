@@ -17,6 +17,7 @@ import {
   updateDealSchema,
   dealFilterSchema,
   customerDealFilterSchema,
+  dealHealthQuerySchema,
 } from "../schemas/deal.schema";
 import { dealQuotationsQuerySchema } from "../schemas/quotation.schema";
 import { CreateDealDto } from "../dto/deal.dto";
@@ -106,6 +107,37 @@ export class DealController {
       .status(StatusCodes.OK)
       .json(
         new ApiResponse(StatusCodes.OK, result, "Deals fetched successfully"),
+      );
+  });
+
+  public getDealHealth = asyncHandler(async (req: Request, res: Response) => {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const queryResult = dealHealthQuerySchema.safeParse(req.query);
+    if (!queryResult.success) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Invalid query parameters for deal health",
+        queryResult.error.errors,
+      );
+    }
+
+    const result = await this.dealService.getDealHealth(
+      companyId,
+      queryResult.data,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Deal health data fetched successfully",
+        ),
       );
   });
 

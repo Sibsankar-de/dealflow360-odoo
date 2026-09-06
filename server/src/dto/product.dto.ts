@@ -47,6 +47,11 @@ export interface StockEntryDto {
   stockQty: number;
 }
 
+export interface DiscountTierEntryDto {
+  customerTier: CustomerTier;
+  discountPercent: number;
+}
+
 export interface CreateProductDto {
   name: string;
   description?: string | null;
@@ -54,6 +59,7 @@ export interface CreateProductDto {
   baseUnit?: string;
   type?: ProductType;
   stocks?: StockEntryDto[];
+  discountTiers?: DiscountTierEntryDto[];
   categoryIds?: string[];
   categoryIdList?: string[];
 }
@@ -65,6 +71,7 @@ export interface UpdateProductDto {
   baseUnit?: string;
   type?: ProductType;
   stocks?: StockEntryDto[];
+  discountTiers?: DiscountTierEntryDto[];
   categoryIds?: string[];
   categoryIdList?: string[];
 }

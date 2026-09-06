@@ -258,6 +258,7 @@ export class CompanyService {
       companyId,
       targetUser.id,
       dto.role,
+      dto.customerTier,
     );
 
     return toCompanyUserDto(member);
@@ -300,6 +301,7 @@ export class CompanyService {
       company.id,
       targetUser.id,
       dto.role,
+      dto.customerTier,
     );
 
     return toCompanyUserDto(updated);

@@ -75,11 +75,13 @@ src/
 │       ├── profile/      # ProfileInfoCard, CompanyCard, CompanyList, EditProfileModal, ChangePasswordModal, CreateCompanyModal
 │       ├── deals/        # DealList, DealModal, DeleteDealModal
 │       ├── products/     # ProductList, ProductModal, DeleteProductModal
+│       ├── categories/   # CategoryList, CategoryModal, DeleteCategoryModal
 │       ├── warehouses/   # WarehouseList, WarehouseModal, DeleteWarehouseModal
 │       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard, CreateQuotationModal, ReQuotationModal
-│       ├── fulfillment/  # Delivery tracking, backorders
+│       ├── backorders/   # FulfillBackorderModal
+│       ├── subscriptions/ # SubscriptionHistoryModal, RenewSubscriptionModal, CancelSubscriptionModal
 │       ├── finance/      # Invoices, financial approvals
-│       ├── customers/    # Customer directory and interaction history
+│       ├── customers/    # CustomerListTable, CustomerDetailView, CreateCustomerModal (email lookup, tier selection)
 │       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
 │       ├── settings/     # Store name, currency, discount tiers & address configuration
 │       ├── accesscontrol/ # TeamMembersTable, InviteTeamMemberModal, EditTeamMemberRoleModal, DeleteTeamMemberModal, ViewTeamMemberModal
@@ -93,11 +95,14 @@ src/
 │   ├── features/         # Feature slices & injected endpoints
 │   │   ├── user/         # userSlice.ts, userApi.ts
 │   │   ├── company/      # companySlice.ts, companyApi.ts (user company affiliations, member list/invite/role update/removal, company roles, lookup)
-│   │   ├── product/      # productApi.ts (product catalog & stock allocation)
+│   │   ├── product/      # productApi.ts (product catalog, stock allocation, category assignment)
+│   │   ├── category/     # categoryApi.ts (product category CRUD and directory)
 │   │   ├── warehouse/    # warehouseApi.ts (warehouses and distribution hubs)
-│   │   └── deal/         # dealApi.ts (deals lifecycle, quotations generation & revisions)
+│   │   ├── deal/         # dealApi.ts (deals lifecycle, quotations generation & revisions)
+│   │   ├── customer/     # customerApi.ts (customers directory, search, tier assignments, and customer account addition)
+│   │   └── subscription/ # subscriptionApi.ts (recurring contracts, renewals, pricing tiers)
 │   └── index.ts          # Central Redux store configuration
-├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, product.ts, warehouse.ts, deal.ts, quotation.ts, SelectType.ts)
+├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, product.ts, category.ts, warehouse.ts, deal.ts, quotation.ts, subscription.ts, dealhealth.ts, SelectType.ts)
 ├── utils/                # Pure helper functions and formatters
 └── assets/               # Static assets, icons, and media
 ```
@@ -109,8 +114,8 @@ src/
 State is strictly divided into two categories:
 
 ### 1. Server State
-* **Examples**: Quotations, Deals, Products, Warehouses, Invoices, Delivery Batches, Users, Notifications.
-* **Management**: Centralized RTK Query caching (`store/baseApi.ts`) with feature endpoints (`userApi.ts`, `companyApi.ts`, `productApi.ts`, `warehouseApi.ts`, `dealApi.ts`) and tag invalidation (`User`, `Company`, `Quotation`, `Product`, `Warehouse`, `Deal`).
+* **Examples**: Quotations, Deals, Products, Subscriptions, SubscriptionPricing, Warehouses, Invoices, Delivery Batches, Users, Notifications.
+* **Management**: Centralized RTK Query caching (`store/baseApi.ts`) with feature endpoints (`userApi.ts`, `companyApi.ts`, `productApi.ts`, `warehouseApi.ts`, `dealApi.ts`, `subscriptionApi.ts`) and tag invalidation (`User`, `Company`, `Quotation`, `Product`, `Warehouse`, `Deal`, `Subscription`, `SubscriptionPricing`).
 * **Authentication**: Automatic session recovery via `baseQueryWithReauth` in `baseApi.ts` on `401 Unauthorized` responses by calling `/auth/refresh`.
 * **Rules**: Do not duplicate server data in local client state. Rely on normalized query caching.
 
@@ -138,24 +143,26 @@ Routes are structured around user roles and core platform workflows:
 
 * `/(auth)`: Authentication routes (Login, Register).
 * `/profile`: User profile, credentials, and company memberships (Profile Navbar layout).
-* `/company/[company-id]/app`: Company tenant workspace (Company Navbar + Sidebar layout).
-  * `/company/[company-id]/app/dashboard`: Company metrics and KPIs.
-  * `/company/[company-id]/app/deals`: Deals pipeline management and opportunity tracking.
-  * `/company/[company-id]/app/deals/[deal-id]`: Deal detail view, nested commercial quotations and revision iteration cycle.
-  * `/company/[company-id]/app/quotations`: Quotation Kanban pipeline board and table views.
-  * `/company/[company-id]/app/products`: Product catalog, pricing models, and warehouse stock allocation.
-  * `/company/[company-id]/app/warehouses`: Warehouses and inventory distribution hubs.
-  * `/company/[company-id]/app/customers`: Customer directory and quotation history.
-  * `/company/[company-id]/app/fulfillment`: Delivery and backorder fulfillment tracking.
-  * `/company/[company-id]/app/fulfillment/[id]`: Fulfillment plan detail and order items.
-  * `/company/[company-id]/app/subscriptions`: Recurring billing and subscription contracts.
-  * `/company/[company-id]/app/invoices`: Invoice management based on delivered items.
-  * `/company/[company-id]/app/deal-health`: Deal health alerts and stalled quotation indicators.
-  * `/company/[company-id]/app/settings`: Company settings, base currency, and billing rules.
+* `/company/[company-id]/workspace`: Company tenant workspace (Company Navbar + Sidebar layout).
+  * `/company/[company-id]/workspace/dashboard`: Company metrics and KPIs.
+  * `/company/[company-id]/workspace/deals`: Deals pipeline management and opportunity tracking.
+  * `/company/[company-id]/workspace/deals/[deal-id]`: Deal detail view, nested commercial quotations and revision iteration cycle.
+  * `/company/[company-id]/workspace/quotations`: Quotation Kanban pipeline board and table views.
+  * `/company/[company-id]/workspace/products`: Product catalog, pricing models, subscription pricing tiers, and warehouse stock allocation.
+  * `/company/[company-id]/workspace/warehouses`: Warehouses and inventory distribution hubs.
+  * `/company/[company-id]/workspace/customers`: Customer directory and quotation history.
+  * `/company/[company-id]/workspace/fulfillment`: Delivery and backorder fulfillment tracking.
+  * `/company/[company-id]/workspace/fulfillment/[id]`: Fulfillment plan detail, split warehouse allocation, and automatic subscription creation.
+  * `/company/[company-id]/workspace/subscriptions`: Recurring billing and subscription contracts directory, KPIs, period history audit, and renewal/cancellation workflows.
+  * `/company/[company-id]/workspace/invoices`: Invoice management based on delivered items.
+  * `/company/[company-id]/workspace/deal-health`: Deal health alerts and stalled quotation indicators.
+  * `/company/[company-id]/workspace/settings`: Company settings, base currency, and billing rules.
 * `/company/[company-id]/(customer)`: Customer portal workspace (URL: `/company/[company-id]/customer`).
   * `/company/[company-id]/customer`: List of deals associated with the customer in the company, with options to view quotations or request deal cancellation.
   * `/company/[company-id]/customer/deals/[deal-id]/quotations`: List of quotations for the selected deal filtered to active/customer-visible statuses.
   * `/company/[company-id]/customer/deals/[deal-id]/quotations/[quotation-id]`: Customer quotation review and negotiation interface featuring transparent-by-default inputs, gray-bordered editable state upon clicking Negotiate, revision history timeline, counter-offer dispatch, and approval/rejection workflows.
+  * `/company/[company-id]/customer/subscriptions`: Customer active contracts, renewal dates, MRR commitment, self-service renewal, and cancellation controls.
+  * `/company/[company-id]/customer/invoices`: Customer invoice overview and payment receipt tracking.
 
 ---
 

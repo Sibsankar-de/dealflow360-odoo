@@ -26,6 +26,8 @@ model Product {
   deliveryItems          DeliveryItem[]
   backorderItems         BackorderItem[]
   invoiceItems           InvoiceItem[]
+  subscriptionItems      SubscriptionItem[]
+  subscriptionPricings   SubscriptionPricing[]
 
   @@index([companyId])
   @@index([type])

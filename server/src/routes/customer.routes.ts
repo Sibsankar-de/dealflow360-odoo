@@ -21,6 +21,16 @@ router.get(
   customerController.list,
 );
 
+router.post(
+  "/:companyId",
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_REP,
+    CompanyUserRole.SALES_MANAGER,
+  ),
+  customerController.create,
+);
+
 router.get(
   "/:companyId/search",
   requireRole(

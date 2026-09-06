@@ -52,6 +52,16 @@ router.get(
   customerController.list,
 );
 router.post(
+  "/:id/customers",
+  verifyCompanyAccess,
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_REP,
+    CompanyUserRole.SALES_MANAGER,
+  ),
+  customerController.create,
+);
+router.post(
   "/:id/users",
   verifyCompanyAccess,
   requireRole(CompanyUserRole.ADMIN),

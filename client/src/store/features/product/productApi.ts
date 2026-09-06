@@ -2,6 +2,7 @@ import { baseApi } from "@/store/baseApi";
 import { ApiResponse } from "@/types/auth";
 import {
   ProductResponseType,
+  ProductSummaryResponseType,
   CreateProductRequest,
   UpdateProductRequest,
   UpsertProductStockRequest,
@@ -21,6 +22,17 @@ export const productApi = baseApi.injectEndpoints({
         params,
       }),
       providesTags: ["Product"],
+    }),
+
+    searchProducts: builder.query<
+      ApiResponse<ProductSummaryResponseType[]>,
+      { companyId: string; query: string; limit?: number }
+    >({
+      query: ({ companyId, query, limit = 10 }) => ({
+        url: `/products/${companyId}/search`,
+        method: "GET",
+        params: { query, limit },
+      }),
     }),
 
     getProductById: builder.query<
@@ -111,18 +123,40 @@ export const productApi = baseApi.injectEndpoints({
         { type: "Product", id: productId },
       ],
     }),
+
+    updateProductCategories: builder.mutation<
+      ApiResponse<{ product: ProductResponseType }>,
+      {
+        companyId: string;
+        productId: string;
+        data: { categoryIdList?: string[]; categoryIds?: string[] };
+      }
+    >({
+      query: ({ companyId, productId, data }) => ({
+        url: `/products/${companyId}/${productId}/categories`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { productId }) => [
+        "Product",
+        "Category",
+        { type: "Product", id: productId },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
 
-
 export const {
   useGetProductsQuery,
   useLazyGetProductsQuery,
+  useSearchProductsQuery,
+  useLazySearchProductsQuery,
   useGetProductByIdQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,
   useUpsertProductStockMutation,
   useDeleteProductStockMutation,
+  useUpdateProductCategoriesMutation,
 } = productApi;

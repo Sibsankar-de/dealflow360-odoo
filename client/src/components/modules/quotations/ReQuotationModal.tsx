@@ -74,8 +74,8 @@ export const ReQuotationModal: React.FC<ReQuotationModalProps> = ({
       description="Issue a revised counter-proposal with updated pricing or negotiated terms."
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-danger text-sm rounded-lg">
               {error}

@@ -1,0 +1,126 @@
+enum SubscriptionType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model SubscriptionPricing {
+  id               String           @id @default(uuid()) @db.Uuid
+  companyId        String           @map("company_id") @db.Uuid
+  productId        String           @map("product_id") @db.Uuid
+  subscriptionType SubscriptionType @map("subscription_type")
+  customerTier     CustomerTier?    @map("customer_tier")
+  price            Decimal          @db.Decimal(12, 2)
+  minQuantity      Decimal          @default(1) @map("min_quantity") @db.Decimal(12, 2)
+  currency         String           @default("USD")
+  isActive         Boolean          @default(true) @map("is_active")
+  validFrom        DateTime?        @map("valid_from")
+  validUntil       DateTime?        @map("valid_until")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  periods       SubscriptionPeriod[]
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([subscriptionType])
+  @@index([customerTier])
+  @@index([isActive])
+  @@map("subscription_pricings")
+}
+
+model Subscription {
+  id                    String              @id @default(uuid()) @db.Uuid
+  companyId             String              @map("company_id") @db.Uuid
+  subscriptionNo        String              @unique @map("subscription_no")
+  customerId            String              @map("customer_id") @db.Uuid
+  salesOrderId          String?             @map("sales_order_id") @db.Uuid
+  quotationId           String?             @map("quotation_id") @db.Uuid
+  subscriptionPricingId String?             @map("subscription_pricing_id") @db.Uuid
+  subscriptionType      SubscriptionType    @map("subscription_type")
+  status                SubscriptionStatus  @default(ACTIVE)
+  startDate             DateTime            @map("start_date")
+  endDate               DateTime            @map("end_date")
+  nextRenewalDate       DateTime            @map("next_renewal_date")
+  currency              String              @default("USD")
+  totalRecurringAmount  Decimal             @default(0) @map("total_recurring_amount") @db.Decimal(12, 2)
+  cancelledAt           DateTime?           @map("cancelled_at")
+  cancellationReason    String?             @map("cancellation_reason")
+  notes                 String?
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer            User                 @relation("SubscriptionCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  salesOrder          SalesOrder?          @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
+  quotation           Quotation?           @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  subscriptionPricing SubscriptionPricing? @relation(fields: [subscriptionPricingId], references: [id], onDelete: SetNull)
+  items               SubscriptionItem[]
+  periods             SubscriptionPeriod[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([salesOrderId])
+  @@index([quotationId])
+  @@index([subscriptionPricingId])
+  @@index([status])
+  @@index([subscriptionType])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  quantity       Decimal  @db.Decimal(12, 2)
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(12, 2)
+  discount       Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal      Decimal  @map("line_total") @db.Decimal(12, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([subscriptionId])
+  @@index([productId])
+  @@map("subscription_items")
+}
+
+model SubscriptionPeriod {
+  id                    String              @id @default(uuid()) @db.Uuid
+  subscriptionId        String              @map("subscription_id") @db.Uuid
+  periodNumber          Int                 @map("period_number")
+  startDate             DateTime            @map("start_date")
+  endDate               DateTime            @map("end_date")
+  subscriptionType      SubscriptionType    @map("subscription_type")
+  totalAmount           Decimal             @map("total_amount") @db.Decimal(12, 2)
+  subscriptionPricingId String?             @map("subscription_pricing_id") @db.Uuid
+  itemsSnapshot         Json?               @map("items_snapshot")
+  renewedById           String?             @map("renewed_by_id") @db.Uuid
+  renewedAt             DateTime            @default(now()) @map("renewed_at")
+  notes                 String?
+
+  // Relations
+  subscription        Subscription         @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscriptionPricing SubscriptionPricing? @relation(fields: [subscriptionPricingId], references: [id], onDelete: SetNull)
+  renewedBy           User?                @relation("SubscriptionPeriodRenewedBy", fields: [renewedById], references: [id], onDelete: SetNull)
+
+  @@unique([subscriptionId, periodNumber])
+  @@index([subscriptionId])
+  @@index([subscriptionPricingId])
+  @@index([renewedById])
+  @@map("subscription_periods")
+}

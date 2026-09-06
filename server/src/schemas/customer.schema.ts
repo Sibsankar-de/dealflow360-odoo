@@ -8,4 +8,14 @@ export const customerListQuerySchema = z.object({
   customerTier: z.nativeEnum(CustomerTier).optional(),
 });
 
+export const createCustomerSchema = z.object({
+  userEmail: z
+    .string({ required_error: "User email is required" })
+    .email("Invalid email address")
+    .trim()
+    .toLowerCase(),
+  customerTier: z.nativeEnum(CustomerTier).default(CustomerTier.BRONZE).optional(),
+});
+
 export type CustomerListQueryInput = z.infer<typeof customerListQuerySchema>;
+export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { CustomerListTable } from "@/components/modules/customer/CustomerListTable";
 import { CustomerDetailView } from "@/components/modules/customer/CustomerDetailView";
 import { CreateCustomerModal } from "@/components/modules/customer/CreateCustomerModal";
-import { CustomerResponseType, ListCustomersQuery } from "@/types/customer";
+import { CustomerResponseType, ListCustomersQuery, CustomerTier } from "@/types/customer";
 import {
   useGetCustomersQuery,
   useAddCustomerMutation,
@@ -38,13 +38,14 @@ export default function CustomersPage() {
   const customers = data?.data?.docs ?? [];
   const totalPages = data?.data?.totalPages ?? 1;
 
-  const handleCreateCustomer = async (formData: { email: string }) => {
+  const handleCreateCustomer = async (formData: { email: string; customerTier?: CustomerTier }) => {
     if (!companyId) return;
     try {
       await addCustomer({
         companyId,
         data: {
           userEmail: formData.email,
+          customerTier: formData.customerTier,
           role: "CUSTOMER",
         },
       }).unwrap();

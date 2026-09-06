@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QuotationStatus, DiscountType } from "@prisma/client";
+import { QuotationStatus, DiscountType, SubscriptionType } from "@prisma/client";
 
 export const addQuotationItemSchema = z.object({
   productId: z
@@ -187,6 +187,7 @@ export const fulfillQuotationItemSchema = z.object({
 
 export const fulfillQuotationSchema = z.object({
   warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
+  subscriptionType: z.nativeEnum(SubscriptionType).optional(),
   items: z.array(fulfillQuotationItemSchema).optional(),
   notes: z
     .string()

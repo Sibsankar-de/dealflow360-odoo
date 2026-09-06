@@ -5,6 +5,7 @@ import {
   CompanyStatus,
   CompanyUserRole,
   CompanySetting,
+  CustomerTier,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
 import { customerDiscountTierConverter } from "../converters/companySetting.converter";
@@ -53,6 +54,7 @@ export interface CompanyUserResponseDto {
   companyId: string;
   userId: string;
   role: CompanyUserRole;
+  customerTier?: CustomerTier | null;
   createdAt: Date;
   updatedAt: Date;
   user?: UserResponseDto;
@@ -139,6 +141,7 @@ export const toCompanyUserDto = (
     companyId: companyUser.companyId,
     userId: companyUser.userId,
     role: companyUser.role,
+    customerTier: companyUser.customerTier ?? null,
     createdAt: companyUser.createdAt,
     updatedAt: companyUser.updatedAt,
     user: companyUser.user ? toUserDto(companyUser.user) : undefined,

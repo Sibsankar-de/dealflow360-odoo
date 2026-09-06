@@ -86,6 +86,11 @@ export class ProductService {
         }
       }
 
+      const discountTiers = (dto.discountTiers || []).map((dt) => ({
+        customerTier: dt.customerTier,
+        discountPercent: new Prisma.Decimal(dt.discountPercent),
+      }));
+
       const product = await this.productRepo.create(
         {
           companyId,
@@ -97,6 +102,7 @@ export class ProductService {
         },
         stocks,
         categoryIdList,
+        discountTiers,
         tx,
       );
 
@@ -128,6 +134,7 @@ export class ProductService {
     filters: {
       type?: ProductType;
       search?: string;
+      categoryId?: string;
       page?: number;
       limit?: number;
     },
@@ -137,7 +144,7 @@ export class ProductService {
 
     const { products, total } = await this.productRepo.findMany(
       companyId,
-      { type: filters.type, search: filters.search },
+      { type: filters.type, search: filters.search, categoryId: filters.categoryId },
       page,
       limit,
     );
@@ -223,6 +230,17 @@ export class ProductService {
             tx,
           );
         }
+      }
+
+      if (dto.discountTiers !== undefined) {
+        await this.productRepo.syncDiscountTiers(
+          productId,
+          dto.discountTiers.map((dt) => ({
+            customerTier: dt.customerTier,
+            discountPercent: new Prisma.Decimal(dt.discountPercent),
+          })),
+          tx,
+        );
       }
 
       await this.productRepo.update(
@@ -373,6 +391,15 @@ export class ProductService {
       );
 
       const updated = await this.productRepo.findById(productId, companyId, tx);
+      if (updated) {
+        void publishElasticsearchJob({
+          action: "index",
+          entity: "product",
+          id: updated.id,
+          companyId: updated.companyId,
+          data: buildProductIndexDocument(updated),
+        });
+      }
       return toProductDto(updated!);
     });
   }

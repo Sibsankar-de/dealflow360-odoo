@@ -45,6 +45,7 @@ export interface ListCustomersQuery {
 
 export interface AddCustomerRequest {
   userEmail: string;
+  customerTier?: CustomerTier | null;
   role?: BackendCompanyRole;
 }
 

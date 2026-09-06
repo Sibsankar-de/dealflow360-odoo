@@ -45,6 +45,10 @@ model User {
   salesOrdersAsSalesRep SalesOrder[]           @relation("SalesOrderSalesRep")
   invoicesAsCustomer    Invoice[]              @relation("InvoiceCustomer")
 
+  // Subscription Relations
+  subscriptionsAsCustomer   Subscription[]       @relation("SubscriptionCustomer")
+  subscriptionPeriodsRenewed SubscriptionPeriod[] @relation("SubscriptionPeriodRenewedBy")
+
   @@index([email])
   @@map("users")
 }

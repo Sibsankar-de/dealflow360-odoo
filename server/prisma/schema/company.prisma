@@ -31,6 +31,8 @@ model Company {
   deliveries   Delivery[]
   backorders   Backorder[]
   invoices     Invoice[]
+  subscriptions Subscription[]
+  subscriptionPricings SubscriptionPricing[]
 
   @@index([ownerId])
   @@index([status])

@@ -177,6 +177,7 @@ Responsibilities:
 - Provide paginated company listing (GET /api/v1/companies) scoped to the authenticated user's memberships and ownerships with assigned userRole, search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
 - Provide company role definition endpoint (GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
 - Provide paginated customer listing endpoint (GET /api/v1/customers/:companyId and GET /api/v1/companies/:id/customers) returning all customers associated with the company, supporting search by name or email, filtering by customer tier, and pagination.
+- Provide add customer endpoint (POST /api/v1/customers/:companyId and POST /api/v1/companies/:id/customers) accepting user email (`userEmail`) and optional customer tier (`customerTier`: BRONZE, SILVER, GOLD), adding the user with the CUSTOMER role and assigned tier or updating existing membership.
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context
@@ -201,6 +202,11 @@ Responsibilities:
   - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
   - Provide paginated deal listing for company sales members via GET /api/v1/deals/:companyId.
   - Provide paginated deal listing for customers via GET /api/v1/deals/customer and GET /api/v1/deals/customer/:companyId scoped to the authenticated user's customer ID with status filtering and pagination.
+  - Provide paginated deal health and anomaly evaluation via GET /api/v1/deals/:companyId/health:
+    - Filters and identifies open, non-terminal deals (`status: OPEN`) that are either idle for extended periods (e.g. no activity for >= 30 days or months) or whose expected close date / expiry is close (e.g. <= 2 days or overdue).
+    - Classifies alert records with `riskType` (`IDLE`, `EXPIRING_SOON`, `EXPIRED`), `severity` (`HIGH`, `MEDIUM`, `LOW`), age formatting, and suggested follow-up actions.
+    - Aggregates company-wide deal health KPIs (`stalledDealsCount`, `expiringSoonCount`, `deliveryRiskCount`, `quoteApprovalsCount`).
+    - Supports search, risk type filtering (`ALL`, `IDLE`, `EXPIRING_SOON`, `EXPIRED`), configurable threshold params (`idleDays`, `idleMonths`, `expiringDays`), and standard pagination.
 - Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).
@@ -244,7 +250,27 @@ Responsibilities:
   - Track dates and terms: `issue_date`, `due_date`, `paid_at`, and `payment_terms`.
   - Track financial totals: `subtotal`, `discount`, `tax`, `total`, `paid_amount`, and `remaining_amount`.
 - Store invoice line items (`invoice_items`) linking invoices to sales order items and products.
-  - Track line-level quantities and commercial values: `delivered_quantity`, `unit_price`, `discount`, `tax`, and `line_total`.
+  - Track line-level quantities and commercial values: `delivered_quantity`, `unitPrice`, `discount`, `tax`, and `line_total`.
+
+### 4.11 Subscription and Recurring Pricing Persistence Context
+
+Responsibilities:
+
+- Store recurring pricing catalog configurations (`subscription_pricings`) linking products and companies.
+  - Support period options via `SubscriptionType` enum (`MONTHLY`, `QUARTERLY`, `YEARLY`).
+  - Support optional customer tier pricing (`customer_tier`: `BRONZE`, `SILVER`, `GOLD`).
+  - Track pricing constraints: `price`, `min_quantity`, `currency`, `valid_from`, `valid_until`, and `is_active`.
+  - Isolate catalog pricing configuration from active subscriptions so historical applied prices remain intact.
+- Store customer subscriptions (`subscriptions`) generated automatically when recurring products are fulfilled through quotation or sales order delivery.
+  - Track subscription lifecycle via `SubscriptionStatus` enum (`ACTIVE`, `EXPIRED`, `CANCELLED`).
+  - Maintain unique `subscription_no` (`SUB-YYYYMM-XXXX`), currency, and `total_recurring_amount`.
+  - Track terms: `start_date`, `end_date`, and `next_renewal_date`.
+  - Maintain commercial traceability to `company`, `customer`, `sales_order`, `quotation`, and `subscription_pricing`.
+- Store subscription line items (`subscription_items`) capturing exact applied pricing for recurring products:
+  - Track line-level `quantity`, applied `unit_price`, `discount`, and `line_total`.
+- Store versioned subscription period history records (`subscription_periods`):
+  - Record each period number (`period_number` = 1, 2, 3...), `start_date`, `end_date`, `subscription_type`, `total_amount`, and `renewed_at`.
+  - Snapshot active lines in `items_snapshot` (JSONB) to preserve full commercial and pricing history across successive renewals.
 
 
 
@@ -707,7 +733,69 @@ Payment records must reference the invoice or invoices they settle.
 
 Payment state must not be confused with delivery state.
 
-## 11. Deal and Discount Engine
+## 11. Subscription and Renewal Workflow
+
+Subscriptions represent ongoing recurring commercial arrangements generated from fulfilled recurring products.
+
+### 11.1 Subscription Generation on Fulfillment
+
+When a sales order or quotation fulfillment is executed:
+
+```text
+Delivered Products
+       |
+       +----> One-Time Products ----> Standard Invoicing Only
+       |
+       +----> Recurring Products ----> Customer Subscription Generated
+                                             |
+                                             +----> Match Configured Pricing (Customer Tier / Base)
+                                             |
+                                             +----> Calculate Start & Next Renewal Dates
+                                             |
+                                             +----> Store Agreed Applied Line Prices
+                                             |
+                                             +----> Create Period 1 Snapshot
+```
+
+Rules:
+1. One-time products (`type = ONE_TIME`) never generate subscriptions.
+2. Recurring products (`type = RECURRING`) automatically generate a `Subscription` and linked `SubscriptionItem` lines.
+3. The subscription applies the configured `SubscriptionPricing` for the customer tier and subscription period, or falls back to agreed order pricing.
+4. Active subscriptions store the actual applied price directly, isolating active customer contracts from future catalog price revisions.
+5. An initial `SubscriptionPeriod` (period 1) records the initial term snapshot.
+
+### 11.2 Subscription Renewal Workflow
+
+When an active or expired subscription is renewed:
+
+```text
+Customer / Staff Request Renewal
+       |
+       v
+Validate Status (ACTIVE or EXPIRED)
+       |
+       v
+Fetch Latest Active Configured Subscription Pricing
+       |
+       v
+Calculate New Period Dates:
+  - ACTIVE:  New Start = Current End Date,  New End = Start + Period
+  - EXPIRED: New Start = Now,               New End = Now + Period
+       |
+       v
+Create New SubscriptionPeriod Record with Items Snapshot
+       |
+       v
+Update Subscription Header & Line Items (Status = ACTIVE)
+```
+
+Rules:
+1. Eligibility: Only `ACTIVE` and `EXPIRED` subscriptions can be renewed. `CANCELLED` subscriptions cannot be renewed.
+2. Pricing: Renewal applies the latest active configured `SubscriptionPricing` available at the time of renewal.
+3. History Preservation: The previous subscription period and pricing are immutably preserved in `SubscriptionPeriod` records with item-level snapshots.
+4. Customer Visibility: The renewed subscription remains immediately accessible on the customer's portal.
+
+## 12. Deal and Discount Engine
 
 The deal engine evaluates applicable commercial rules.
 

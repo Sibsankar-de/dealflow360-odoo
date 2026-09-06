@@ -5,6 +5,7 @@ import {
   ProductStock,
   ProductDiscountTier,
   ProductType,
+  CustomerTier,
   Category,
   CategoryProduct,
 } from "@prisma/client";
@@ -47,6 +48,7 @@ export class ProductRepository {
     },
     stocks: Array<{ warehouseId: string; stockQty: Prisma.Decimal }> = [],
     categoryIds: string[] = [],
+    discountTiers: Array<{ customerTier: CustomerTier; discountPercent: Prisma.Decimal }> = [],
     tx?: TransactionClient,
   ): Promise<ProductWithRelations> {
     const client = tx || this.prisma;
@@ -68,6 +70,12 @@ export class ProductRepository {
         categories: {
           create: categoryIds.map((categoryId) => ({
             categoryId,
+          })),
+        },
+        discountTiers: {
+          create: discountTiers.map((dt) => ({
+            customerTier: dt.customerTier,
+            discountPercent: dt.discountPercent,
           })),
         },
       },
@@ -94,7 +102,7 @@ export class ProductRepository {
 
   public async findMany(
     companyId: string,
-    filters: { type?: ProductType; search?: string },
+    filters: { type?: ProductType; search?: string; categoryId?: string },
     page: number = 1,
     limit: number = 20,
     tx?: TransactionClient,
@@ -105,6 +113,15 @@ export class ProductRepository {
     const where: Prisma.ProductWhereInput = {
       companyId,
       ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.categoryId
+        ? {
+            categories: {
+              some: {
+                categoryId: filters.categoryId,
+              },
+            },
+          }
+        : {}),
       ...(filters.search
         ? {
             name: {
@@ -210,6 +227,33 @@ export class ProductRepository {
     return client.categoryProduct.findMany({
       where: { productId },
       include: { category: true },
+    });
+  }
+
+  public async syncDiscountTiers(
+    productId: string,
+    discountTiers: Array<{ customerTier: CustomerTier; discountPercent: Prisma.Decimal }>,
+    tx?: TransactionClient,
+  ): Promise<ProductDiscountTier[]> {
+    const client = tx || this.prisma;
+
+    await client.productDiscountTier.deleteMany({
+      where: { productId },
+    });
+
+    if (discountTiers.length > 0) {
+      await client.productDiscountTier.createMany({
+        data: discountTiers.map((dt) => ({
+          productId,
+          customerTier: dt.customerTier,
+          discountPercent: dt.discountPercent,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return client.productDiscountTier.findMany({
+      where: { productId },
     });
   }
 }

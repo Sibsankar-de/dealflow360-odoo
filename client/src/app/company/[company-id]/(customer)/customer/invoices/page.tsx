@@ -5,7 +5,13 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
+import { Modal, ModalFooter } from "@/components/ui/Modal";
+import {
+  useGetInvoicesQuery,
+  useGetInvoiceSummaryQuery,
+  useRecordInvoicePaymentMutation,
+} from "@/store/features/invoice/invoiceApi";
+import { InvoiceResponse, InvoiceStatus } from "@/types/invoice";
 import {
   Receipt,
   Search,
@@ -16,116 +22,13 @@ import {
   FileText,
   CreditCard,
   Building2,
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-interface CustomerInvoice {
-  id: string;
-  invoiceNo: string;
-  orderNo: string;
-  dealTitle: string;
-  issueDate: string;
-  dueDate: string;
-  totalAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
-  currency: string;
-  status: "PAID" | "PARTIALLY_PAID" | "POSTED" | "OVERDUE";
-  items: Array<{
-    productName: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }>;
-}
-
-const MOCK_CUSTOMER_INVOICES: CustomerInvoice[] = [
-  {
-    id: "inv-001",
-    invoiceNo: "INV-2026-0042",
-    orderNo: "ORD-9402",
-    dealTitle: "Enterprise Machinery & Hardware Procurement",
-    issueDate: "2026-02-28",
-    dueDate: "2026-03-30",
-    totalAmount: 18500.0,
-    paidAmount: 18500.0,
-    remainingAmount: 0.0,
-    currency: "USD",
-    status: "PAID",
-    items: [
-      {
-        productName: "Heavy Duty Industrial Lathe Pro",
-        quantity: 2,
-        unitPrice: 7500.0,
-        total: 15000.0,
-      },
-      {
-        productName: "High-Precision Tooling Calibrator Kit",
-        quantity: 1,
-        unitPrice: 3500.0,
-        total: 3500.0,
-      },
-    ],
-  },
-  {
-    id: "inv-002",
-    invoiceNo: "INV-2026-0089",
-    orderNo: "ORD-9821",
-    dealTitle: "Q1 Raw Materials & Steel Alloy Supply",
-    issueDate: "2026-03-02",
-    dueDate: "2026-04-01",
-    totalAmount: 9400.0,
-    paidAmount: 4000.0,
-    remainingAmount: 5400.0,
-    currency: "USD",
-    status: "PARTIALLY_PAID",
-    items: [
-      {
-        productName: "Structural Steel Rods (Grade 60)",
-        quantity: 50,
-        unitPrice: 120.0,
-        total: 6000.0,
-      },
-      {
-        productName: "Industrial Galvanized Fasteners Pack (1000ct)",
-        quantity: 10,
-        unitPrice: 340.0,
-        total: 3400.0,
-      },
-    ],
-  },
-  {
-    id: "inv-003",
-    invoiceNo: "INV-2026-0104",
-    orderNo: "ORD-9910",
-    dealTitle: "Automated Conveyor Belt System Expansion",
-    issueDate: "2026-03-04",
-    dueDate: "2026-04-04",
-    totalAmount: 24800.0,
-    paidAmount: 0.0,
-    remainingAmount: 24800.0,
-    currency: "USD",
-    status: "POSTED",
-    items: [
-      {
-        productName: "Modular Conveyor Roller Assembly (10m)",
-        quantity: 4,
-        unitPrice: 5200.0,
-        total: 20800.0,
-      },
-      {
-        productName: "Variable Speed Motor Drive Unit",
-        quantity: 2,
-        unitPrice: 2000.0,
-        total: 4000.0,
-      },
-    ],
-  },
-];
-
 const getStatusConfig = (
-  status: CustomerInvoice["status"]
+  status: InvoiceStatus
 ): { variant: BadgeVariant; label: string; dotClass: string } => {
   switch (status) {
     case "PAID":
@@ -138,8 +41,11 @@ const getStatusConfig = (
       };
     case "POSTED":
       return { variant: "info", label: "Open / Posted", dotClass: "bg-blue-500" };
-    case "OVERDUE":
-      return { variant: "danger", label: "Overdue", dotClass: "bg-red-500" };
+    case "DRAFT":
+      return { variant: "secondary", label: "Draft", dotClass: "bg-slate-400" };
+    case "CANCELLED":
+    case "VOID":
+      return { variant: "danger", label: status, dotClass: "bg-red-500" };
     default:
       return {
         variant: "secondary",
@@ -154,14 +60,36 @@ export default function CustomerInvoicesPage() {
   const companyId =
     typeof params?.["company-id"] === "string" ? params["company-id"] : "";
 
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<
-    CustomerInvoice["status"] | "ALL"
-  >("ALL");
+  const [activeFilter, setActiveFilter] = useState<InvoiceStatus | "ALL">("ALL");
   const [selectedInvoice, setSelectedInvoice] =
-    useState<CustomerInvoice | null>(null);
+    useState<InvoiceResponse | null>(null);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Live queries
+  const { data: invoicesData, isLoading: isLoadingInvoices } = useGetInvoicesQuery(
+    {
+      companyId,
+      params: {
+        search: search.trim() || undefined,
+        status: activeFilter !== "ALL" ? activeFilter : undefined,
+        page,
+        limit: 10,
+      },
+    },
+    { skip: !companyId }
+  );
+
+  const { data: summaryData, isLoading: isLoadingSummary } =
+    useGetInvoiceSummaryQuery({ companyId }, { skip: !companyId });
+
+  const [recordPayment, { isLoading: isProcessingPayment }] =
+    useRecordInvoicePaymentMutation();
+
+  const invoices = invoicesData?.data?.docs || [];
+  const totalPages = invoicesData?.data?.totalPages || 1;
+  const summary = summaryData?.data;
 
   const formatCurrency = (val: number = 0, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -170,49 +98,42 @@ export default function CustomerInvoicesPage() {
     }).format(val);
   };
 
-  const filteredInvoices = MOCK_CUSTOMER_INVOICES.filter((inv) => {
-    const matchesSearch =
-      inv.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
-      inv.orderNo.toLowerCase().includes(search.toLowerCase()) ||
-      inv.dealTitle.toLowerCase().includes(search.toLowerCase());
-
-    const matchesFilter =
-      activeFilter === "ALL" || inv.status === activeFilter;
-
-    return matchesSearch && matchesFilter;
-  });
-
-  const totalInvoiced = MOCK_CUSTOMER_INVOICES.reduce(
-    (sum, inv) => sum + inv.totalAmount,
-    0
-  );
-  const totalPaid = MOCK_CUSTOMER_INVOICES.reduce(
-    (sum, inv) => sum + inv.paidAmount,
-    0
-  );
-  const totalOutstanding = MOCK_CUSTOMER_INVOICES.reduce(
-    (sum, inv) => sum + inv.remainingAmount,
-    0
-  );
-
-  const handlePayInvoice = (inv: CustomerInvoice) => {
+  const handlePayInvoice = (inv: InvoiceResponse) => {
     setSelectedInvoice(inv);
     setIsPayModalOpen(true);
   };
 
-  const handleConfirmPayment = () => {
-    setIsProcessingPayment(true);
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      setIsPayModalOpen(false);
+  const handleConfirmPayment = async () => {
+    if (!selectedInvoice || !companyId) return;
+
+    try {
+      await recordPayment({
+        companyId,
+        invoiceId: selectedInvoice.id,
+        data: {
+          amount: selectedInvoice.remainingAmount,
+          paymentMethod: "Online Payment",
+          notes: "Customer portal online payment",
+        },
+      }).unwrap();
+
       toast.success(
-        `Payment receipt generated for ${selectedInvoice?.invoiceNo}. Balance settled successfully!`
+        `Payment receipt generated for ${selectedInvoice.invoiceNo}. Balance settled successfully!`
       );
-    }, 1000);
+      setIsPayModalOpen(false);
+      setSelectedInvoice(null);
+    } catch (err: unknown) {
+      const errorObj = err as { data?: { message?: string }; message?: string };
+      toast.error(
+        errorObj?.data?.message ||
+          errorObj?.message ||
+          "Payment processing failed. Please try again."
+      );
+    }
   };
 
   const handleDownloadInvoice = (invoiceNo: string) => {
-    toast.success(`Downloading PDF for ${invoiceNo}...`);
+    toast.success(`Downloading PDF statement for ${invoiceNo}...`);
   };
 
   return (
@@ -221,7 +142,7 @@ export default function CustomerInvoicesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-brand-50 border border-brand-100 text-brand-600">
+            <div className="p-2 rounded-xl bg-surface border border-border text-brand-600 shadow-2xs">
               <Receipt className="w-6 h-6" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
@@ -241,16 +162,20 @@ export default function CustomerInvoicesPage() {
             <span className="text-xs sm:text-sm font-semibold text-text-secondary">
               Total Invoiced
             </span>
-            <div className="p-2 rounded-xl bg-surface/80 text-brand-600">
+            <div className="p-2 rounded-xl bg-surface border border-border text-brand-600">
               <FileText className="w-5 h-5" />
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-600">
-              {formatCurrency(totalInvoiced)}
-            </span>
+            {isLoadingSummary ? (
+              <div className="h-8 w-28 bg-surface animate-pulse rounded-lg" />
+            ) : (
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-600">
+                {formatCurrency(summary?.totalAmount ?? 0)}
+              </span>
+            )}
             <span className="text-xs text-text-muted">
-              {MOCK_CUSTOMER_INVOICES.length} invoices issued to date
+              {summary?.totalCount ?? 0} invoices issued to date
             </span>
           </div>
         </Card>
@@ -260,16 +185,20 @@ export default function CustomerInvoicesPage() {
             <span className="text-xs sm:text-sm font-semibold text-text-secondary">
               Total Paid
             </span>
-            <div className="p-2 rounded-xl bg-surface/80 text-emerald-600">
+            <div className="p-2 rounded-xl bg-surface border border-border text-emerald-600">
               <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600">
-              {formatCurrency(totalPaid)}
-            </span>
+            {isLoadingSummary ? (
+              <div className="h-8 w-28 bg-surface animate-pulse rounded-lg" />
+            ) : (
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600">
+                {formatCurrency(summary?.paidAmount ?? 0)}
+              </span>
+            )}
             <span className="text-xs text-text-muted">
-              Settled against deliveries
+              {summary?.paidCount ?? 0} invoices fully settled
             </span>
           </div>
         </Card>
@@ -279,16 +208,20 @@ export default function CustomerInvoicesPage() {
             <span className="text-xs sm:text-sm font-semibold text-text-secondary">
               Balance Outstanding
             </span>
-            <div className="p-2 rounded-xl bg-surface/80 text-blue-600">
+            <div className="p-2 rounded-xl bg-surface border border-border text-blue-600">
               <Clock className="w-5 h-5" />
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-600">
-              {formatCurrency(totalOutstanding)}
-            </span>
+            {isLoadingSummary ? (
+              <div className="h-8 w-28 bg-surface animate-pulse rounded-lg" />
+            ) : (
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-600">
+                {formatCurrency(summary?.remainingAmount ?? 0)}
+              </span>
+            )}
             <span className="text-xs text-text-muted">
-              Awaiting payment settlement
+              {(summary?.postedCount ?? 0) + (summary?.partiallyPaidCount ?? 0)} awaiting full settlement
             </span>
           </div>
         </Card>
@@ -309,7 +242,10 @@ export default function CustomerInvoicesPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveFilter(tab.id as CustomerInvoice["status"] | "ALL")}
+                onClick={() => {
+                  setActiveFilter(tab.id as InvoiceStatus | "ALL");
+                  setPage(1);
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 cursor-pointer ${
                   isActive
                     ? "bg-brand-600 text-white font-semibold shadow-xs"
@@ -327,8 +263,11 @@ export default function CustomerInvoicesPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search invoice or deal..."
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search invoice number..."
             className="w-full pl-9 pr-4 py-2 text-xs font-medium bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all text-text-primary placeholder:text-text-muted shadow-xs"
           />
         </div>
@@ -346,7 +285,7 @@ export default function CustomerInvoicesPage() {
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wider font-semibold text-text-muted bg-surface/30">
                 <th className="py-3.5 px-6">Invoice #</th>
-                <th className="py-3.5 px-4">Deal / Order</th>
+                <th className="py-3.5 px-4">Sales Order / Delivery</th>
                 <th className="py-3.5 px-4">Issue Date</th>
                 <th className="py-3.5 px-4">Due Date</th>
                 <th className="py-3.5 px-4 text-right">Total</th>
@@ -357,7 +296,16 @@ export default function CustomerInvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {filteredInvoices.length === 0 ? (
+              {isLoadingInvoices ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-text-secondary">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+                      <span className="text-xs text-text-muted">Loading invoices...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : invoices.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-text-secondary">
                     <Receipt className="w-8 h-8 text-text-muted opacity-60 mx-auto mb-2" />
@@ -370,9 +318,9 @@ export default function CustomerInvoicesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => {
+                invoices.map((inv) => {
                   const badge = getStatusConfig(inv.status);
-                  const isPending = inv.remainingAmount > 0;
+                  const isPending = inv.remainingAmount > 0 && inv.status !== "CANCELLED" && inv.status !== "VOID";
 
                   return (
                     <tr
@@ -390,20 +338,22 @@ export default function CustomerInvoicesPage() {
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap max-w-xs">
                         <div className="font-semibold text-text-primary truncate">
-                          {inv.dealTitle}
+                          {inv.orderNo || "Sales Order"}
                         </div>
-                        <div className="text-xs text-text-muted">
-                          {inv.orderNo}
-                        </div>
+                        {inv.deliveryNo && (
+                          <div className="text-xs text-text-muted">
+                            Delivery: {inv.deliveryNo}
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-4 text-text-secondary whitespace-nowrap text-xs">
-                        {inv.issueDate}
+                        {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString() : "—"}
                       </td>
                       <td className="py-4 px-4 text-text-secondary whitespace-nowrap text-xs">
-                        {inv.dueDate}
+                        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
                       </td>
                       <td className="py-4 px-4 text-right font-bold text-text-primary whitespace-nowrap">
-                        {formatCurrency(inv.totalAmount, inv.currency)}
+                        {formatCurrency(inv.total, inv.currency)}
                       </td>
                       <td className="py-4 px-4 text-right font-medium text-emerald-600 whitespace-nowrap">
                         {formatCurrency(inv.paidAmount, inv.currency)}
@@ -462,6 +412,35 @@ export default function CustomerInvoicesPage() {
             </tbody>
           </table>
         </CardContent>
+
+        {/* Pagination footer */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-text-muted">
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                rightIcon={<ChevronRight className="w-4 h-4" />}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Invoice Detail Modal */}
@@ -470,7 +449,7 @@ export default function CustomerInvoicesPage() {
           isOpen={!!selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
           title={`Invoice ${selectedInvoice.invoiceNo}`}
-          description={`Issued against ${selectedInvoice.orderNo} for ${selectedInvoice.dealTitle}`}
+          description={`Issued against ${selectedInvoice.orderNo || "Sales Order"}`}
           size="lg"
         >
           <div className="space-y-6">
@@ -479,13 +458,17 @@ export default function CustomerInvoicesPage() {
               <div>
                 <span className="text-text-muted block">Issue Date</span>
                 <span className="font-semibold text-text-primary">
-                  {selectedInvoice.issueDate}
+                  {selectedInvoice.issueDate
+                    ? new Date(selectedInvoice.issueDate).toLocaleDateString()
+                    : "—"}
                 </span>
               </div>
               <div>
                 <span className="text-text-muted block">Due Date</span>
                 <span className="font-semibold text-text-primary">
-                  {selectedInvoice.dueDate}
+                  {selectedInvoice.dueDate
+                    ? new Date(selectedInvoice.dueDate).toLocaleDateString()
+                    : "—"}
                 </span>
               </div>
               <div>
@@ -513,26 +496,42 @@ export default function CustomerInvoicesPage() {
                     <th className="py-2.5 px-4">Item Description</th>
                     <th className="py-2.5 px-4 text-right">Qty</th>
                     <th className="py-2.5 px-4 text-right">Unit Price</th>
+                    <th className="py-2.5 px-4 text-right">Discount</th>
+                    <th className="py-2.5 px-4 text-right">Tax</th>
                     <th className="py-2.5 px-4 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {selectedInvoice.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-surface/30">
-                      <td className="py-3 px-4 font-medium text-text-primary">
-                        {item.productName}
-                      </td>
-                      <td className="py-3 px-4 text-right text-text-secondary">
-                        {item.quantity}
-                      </td>
-                      <td className="py-3 px-4 text-right text-text-secondary">
-                        {formatCurrency(item.unitPrice, selectedInvoice.currency)}
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold text-text-primary">
-                        {formatCurrency(item.total, selectedInvoice.currency)}
+                  {!selectedInvoice.items || selectedInvoice.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-4 px-4 text-center text-text-muted">
+                        No line items recorded on this invoice.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    selectedInvoice.items.map((item, idx) => (
+                      <tr key={item.id || idx} className="hover:bg-surface/30">
+                        <td className="py-3 px-4 font-medium text-text-primary">
+                          {item.productName || "Delivered Product"}
+                        </td>
+                        <td className="py-3 px-4 text-right text-text-secondary">
+                          {item.deliveredQuantity}
+                        </td>
+                        <td className="py-3 px-4 text-right text-text-secondary">
+                          {formatCurrency(item.unitPrice, selectedInvoice.currency)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-text-secondary">
+                          {formatCurrency(item.discount, selectedInvoice.currency)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-text-secondary">
+                          {formatCurrency(item.tax, selectedInvoice.currency)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-semibold text-text-primary">
+                          {formatCurrency(item.lineTotal, selectedInvoice.currency)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -544,11 +543,27 @@ export default function CustomerInvoicesPage() {
                   <span>Subtotal</span>
                   <span>
                     {formatCurrency(
-                      selectedInvoice.totalAmount,
+                      selectedInvoice.subtotal,
                       selectedInvoice.currency
                     )}
                   </span>
                 </div>
+                {selectedInvoice.discount > 0 && (
+                  <div className="flex justify-between text-text-secondary">
+                    <span>Discount</span>
+                    <span className="text-amber-600">
+                      -{formatCurrency(selectedInvoice.discount, selectedInvoice.currency)}
+                    </span>
+                  </div>
+                )}
+                {selectedInvoice.tax > 0 && (
+                  <div className="flex justify-between text-text-secondary">
+                    <span>Tax</span>
+                    <span>
+                      +{formatCurrency(selectedInvoice.tax, selectedInvoice.currency)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-text-secondary">
                   <span>Paid to Date</span>
                   <span className="text-emerald-600 font-medium">
@@ -587,7 +602,7 @@ export default function CustomerInvoicesPage() {
               >
                 Download PDF
               </Button>
-              {selectedInvoice.remainingAmount > 0 && (
+              {selectedInvoice.remainingAmount > 0 && selectedInvoice.status !== "CANCELLED" && selectedInvoice.status !== "VOID" && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -612,7 +627,7 @@ export default function CustomerInvoicesPage() {
           size="md"
         >
           <div className="space-y-4">
-            <div className="p-4 bg-brand-50 border border-brand-200 rounded-xl flex items-center justify-between">
+            <div className="p-4 bg-surface border border-border rounded-xl flex items-center justify-between">
               <div>
                 <span className="text-xs text-text-muted block">Amount Due</span>
                 <span className="text-xl font-bold text-brand-600">

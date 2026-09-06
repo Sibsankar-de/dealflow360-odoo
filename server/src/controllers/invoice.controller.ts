@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
+import { CompanyUserRole } from "@prisma/client";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/apiResponseHandler";
 import { ApiError } from "../utils/apiErrorHandler";
@@ -67,6 +68,16 @@ export class InvoiceController {
       companyId,
     );
 
+    if (
+      req.companyRole === CompanyUserRole.CUSTOMER &&
+      invoice.customerId !== req.user?.id
+    ) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "You do not have permission to view this invoice",
+      );
+    }
+
     return res
       .status(StatusCodes.OK)
       .json(
@@ -93,9 +104,17 @@ export class InvoiceController {
       );
     }
 
+    const isCustomer = req.companyRole === CompanyUserRole.CUSTOMER;
+    const customerId = isCustomer
+      ? req.user?.id
+      : filterResult.data.customerId;
+
     const result = await this.invoiceService.listInvoices(
       companyId,
-      filterResult.data,
+      {
+        ...filterResult.data,
+        ...(customerId ? { customerId } : {}),
+      },
     );
 
     return res
@@ -125,6 +144,19 @@ export class InvoiceController {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
     }
 
+    if (req.companyRole === CompanyUserRole.CUSTOMER) {
+      const invoice = await this.invoiceService.getInvoiceById(
+        invoiceId,
+        companyId,
+      );
+      if (invoice.customerId !== userId) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "You can only pay invoices issued to your account",
+        );
+      }
+    }
+
     const validated = validateBody(recordInvoicePaymentSchema, req.body);
     const invoice = await this.invoiceService.recordPayment(
       companyId,
@@ -149,7 +181,17 @@ export class InvoiceController {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
     }
 
-    const summary = await this.invoiceService.getInvoiceSummary(companyId);
+    const isCustomer = req.companyRole === CompanyUserRole.CUSTOMER;
+    const customerId = isCustomer
+      ? req.user?.id
+      : typeof req.query.customerId === "string"
+      ? req.query.customerId
+      : undefined;
+
+    const summary = await this.invoiceService.getInvoiceSummary(
+      companyId,
+      customerId,
+    );
 
     return res
       .status(StatusCodes.OK)

@@ -4,13 +4,17 @@ import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FulfillmentDetailHeader } from "@/components/modules/fulfillment/FulfillmentDetailHeader";
 import { FulfillmentOrderItemsTable } from "@/components/modules/fulfillment/FulfillmentOrderItemsTable";
-import { FulfillmentPlanAllocation } from "@/components/modules/fulfillment/FulfillmentPlanAllocation";
+import {
+  FulfillmentPlanAllocation,
+  ItemWarehouseAllocationPayload,
+} from "@/components/modules/fulfillment/FulfillmentPlanAllocation";
 import {
   FulfillmentOrderDetail,
   FulfillmentOrderItem,
   FulfillmentStatus,
   RecommendedFulfillmentPlan,
-  WarehouseAllocation,
+  ItemFulfillmentPlan,
+  ProductWarehouseStock,
 } from "@/types/fulfillment";
 import {
   useGetQuotationByIdQuery,
@@ -43,7 +47,7 @@ export default function FulfillmentDetailPage() {
     useGetWarehousesQuery({ companyId }, { skip: !companyId });
 
   const { data: productsData } = useGetProductsQuery(
-    { companyId },
+    { companyId, params: { limit: 100 } },
     { skip: !companyId }
   );
 
@@ -55,7 +59,9 @@ export default function FulfillmentDetailPage() {
   const warehouses = warehousesData?.data?.warehouses || [];
   const products = productsData?.data?.products || [];
 
-  // Build the live fulfillment order detail
+  const [selectedPrimaryWhId, setSelectedPrimaryWhId] = useState<string>("");
+
+  // Build the live fulfillment order detail with real warehouse stock allocations
   const orderDetail: FulfillmentOrderDetail | null = useMemo(() => {
     if (!quotation) return null;
 
@@ -91,66 +97,117 @@ export default function FulfillmentDetailPage() {
       }
     }
 
-    const items: FulfillmentOrderItem[] = (quotation.items || []).map((it) => ({
-      id: it.id,
-      productName: it.productName || "Product",
-      productType: "Hardware",
-      requiredQty: Number(it.quantity) || 0,
-      weight: `${quotation.currency || "USD"} ${Number(it.lineTotal || 0).toLocaleString()} (${it.quantity} × ${quotation.currency || "USD"} ${it.unitPrice})`,
-    }));
-
-    // Primary product line to allocate
-    const primaryItem = quotation.items?.[0];
-    const targetQty = primaryItem ? Number(primaryItem.quantity) || 0 : totalQty;
-    const productName = primaryItem?.productName || "Order Line Items";
-    const productId = primaryItem?.productId || "";
-
-    // Find the product in product list to get per-warehouse stock records
-    const fullProduct = products.find((p) => p.id === productId);
-
-    // Compute warehouse allocations
-    let remainingNeeded = targetQty;
-    const warehouseAllocations: WarehouseAllocation[] = warehouses.map((wh, idx) => {
-      // Find stock in this warehouse
-      const stockEntry = fullProduct?.stocks?.find(
-        (s) => s.warehouseId === wh.id
-      );
-      const availableQty = stockEntry
-        ? Number(stockEntry.stockQty) || 0
-        : (fullProduct?.totalStock ? Math.floor(fullProduct.totalStock / (warehouses.length || 1)) : 10);
-
-      // Auto suggested split
-      const allocatedQty = Math.min(availableQty, Math.max(0, remainingNeeded));
-      remainingNeeded -= allocatedQty;
+    // Map order items
+    const items: FulfillmentOrderItem[] = (quotation.items || []).map((it) => {
+      const matchedProd = products.find((p) => p.id === it.productId);
+      const isRecurring = matchedProd?.type === "RECURRING";
 
       return {
-        id: wh.id,
-        name: wh.name,
-        location: `${wh.addressLine || ""}, ${wh.country || ""}`.replace(/^,\s*|,\s*$/g, "") || "Warehouse",
-        availableQty,
-        allocatedQty,
-        remainingQty: Math.max(0, availableQty - allocatedQty),
-        shippingEstimate: 500 + idx * 200,
-        currencySymbol: quotation.currency === "INR" ? "₹" : "$",
+        id: it.id,
+        productName: it.productName || "Product",
+        productType: isRecurring
+          ? "Recurring Subscription"
+          : "Hardware / One-Time",
+        requiredQty: Number(it.quantity) || 0,
+        weight: `${quotation.currency || "USD"} ${Number(
+          it.lineTotal || 0
+        ).toLocaleString()} (${it.quantity} × ${quotation.currency || "USD"} ${
+          it.unitPrice
+        })`,
       };
     });
 
-    const totalAllocated = warehouseAllocations.reduce((sum, w) => sum + w.allocatedQty, 0);
-    const shipmentsCount = warehouseAllocations.filter((w) => w.allocatedQty > 0).length || 1;
-    const estShippingCost = warehouseAllocations
-      .filter((w) => w.allocatedQty > 0)
-      .reduce((sum, w) => sum + w.shippingEstimate, 0);
+    // Compute real warehouse allocations across all quotation items
+    const itemPlans: ItemFulfillmentPlan[] = (quotation.items || []).map(
+      (it) => {
+        const matchedProd = products.find((p) => p.id === it.productId);
+        const isRecurring = matchedProd?.type === "RECURRING";
+        const requiredQty = Number(it.quantity) || 0;
+        let remainingNeeded = requiredQty;
+
+        const warehouseStocks: ProductWarehouseStock[] = warehouses.map(
+          (wh) => {
+            const stockEntry = matchedProd?.stocks?.find(
+              (s) => s.warehouseId === wh.id
+            );
+            // Real available stock count - 0 if not allocated in warehouse
+            const availableQty = stockEntry
+              ? Number(stockEntry.stockQty) || 0
+              : 0;
+
+            const allocatedQty = Math.min(
+              availableQty,
+              Math.max(0, remainingNeeded)
+            );
+            remainingNeeded -= allocatedQty;
+
+            const remainingQty = Math.max(0, availableQty - allocatedQty);
+            const location =
+              [wh.addressLine, wh.country].filter(Boolean).join(", ") ||
+              "Warehouse Hub";
+
+            return {
+              warehouseId: wh.id,
+              warehouseName: wh.name,
+              location,
+              availableQty,
+              allocatedQty,
+              remainingQty,
+            };
+          }
+        );
+
+        const allocatedTotal = warehouseStocks.reduce(
+          (sum, w) => sum + w.allocatedQty,
+          0
+        );
+        const backorderQty = Math.max(0, requiredQty - allocatedTotal);
+
+        return {
+          productId: it.productId,
+          productName: it.productName || "Order Item",
+          productType: isRecurring
+            ? "Recurring Subscription"
+            : "Hardware / One-Time",
+          requiredQty,
+          allocatedQty: allocatedTotal,
+          backorderQty,
+          warehouses: warehouseStocks,
+        };
+      }
+    );
+
+    const totalRequired = itemPlans.reduce(
+      (sum, p) => sum + p.requiredQty,
+      0
+    );
+    const totalAllocated = itemPlans.reduce(
+      (sum, p) => sum + p.allocatedQty,
+      0
+    );
+    const totalBackordered = itemPlans.reduce(
+      (sum, p) => sum + p.backorderQty,
+      0
+    );
+
+    const shippingWarehouses = new Set<string>();
+    itemPlans.forEach((it) => {
+      it.warehouses.forEach((wh) => {
+        if (wh.allocatedQty > 0) {
+          shippingWarehouses.add(wh.warehouseId);
+        }
+      });
+    });
 
     const fulfillmentPlan: RecommendedFulfillmentPlan = {
-      productId,
-      productName,
-      targetQty,
       mode: "Suggested",
-      totalRequired: targetQty,
+      currency: quotation.currency || "USD",
+      items: itemPlans,
+      totalRequired,
       totalAllocated,
-      shipmentsCount,
-      estShippingCost,
-      warehouses: warehouseAllocations,
+      totalBackordered,
+      shipmentsCount: shippingWarehouses.size || 1,
+      primaryWarehouseId: selectedPrimaryWhId || warehouses[0]?.id,
     };
 
     return {
@@ -165,57 +222,50 @@ export default function FulfillmentDetailPage() {
       totalQty,
       qtyUnit: "units",
       warehousesCount: warehouses.length || 1,
-      shipmentsCount: latestSalesOrder?.deliveriesCount || shipmentsCount,
+      shipmentsCount: latestSalesOrder?.deliveriesCount || shippingWarehouses.size || 1,
       status,
       requiredBy,
       isUrgentDate,
       items,
       fulfillmentPlan,
     };
-  }, [quotation, warehouses, products]);
+  }, [quotation, warehouses, products, selectedPrimaryWhId]);
 
   // Execute Fulfillment Action
   const executeFulfillment = async (
-    warehouseOverrides?: Record<string, number>
+    allocationsOverride?: ItemWarehouseAllocationPayload[],
+    customPrimaryWhId?: string
   ) => {
     if (!quotation) return;
 
     try {
-
-      // Build items array with warehouse allocations
-      const itemsPayload: Array<{
+      let itemsPayload: Array<{
         productId: string;
         warehouseId?: string;
         quantity?: number;
       }> = [];
 
-      const primaryItem = quotation.items?.[0];
-
-      if (warehouseOverrides && Object.keys(warehouseOverrides).length > 0) {
-        Object.entries(warehouseOverrides).forEach(([whId, qty]) => {
-          if (qty > 0 && primaryItem) {
-            itemsPayload.push({
-              productId: primaryItem.productId,
-              warehouseId: whId,
-              quantity: qty,
-            });
-          }
-        });
-      } else if (orderDetail?.fulfillmentPlan?.warehouses) {
-        orderDetail.fulfillmentPlan.warehouses.forEach((wh) => {
-          if (wh.allocatedQty > 0 && primaryItem) {
-            itemsPayload.push({
-              productId: primaryItem.productId,
-              warehouseId: wh.id,
-              quantity: wh.allocatedQty,
-            });
-          }
+      if (allocationsOverride && allocationsOverride.length > 0) {
+        itemsPayload = allocationsOverride.filter((a) => a.quantity > 0);
+      } else if (orderDetail?.fulfillmentPlan?.items) {
+        orderDetail.fulfillmentPlan.items.forEach((item) => {
+          item.warehouses.forEach((wh) => {
+            if (wh.allocatedQty > 0) {
+              itemsPayload.push({
+                productId: item.productId,
+                warehouseId: wh.warehouseId,
+                quantity: wh.allocatedQty,
+              });
+            }
+          });
         });
       }
 
-      // Default warehouse
       const defaultWarehouseId =
-        itemsPayload[0]?.warehouseId || warehouses[0]?.id;
+        customPrimaryWhId ||
+        selectedPrimaryWhId ||
+        itemsPayload[0]?.warehouseId ||
+        warehouses[0]?.id;
 
       const res = await fulfillQuotation({
         companyId,
@@ -223,13 +273,20 @@ export default function FulfillmentDetailPage() {
         data: {
           warehouseId: defaultWarehouseId,
           items: itemsPayload.length > 0 ? itemsPayload : undefined,
-          notes: `Fulfillment generated for ${quotation.quotationNo}`,
+          notes: `Fulfillment processed for ${quotation.quotationNo}`,
         },
       }).unwrap();
 
-      toast.success(
-        `Fulfillment processed successfully for ${quotation.quotationNo}! Stock deducted, delivery created, and invoice generated.`,
-      );
+      const createdSub = (res as any)?.data?.subscription;
+      if (createdSub) {
+        toast.success(
+          `Fulfillment processed for ${quotation.quotationNo}! Stock deducted, delivery created, invoice generated, and subscription ${createdSub.subscriptionNo} created.`
+        );
+      } else {
+        toast.success(
+          `Fulfillment processed successfully for ${quotation.quotationNo}! Stock deducted, delivery created, and invoice generated.`
+        );
+      }
 
       setTimeout(() => {
         router.push(`/company/${companyId}/workspace/fulfillment`);
@@ -246,8 +303,11 @@ export default function FulfillmentDetailPage() {
     executeFulfillment();
   };
 
-  const handleConfirmOverride = (allocations: Record<string, number>) => {
-    executeFulfillment(allocations);
+  const handleConfirmOverride = (
+    allocations: ItemWarehouseAllocationPayload[],
+    primaryWhId?: string
+  ) => {
+    executeFulfillment(allocations, primaryWhId);
   };
 
   if (isLoadingQuotation || isLoadingWarehouses) {
@@ -266,12 +326,18 @@ export default function FulfillmentDetailPage() {
       <main className="flex-1 py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <div className="p-8 text-center bg-card border border-border rounded-2xl space-y-4">
           <AlertCircle className="w-10 h-10 text-danger mx-auto" />
-          <h2 className="text-xl font-bold text-text-primary">Quotation Not Found</h2>
+          <h2 className="text-xl font-bold text-text-primary">
+            Quotation Not Found
+          </h2>
           <p className="text-xs text-text-muted max-w-md mx-auto">
             The requested quotation could not be loaded or is not available for fulfillment in this company.
           </p>
           <Link href={`/company/${companyId}/workspace/fulfillment`}>
-            <Button variant="outline" size="sm" className="mt-2 inline-flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 inline-flex items-center gap-2"
+            >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Fulfillment</span>
             </Button>
@@ -289,10 +355,13 @@ export default function FulfillmentDetailPage() {
       {/* Order Items Table */}
       <FulfillmentOrderItemsTable items={orderDetail.items} />
 
-      {/* Recommended Fulfillment Plan & Warehouse Allocations */}
+      {/* Recommended Fulfillment Plan & Real Warehouse Allocations */}
       {orderDetail.status !== "Fulfilled" ? (
         <FulfillmentPlanAllocation
           plan={orderDetail.fulfillmentPlan}
+          warehouses={warehouses}
+          selectedWarehouseId={selectedPrimaryWhId || warehouses[0]?.id}
+          onSelectPrimaryWarehouse={setSelectedPrimaryWhId}
           onAcceptSplit={handleAcceptSplit}
           onConfirmOverride={handleConfirmOverride}
           isSubmitting={isFulfilling}

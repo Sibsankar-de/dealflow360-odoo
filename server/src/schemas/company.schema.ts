@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CompanyStatus, CompanyUserRole } from "@prisma/client";
+import { CompanyStatus, CompanyUserRole, CustomerTier } from "@prisma/client";
 
 export const createCompanySchema = z.object({
   name: z
@@ -74,6 +74,7 @@ export const addCompanyUserSchema = z.object({
   role: z.nativeEnum(CompanyUserRole, {
     errorMap: () => ({ message: "Invalid company user role" }),
   }),
+  customerTier: z.nativeEnum(CustomerTier).optional(),
 });
 
 export const updateCompanyUserRoleSchema = z.object({
@@ -85,6 +86,7 @@ export const updateCompanyUserRoleSchema = z.object({
   role: z.nativeEnum(CompanyUserRole, {
     errorMap: () => ({ message: "Invalid company user role" }),
   }),
+  customerTier: z.nativeEnum(CustomerTier).optional(),
 });
 
 export const listCompaniesQuerySchema = z.object({

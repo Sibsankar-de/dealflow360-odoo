@@ -18,13 +18,17 @@ import {
   TransactionClient,
 } from "../utils/transactionHandler";
 import { PaginatedResult } from "../utils/paginate";
+import { prisma } from "../lib/prisma";
 import {
   CreateDealDto,
   UpdateDealDto,
   DealFilterDto,
   CustomerDealFilterDto,
+  DealHealthQueryDto,
+  DealHealthResponseDto,
   DealResponseDto,
   toDealDto,
+  toDealHealthAlertDto,
 } from "../dto/deal.dto";
 
 export class DealService {
@@ -253,6 +257,178 @@ export class DealService {
     return {
       ...result,
       docs: result.docs.map(toDealDto),
+    };
+  }
+
+  public async getDealHealth(
+    companyId: string,
+    query: DealHealthQueryDto,
+  ): Promise<DealHealthResponseDto> {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const now = new Date();
+
+    const idleDays =
+      query.idleDays ?? (query.idleMonths ? query.idleMonths * 30 : 30);
+    const idleThreshold = new Date(
+      now.getTime() - idleDays * 24 * 60 * 60 * 1000,
+    );
+
+    const expiringDays = query.expiringDays ?? 2;
+    const expiringThreshold = new Date(
+      now.getTime() + expiringDays * 24 * 60 * 60 * 1000,
+    );
+
+    const baseWhere: Prisma.DealWhereInput = {
+      companyId,
+      status: DealStatus.OPEN,
+    };
+
+    const riskType = query.riskType || "ALL";
+    let riskFilter: Prisma.DealWhereInput = {};
+
+    if (riskType === "IDLE") {
+      riskFilter = {
+        updatedAt: { lte: idleThreshold },
+      };
+    } else if (riskType === "EXPIRING_SOON") {
+      riskFilter = {
+        expectedCloseDate: {
+          not: null,
+          gte: now,
+          lte: expiringThreshold,
+        },
+      };
+    } else if (riskType === "EXPIRED") {
+      riskFilter = {
+        expectedCloseDate: {
+          not: null,
+          lt: now,
+        },
+      };
+    } else {
+      // "ALL"
+      riskFilter = {
+        OR: [
+          { updatedAt: { lte: idleThreshold } },
+          { expectedCloseDate: { not: null, lte: expiringThreshold } },
+        ],
+      };
+    }
+
+    const where: Prisma.DealWhereInput = {
+      ...baseWhere,
+      ...riskFilter,
+    };
+
+    if (query.search) {
+      const searchTerms: Prisma.DealWhereInput[] = [
+        { name: { contains: query.search, mode: "insensitive" } },
+        { dealNo: { contains: query.search, mode: "insensitive" } },
+        { customer: { userName: { contains: query.search, mode: "insensitive" } } },
+      ];
+
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchTerms },
+        ];
+        delete where.OR;
+      } else {
+        where.AND = [{ OR: searchTerms }];
+      }
+    }
+
+    const [
+      paginatedDeals,
+      stalledDealsCount,
+      expiringDealsCount,
+      expiredDealsCount,
+      totalAtRiskCount,
+      discountAnomaliesCount,
+      deliveryRisksCount,
+      highRiskApprovalsCount,
+    ] = await Promise.all([
+      this.dealRepo.findMany(where, { page, limit }),
+      prisma.deal.count({
+        where: {
+          companyId,
+          status: DealStatus.OPEN,
+          updatedAt: { lte: idleThreshold },
+        },
+      }),
+      prisma.deal.count({
+        where: {
+          companyId,
+          status: DealStatus.OPEN,
+          expectedCloseDate: {
+            not: null,
+            gte: now,
+            lte: expiringThreshold,
+          },
+        },
+      }),
+      prisma.deal.count({
+        where: {
+          companyId,
+          status: DealStatus.OPEN,
+          expectedCloseDate: {
+            not: null,
+            lt: now,
+          },
+        },
+      }),
+      prisma.deal.count({
+        where: {
+          companyId,
+          status: DealStatus.OPEN,
+          OR: [
+            { updatedAt: { lte: idleThreshold } },
+            { expectedCloseDate: { not: null, lte: expiringThreshold } },
+          ],
+        },
+      }),
+      prisma.quotation.count({
+        where: {
+          companyId,
+          status: { in: ["DRAFT", "NEGOTIATING"] },
+        },
+      }),
+      prisma.backorder.count({
+        where: {
+          companyId,
+          status: "PENDING",
+        },
+      }),
+      prisma.quotation.count({
+        where: {
+          companyId,
+          status: "NEGOTIATING",
+        },
+      }),
+    ]);
+
+    const docs = paginatedDeals.docs.map((deal) =>
+      toDealHealthAlertDto(deal, now, idleDays, expiringDays),
+    );
+
+    return {
+      docs,
+      total: paginatedDeals.totalDocs,
+      page: paginatedDeals.page,
+      limit: paginatedDeals.limit,
+      totalPages: paginatedDeals.totalPages,
+      hasNextPage: paginatedDeals.hasNextPage,
+      hasPrevPage: paginatedDeals.hasPrevPage,
+      kpi: {
+        stalledDealsCount,
+        expiringDealsCount,
+        expiredDealsCount,
+        totalAtRiskCount,
+        discountAnomaliesCount,
+        deliveryRisksCount,
+        highRiskApprovalsCount,
+      },
     };
   }
 
