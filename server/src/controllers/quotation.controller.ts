@@ -656,6 +656,31 @@ export class QuotationController {
         ),
       );
   });
+
+  public getFulfillmentSummary = asyncHandler(
+    async (req: Request, res: Response) => {
+      const companyId = req.company?.id;
+      if (!companyId) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Company context is required",
+        );
+      }
+
+      const summary =
+        await this.quotationService.getFulfillmentSummary(companyId);
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            summary,
+            "Fulfillment summary retrieved successfully",
+          ),
+        );
+    },
+  );
 }
 
 export const quotationController = new QuotationController();

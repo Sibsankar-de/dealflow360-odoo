@@ -31,6 +31,19 @@ router.get("/:companyId", quotationController.list);
 // List quotations by deal.
 router.get("/:companyId/deal/:dealId", quotationController.listByDeal);
 
+// Fulfillment summary KPI metrics
+router.get(
+  "/:companyId/fulfillment-summary",
+  verifyCompanyAccess,
+  requireRole(
+    CompanyUserRole.ADMIN,
+    CompanyUserRole.SALES_REP,
+    CompanyUserRole.SALES_MANAGER,
+    CompanyUserRole.FINANCE_MANAGER,
+  ),
+  quotationController.getFulfillmentSummary,
+);
+
 // Quotation details and revisions.
 router.get("/:companyId/:id", quotationController.getById);
 router.get("/:companyId/:id/items", quotationController.getItems);

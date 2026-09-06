@@ -12,6 +12,7 @@ import {
   ApproveNegotiationPayload,
   RejectNegotiationPayload,
   FulfillQuotationPayload,
+  FulfillmentSummaryResponse,
 } from "@/types/quotation";
 
 export interface ListQuotationsQuery {
@@ -341,6 +342,17 @@ export const quotationApi = baseApi.injectEndpoints({
       ],
     }),
 
+    getFulfillmentSummary: builder.query<
+      ApiResponse<FulfillmentSummaryResponse>,
+      { companyId: string }
+    >({
+      query: ({ companyId }) => ({
+        url: `/quotations/${companyId}/fulfillment-summary`,
+        method: "GET",
+      }),
+      providesTags: ["Quotation"],
+    }),
+
     updateQuotationStatus: builder.mutation<
       ApiResponse<{ quotation: QuotationResponse }>,
       { companyId?: string; id: string; status: string }
@@ -368,6 +380,7 @@ export const {
   useGetNegotiationsQuery,
   useGetRevisionsQuery,
   useGetDiscountEvaluationQuery,
+  useGetFulfillmentSummaryQuery,
   useCreateQuotationMutation,
   useUpdateQuotationMutation,
   useSendQuotationMutation,

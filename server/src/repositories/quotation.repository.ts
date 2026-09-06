@@ -17,6 +17,11 @@ import {
   Deal,
   Negotiation,
   NegotiationItem,
+  SalesOrder,
+  Delivery,
+  Backorder,
+  Invoice,
+  SalesOrderItem,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
@@ -36,6 +41,12 @@ export type QuotationWithRelations = Quotation & {
   company: Company;
   negotiations?: (Negotiation & {
     items: (NegotiationItem & { product: Product })[];
+  })[];
+  salesOrders?: (SalesOrder & {
+    items?: (SalesOrderItem & { product?: Product | null })[];
+    deliveries?: Delivery[];
+    backorders?: Backorder[];
+    invoices?: Invoice[];
   })[];
 };
 
@@ -406,6 +417,18 @@ export class QuotationRepository {
             },
           },
         },
+        salesOrders: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            deliveries: true,
+            backorders: true,
+            invoices: true,
+          },
+        },
       },
     });
   }
@@ -434,6 +457,18 @@ export class QuotationRepository {
               product: true,
             },
           },
+        },
+      },
+      salesOrders: {
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          deliveries: true,
+          backorders: true,
+          invoices: true,
         },
       },
     };

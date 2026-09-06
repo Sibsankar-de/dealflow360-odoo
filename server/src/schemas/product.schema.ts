@@ -23,6 +23,7 @@ export const updateProductSchema = z.object({
   price: z.number().positive().optional(),
   baseUnit: z.string().min(1).max(20).trim().optional(),
   type: z.nativeEnum(ProductType).optional(),
+  stocks: z.array(stockEntrySchema).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
   categoryIdList: z.array(z.string().uuid()).optional(),
 });

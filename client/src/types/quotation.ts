@@ -130,12 +130,37 @@ export interface QuotationResponse {
   revisions?: QuotationRevisionDetail[];
   negotiations?: NegotiationDetail[];
   discountEvaluation?: DiscountViolationEvaluation;
+  salesOrders?: Array<{
+    id: string;
+    orderNo: string;
+    status: string;
+    deliveriesCount?: number;
+    invoicesCount?: number;
+    backordersCount?: number;
+    items?: Array<{
+      id: string;
+      productId: string;
+      productName?: string;
+      orderedQuantity: number;
+      deliveredQuantity: number;
+      invoicedQuantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }>;
+  }>;
   customer?: UserResponseType;
   salesRep?: UserResponseType;
   company?: {
     id: string;
     name: string;
   };
+}
+
+export interface FulfillmentSummaryResponse {
+  readyToFulfillCount: number;
+  partiallyFulfilledCount: number;
+  backorderedCount: number;
+  completedCount: number;
 }
 
 export interface CreateQuotationItemRequest {

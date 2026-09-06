@@ -55,6 +55,7 @@ export interface UpdateProductRequest {
   price?: number;
   baseUnit?: string;
   type?: ProductType;
+  stocks?: { warehouseId: string; stockQty: number }[];
 }
 
 export interface UpsertProductStockRequest {

@@ -55,6 +55,7 @@ import {
   productRepository as defaultProductRepository,
 } from "../repositories/product.repository";
 import { ApiError } from "../utils/apiErrorHandler";
+import { prisma as defaultPrisma } from "../lib/prisma";
 import {
   prismaTransaction,
   TransactionClient,
@@ -76,6 +77,7 @@ import {
   RejectNegotiationDto,
   FulfillQuotationDto,
   FulfillmentResultDto,
+  FulfillmentSummaryResponseDto,
   NegotiationResponseDto,
   toQuotationDto,
   toQuotationItemDto,
@@ -700,6 +702,9 @@ export class QuotationService {
     if (filters.search) {
       where.OR = [
         { quotationNo: { contains: filters.search, mode: "insensitive" } },
+        { customer: { userName: { contains: filters.search, mode: "insensitive" } } },
+        { customer: { email: { contains: filters.search, mode: "insensitive" } } },
+        { deal: { name: { contains: filters.search, mode: "insensitive" } } },
       ];
     }
 
@@ -2068,15 +2073,19 @@ export class QuotationService {
     companyId: string,
     defaultWarehouseId: string,
     itemWarehouseOverrides:
-      Array<{ productId: string; warehouseId?: string }> | undefined,
+      | Array<{ productId: string; warehouseId?: string; quantity?: number }>
+      | undefined,
     tx: TransactionClient,
   ): Promise<EvaluatedFulfillmentLines> {
-    const itemWarehouseMap = new Map<string, string>();
+    const itemOverridesMap = new Map<
+      string,
+      Array<{ warehouseId?: string; quantity?: number }>
+    >();
     if (itemWarehouseOverrides && itemWarehouseOverrides.length > 0) {
       for (const it of itemWarehouseOverrides) {
-        if (it.warehouseId) {
-          itemWarehouseMap.set(it.productId, it.warehouseId);
-        }
+        const list = itemOverridesMap.get(it.productId) || [];
+        list.push(it);
+        itemOverridesMap.set(it.productId, list);
       }
     }
 
@@ -2089,61 +2098,144 @@ export class QuotationService {
         continue;
       }
 
-      const targetWarehouseId =
-        itemWarehouseMap.get(orderItem.productId) || defaultWarehouseId;
+      const overrides = itemOverridesMap.get(orderItem.productId);
+      if (overrides && overrides.length > 0) {
+        let deliveredSoFar = 0;
+        for (const override of overrides) {
+          if (deliveredSoFar >= remainingToDeliver) break;
+          const targetWarehouseId = override.warehouseId || defaultWarehouseId;
+          const wh = await this.warehouseRepo.findById(
+            targetWarehouseId,
+            companyId,
+            tx,
+          );
+          if (!wh) {
+            throw new ApiError(
+              StatusCodes.NOT_FOUND,
+              `Warehouse ${targetWarehouseId} not found`,
+            );
+          }
 
-      const wh = await this.warehouseRepo.findById(
-        targetWarehouseId,
-        companyId,
-        tx,
-      );
-      if (!wh) {
-        throw new ApiError(
-          StatusCodes.NOT_FOUND,
-          `Warehouse ${targetWarehouseId} not found`,
+          const stockRecord = await tx.productStock.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: orderItem.productId,
+                warehouseId: targetWarehouseId,
+              },
+            },
+          });
+
+          const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
+          const needed = remainingToDeliver - deliveredSoFar;
+          const requestedQty =
+            override.quantity !== undefined
+              ? Math.min(override.quantity, needed)
+              : needed;
+          const deliverableQuantity = Math.max(
+            0,
+            Math.min(availableStock, requestedQty),
+          );
+
+          if (deliverableQuantity > 0) {
+            deliveredSoFar += deliverableQuantity;
+            evaluatedLines.push({
+              salesOrderItemId: orderItem.id,
+              productId: orderItem.productId,
+              orderedQuantity: remainingToDeliver,
+              deliverableQuantity,
+              backorderQuantity: 0,
+              warehouseId: targetWarehouseId,
+              unitPrice: Number(orderItem.unitPrice),
+              discount: Number(orderItem.discount),
+              taxRate: Number(orderItem.taxRate),
+              finalUnitPrice: Number(orderItem.finalUnitPrice),
+            });
+
+            if (stockRecord) {
+              const newStockQty = Number(
+                (availableStock - deliverableQuantity).toFixed(4),
+              );
+              await tx.productStock.update({
+                where: { id: stockRecord.id },
+                data: { stockQty: new Prisma.Decimal(newStockQty) },
+              });
+            }
+          }
+        }
+
+        const remainingBackorder = Math.max(
+          0,
+          remainingToDeliver - deliveredSoFar,
         );
-      }
-
-      const stockRecord = await tx.productStock.findUnique({
-        where: {
-          productId_warehouseId: {
+        if (remainingBackorder > 0) {
+          evaluatedLines.push({
+            salesOrderItemId: orderItem.id,
             productId: orderItem.productId,
-            warehouseId: targetWarehouseId,
-          },
-        },
-      });
-
-      const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
-      const deliverableQuantity = Math.max(
-        0,
-        Math.min(availableStock, remainingToDeliver),
-      );
-      const backorderQuantity = Math.max(
-        0,
-        remainingToDeliver - deliverableQuantity,
-      );
-
-      evaluatedLines.push({
-        salesOrderItemId: orderItem.id,
-        productId: orderItem.productId,
-        orderedQuantity: remainingToDeliver,
-        deliverableQuantity,
-        backorderQuantity,
-        warehouseId: targetWarehouseId,
-        unitPrice: Number(orderItem.unitPrice),
-        discount: Number(orderItem.discount),
-        taxRate: Number(orderItem.taxRate),
-        finalUnitPrice: Number(orderItem.finalUnitPrice),
-      });
-
-      if (deliverableQuantity > 0 && stockRecord) {
-        const newStockQty = Number(
-          (availableStock - deliverableQuantity).toFixed(4),
+            orderedQuantity: remainingToDeliver,
+            deliverableQuantity: 0,
+            backorderQuantity: remainingBackorder,
+            warehouseId: defaultWarehouseId,
+            unitPrice: Number(orderItem.unitPrice),
+            discount: Number(orderItem.discount),
+            taxRate: Number(orderItem.taxRate),
+            finalUnitPrice: Number(orderItem.finalUnitPrice),
+          });
+        }
+      } else {
+        const targetWarehouseId = defaultWarehouseId;
+        const wh = await this.warehouseRepo.findById(
+          targetWarehouseId,
+          companyId,
+          tx,
         );
-        await tx.productStock.update({
-          where: { id: stockRecord.id },
-          data: { stockQty: new Prisma.Decimal(newStockQty) },
+        if (!wh) {
+          throw new ApiError(
+            StatusCodes.NOT_FOUND,
+            `Warehouse ${targetWarehouseId} not found`,
+          );
+        }
+
+        const stockRecord = await tx.productStock.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: orderItem.productId,
+              warehouseId: targetWarehouseId,
+            },
+          },
         });
+
+        const availableStock = stockRecord ? Number(stockRecord.stockQty) : 0;
+        const deliverableQuantity = Math.max(
+          0,
+          Math.min(availableStock, remainingToDeliver),
+        );
+        const backorderQuantity = Math.max(
+          0,
+          remainingToDeliver - deliverableQuantity,
+        );
+
+        evaluatedLines.push({
+          salesOrderItemId: orderItem.id,
+          productId: orderItem.productId,
+          orderedQuantity: remainingToDeliver,
+          deliverableQuantity,
+          backorderQuantity,
+          warehouseId: targetWarehouseId,
+          unitPrice: Number(orderItem.unitPrice),
+          discount: Number(orderItem.discount),
+          taxRate: Number(orderItem.taxRate),
+          finalUnitPrice: Number(orderItem.finalUnitPrice),
+        });
+
+        if (deliverableQuantity > 0 && stockRecord) {
+          const newStockQty = Number(
+            (availableStock - deliverableQuantity).toFixed(4),
+          );
+          await tx.productStock.update({
+            where: { id: stockRecord.id },
+            data: { stockQty: new Prisma.Decimal(newStockQty) },
+          });
+        }
       }
     }
 
@@ -2558,6 +2650,62 @@ export class QuotationService {
     }
 
     return quotationNo;
+  }
+
+  public async getFulfillmentSummary(
+    companyId: string,
+  ): Promise<FulfillmentSummaryResponseDto> {
+    const company = await this.companyRepo.findById(companyId);
+    if (!company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const [readyCount, partialCount, backorderCount, completedCount] =
+      await Promise.all([
+        defaultPrisma.quotation.count({
+          where: {
+            companyId,
+            status: QuotationStatus.ACCEPTED,
+            salesOrders: {
+              none: {
+                status: {
+                  in: [
+                    SalesOrderStatus.PARTIALLY_DELIVERED,
+                    SalesOrderStatus.DELIVERED,
+                  ],
+                },
+              },
+            },
+          },
+        }),
+        defaultPrisma.salesOrder.count({
+          where: {
+            companyId,
+            status: SalesOrderStatus.PARTIALLY_DELIVERED,
+          },
+        }),
+        defaultPrisma.backorder.count({
+          where: {
+            companyId,
+            status: {
+              in: [BackorderStatus.PENDING, BackorderStatus.PARTIALLY_FULFILLED],
+            },
+          },
+        }),
+        defaultPrisma.salesOrder.count({
+          where: {
+            companyId,
+            status: SalesOrderStatus.DELIVERED,
+          },
+        }),
+      ]);
+
+    return {
+      readyToFulfillCount: readyCount,
+      partiallyFulfilledCount: partialCount,
+      backorderedCount: backorderCount,
+      completedCount: completedCount,
+    };
   }
 }
 

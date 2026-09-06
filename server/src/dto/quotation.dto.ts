@@ -19,7 +19,7 @@ import {
   Company,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
-import { SalesOrderResponseDto } from "./salesOrder.dto";
+import { SalesOrderResponseDto, toSalesOrderDto } from "./salesOrder.dto";
 import { DeliveryResponseDto } from "./delivery.dto";
 import { InvoiceResponseDto } from "./invoice.dto";
 import { BackorderResponseDto } from "./backorder.dto";
@@ -142,6 +142,14 @@ export interface QuotationResponseDto {
   };
   negotiations?: NegotiationResponseDto[];
   discountEvaluation?: DiscountViolationEvaluation;
+  salesOrders?: SalesOrderResponseDto[];
+}
+
+export interface FulfillmentSummaryResponseDto {
+  readyToFulfillCount: number;
+  partiallyFulfilledCount: number;
+  backorderedCount: number;
+  completedCount: number;
 }
 
 export interface DealResponseDto {
@@ -359,6 +367,7 @@ export const toQuotationDto = (
     customer?: User;
     company?: Company;
     negotiations?: Parameters<typeof toNegotiationDto>[0][];
+    salesOrders?: Parameters<typeof toSalesOrderDto>[0][];
   },
 ): QuotationResponseDto => {
   const items = quotation.items ? quotation.items.map(toQuotationItemDto) : [];
@@ -410,6 +419,9 @@ export const toQuotationDto = (
       : undefined,
     negotiations: quotation.negotiations
       ? quotation.negotiations.map(toNegotiationDto)
+      : undefined,
+    salesOrders: quotation.salesOrders
+      ? quotation.salesOrders.map(toSalesOrderDto)
       : undefined,
   };
 };
