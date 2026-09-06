@@ -1,81 +1,57 @@
 "use client";
 
 import React, { useState } from "react";
-import { Navbar } from "@/components/modules/layout/Navbar";
+import { useParams } from "next/navigation";
 import { DealHealthSummaryCards } from "@/components/modules/dealhealth/DealHealthSummaryCards";
 import { AttentionRequiredTable } from "@/components/modules/dealhealth/AttentionRequiredTable";
-import { DealHealthKPI, DealHealthAlert } from "@/types/dealhealth";
+import { DealHealthAlert, HealthRiskType, DealHealthKPI } from "@/types/dealhealth";
+import { useGetDealHealthQuery } from "@/store/features/deal/dealApi";
 import { CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 
-const INITIAL_KPI: DealHealthKPI = {
-  stalledDealsCount: 2,
-  discountAnomaliesCount: 3,
-  deliveryRisksCount: 1,
-  highRiskApprovalsCount: 2,
+const DEFAULT_KPI: DealHealthKPI = {
+  stalledDealsCount: 0,
+  expiringDealsCount: 0,
+  expiredDealsCount: 0,
+  totalAtRiskCount: 0,
+  discountAnomaliesCount: 0,
+  deliveryRisksCount: 0,
+  highRiskApprovalsCount: 0,
 };
 
-const INITIAL_ALERTS: DealHealthAlert[] = [
-  {
-    id: "alert_01",
-    severity: "HIGH",
-    customerName: "Acme Corp",
-    referenceNumber: "QT-1042",
-    referenceType: "Quotation",
-    issueDescription: "No customer activity for 8 days",
-    ageDays: "8d",
-    ownerName: "Rahul Sharma",
-    suggestedAction: "Nudge Customer",
-  },
-  {
-    id: "alert_02",
-    severity: "MEDIUM",
-    customerName: "Beta Industries",
-    referenceNumber: "QT-1045",
-    referenceType: "Quotation",
-    issueDescription: "Discount 6 pts above rep historical average",
-    ageDays: "3d",
-    ownerName: "Priya Nair",
-    suggestedAction: "Review Discount",
-  },
-  {
-    id: "alert_03",
-    severity: "HIGH",
-    customerName: "Nova Systems",
-    referenceNumber: "SO-1092",
-    referenceType: "Order",
-    issueDescription: "Delivery promise at risk - 3 units backordered",
-    ageDays: "2d",
-    ownerName: "Arjun Mehta",
-    suggestedAction: "Check Fulfillment",
-  },
-  {
-    id: "alert_04",
-    severity: "LOW",
-    customerName: "Vertex Solutions",
-    referenceNumber: "QT-1035",
-    referenceType: "Quotation",
-    issueDescription: "Approval waiting over 48 hours",
-    ageDays: "2d",
-    ownerName: "Rahul Sharma",
-    suggestedAction: "Escalate",
-  },
-];
-
 export default function DealHealthPage() {
-  const [kpi] = useState<DealHealthKPI>(INITIAL_KPI);
-  const [alerts] = useState<DealHealthAlert[]>(INITIAL_ALERTS);
+  const params = useParams();
+  const companyId =
+    typeof params?.["company-id"] === "string"
+      ? params["company-id"]
+      : "";
+
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [riskType, setRiskType] = useState<HealthRiskType>("ALL");
   const [notification, setNotification] = useState<string | null>(null);
 
-  const mockUser = {
-    fullName: "Rahul Sharma",
-    email: "rahul.sharma@example.com",
-    platformRole: "User",
-  };
+  const { data, isLoading } = useGetDealHealthQuery(
+    {
+      companyId,
+      params: {
+        page,
+        limit: 10,
+        search: search.trim() || undefined,
+        riskType,
+      },
+    },
+    { skip: !companyId }
+  );
+
+  const alerts = data?.data?.docs ?? [];
+  const kpi = data?.data?.kpi ?? DEFAULT_KPI;
+  const totalPages = data?.data?.totalPages ?? 1;
 
   const handleActionClick = (alertItem: DealHealthAlert) => {
-    setNotification(
-      `Triggered action "${alertItem.suggestedAction}" for deal ${alertItem.referenceNumber} (${alertItem.customerName})`
-    );
+    const msg = `Triggered action "${alertItem.suggestedAction}" for deal ${alertItem.referenceNumber} (${alertItem.customerName})`;
+    setNotification(msg);
+    toast.success(msg);
     setTimeout(() => setNotification(null), 3500);
   };
 
@@ -87,7 +63,7 @@ export default function DealHealthPage() {
           Deal Health
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          Identify deals that need immediate intervention before they stall or deteriorate.
+          Monitor stalled opportunities without activity and deals with closing deadlines within 2 days.
         </p>
       </div>
 
@@ -102,7 +78,25 @@ export default function DealHealthPage() {
       <DealHealthSummaryCards kpi={kpi} />
 
       {/* Attention Required Table */}
-      <AttentionRequiredTable alerts={alerts} onActionClick={handleActionClick} />
+      <AttentionRequiredTable
+        alerts={alerts}
+        companyId={companyId}
+        isLoading={isLoading}
+        currentPage={page}
+        totalPage={totalPages}
+        onPageChange={setPage}
+        searchTerm={search}
+        onSearchChange={(val) => {
+          setSearch(val);
+          setPage(1);
+        }}
+        riskType={riskType}
+        onRiskTypeChange={(val) => {
+          setRiskType(val);
+          setPage(1);
+        }}
+        onActionClick={handleActionClick}
+      />
     </div>
   );
 }

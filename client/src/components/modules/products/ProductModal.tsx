@@ -18,7 +18,8 @@ import {
   useUpdateSubscriptionPricingMutation,
   useDeleteSubscriptionPricingMutation,
 } from "@/store/features/subscription/subscriptionApi";
-import { Plus, Trash2, Layers } from "lucide-react";
+import { useGetCategoriesQuery } from "@/store/features/category/categoryApi";
+import { Plus, Trash2, Layers, FolderTree, Check } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface ProductModalProps {
@@ -63,7 +64,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     { skip: !isOpen || !companyId || !product?.id }
   );
 
+  const { data: categoryData } = useGetCategoriesQuery(
+    { companyId, params: { limit: 100 } },
+    { skip: !isOpen || !companyId }
+  );
+
   const warehouses = warehouseData?.data?.warehouses ?? [];
+  const categories = categoryData?.data?.docs ?? [];
 
   const [name, setName] = useState(product?.name || "");
   const [description, setDescription] = useState(product?.description || "");
@@ -79,6 +86,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       warehouseId: s.warehouseId,
       stockQty: s.stockQty,
     })) || []
+  );
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
+    product?.categories?.map((c) => c.id) || []
   );
 
   const [pricingTiers, setPricingTiers] = useState<PricingTierRow[]>([]);
@@ -97,6 +107,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           stockQty: s.stockQty,
         })) || []
       );
+      setSelectedCategoryIds(product.categories?.map((c) => c.id) || []);
     } else {
       setName("");
       setDescription("");
@@ -105,6 +116,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setType("ONE_TIME");
       setStocks([]);
       setPricingTiers([]);
+      setSelectedCategoryIds([]);
     }
     setErrors({});
   }, [product, isOpen]);
@@ -186,6 +198,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     );
   };
 
+  const handleToggleCategory = (categoryId: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
@@ -229,6 +249,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             baseUnit,
             type,
             stocks: formattedStocks,
+            categoryIds: selectedCategoryIds,
           },
         }).unwrap();
         savedProductId = res.data.product.id;
@@ -242,6 +263,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             baseUnit,
             type,
             stocks: formattedStocks.length > 0 ? formattedStocks : undefined,
+            categoryIds: selectedCategoryIds,
           },
         }).unwrap();
         savedProductId = res.data.product.id;
@@ -377,6 +399,50 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               placeholder="Optional product details..."
               className="w-full rounded-lg border border-border bg-card p-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 shadow-xs resize-none"
             />
+          </div>
+
+          {/* Product Categories Selection */}
+          <div className="pt-2 border-t border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                <FolderTree className="w-4 h-4 text-brand-600" />
+                <span>Product Categories</span>
+              </label>
+              <span className="text-xs text-text-muted">
+                {selectedCategoryIds.length} selected
+              </span>
+            </div>
+
+            {categories.length === 0 ? (
+              <p className="text-xs text-text-muted bg-surface p-2.5 rounded-lg border border-dashed border-border">
+                No categories created yet. You can create categories in the Categories tab.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 p-2.5 bg-surface rounded-lg border border-border min-h-[44px]">
+                {categories.map((cat) => {
+                  const isSelected = selectedCategoryIds.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => handleToggleCategory(cat.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-brand-600 text-white shadow-xs"
+                          : "bg-card text-text-secondary border border-border hover:border-brand-300 hover:text-text-primary"
+                      }`}
+                    >
+                      <Check
+                        className={`w-3.5 h-3.5 transition-transform ${
+                          isSelected ? "scale-100 opacity-100" : "scale-0 opacity-0 -mr-3.5 w-0"
+                        }`}
+                      />
+                      <span>{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Subscription Pricing Tiers (Only for RECURRING products) */}

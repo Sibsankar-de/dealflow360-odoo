@@ -48,14 +48,15 @@ export const customerApi = baseApi.injectEndpoints({
     }),
 
     addCustomer: builder.mutation<
-      ApiResponse<{ member: CompanyMemberType }>,
+      ApiResponse<{ customer: CustomerResponseType }>,
       { companyId: string; data: AddCustomerRequest }
     >({
       query: ({ companyId, data }) => ({
-        url: `/companies/${companyId}/users`,
+        url: `/customers/${companyId}`,
         method: "POST",
         body: {
           userEmail: data.userEmail,
+          customerTier: data.customerTier || "BRONZE",
           role: data.role || "CUSTOMER",
         },
       }),

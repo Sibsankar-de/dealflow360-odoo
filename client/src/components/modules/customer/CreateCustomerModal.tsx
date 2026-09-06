@@ -4,16 +4,18 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Select } from "@/components/ui/Select";
 import { SearchableInput } from "@/components/ui/SearchableInput";
 import { useSearchCustomersQuery } from "@/store/features/customer/customerApi";
+import { CustomerTier } from "@/types/customer";
 import { useAuth } from "@/context/AuthContext";
-import { User, Check } from "lucide-react";
+import { User, Check, Shield } from "lucide-react";
 
 export interface CreateCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
   companyId: string;
-  onCreateCustomer: (data: { email: string }) => Promise<void> | void;
+  onCreateCustomer: (data: { email: string; customerTier?: CustomerTier }) => Promise<void> | void;
   isLoading?: boolean;
 }
 
@@ -34,6 +36,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
 }) => {
   const { user: currentUser } = useAuth();
   const [email, setEmail] = useState("");
+  const [customerTier, setCustomerTier] = useState<CustomerTier>("BRONZE");
   const [error, setError] = useState<string | null>(null);
 
   const { data: searchResults, isFetching } = useSearchCustomersQuery(
@@ -67,6 +70,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
 
   const handleClose = () => {
     setEmail("");
+    setCustomerTier("BRONZE");
     setError(null);
     onClose();
   };
@@ -88,8 +92,9 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
     }
 
     try {
-      await onCreateCustomer({ email: trimmedEmail });
+      await onCreateCustomer({ email: trimmedEmail, customerTier });
       setEmail("");
+      setCustomerTier("BRONZE");
       onClose();
     } catch (err: unknown) {
       const msg =
@@ -165,6 +170,22 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
             </div>
           )}
         />
+
+        <div>
+          <Select
+            label="Customer Pricing Tier"
+            value={customerTier}
+            onChange={(val) => setCustomerTier(val as CustomerTier)}
+            options={[
+              { key: "BRONZE", value: "Bronze Tier (Standard Discounts)" },
+              { key: "SILVER", value: "Silver Tier (Preferred Volume Discounts)" },
+              { key: "GOLD", value: "Gold Tier (VIP Premium Discounts)" },
+            ]}
+          />
+          <p className="text-[11px] text-text-muted mt-1.5">
+            Customer tier determines automated discount thresholds and subscription pricing tier resolution on quotations.
+          </p>
+        </div>
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-6">
           <Button

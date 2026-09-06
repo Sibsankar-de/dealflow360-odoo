@@ -75,12 +75,13 @@ src/
 │       ├── profile/      # ProfileInfoCard, CompanyCard, CompanyList, EditProfileModal, ChangePasswordModal, CreateCompanyModal
 │       ├── deals/        # DealList, DealModal, DeleteDealModal
 │       ├── products/     # ProductList, ProductModal, DeleteProductModal
+│       ├── categories/   # CategoryList, CategoryModal, DeleteCategoryModal
 │       ├── warehouses/   # WarehouseList, WarehouseModal, DeleteWarehouseModal
 │       ├── quotations/   # QuotationKanbanBoard, QuotationKanbanColumn, QuotationKanbanCard, CreateQuotationModal, ReQuotationModal
 │       ├── backorders/   # FulfillBackorderModal
 │       ├── subscriptions/ # SubscriptionHistoryModal, RenewSubscriptionModal, CancelSubscriptionModal
 │       ├── finance/      # Invoices, financial approvals
-│       ├── customers/    # Customer directory and interaction history
+│       ├── customers/    # CustomerListTable, CustomerDetailView, CreateCustomerModal (email lookup, tier selection)
 │       ├── dealhealth/   # Deal health risk metrics, anomaly detection & action alerts
 │       ├── settings/     # Store name, currency, discount tiers & address configuration
 │       ├── accesscontrol/ # TeamMembersTable, InviteTeamMemberModal, EditTeamMemberRoleModal, DeleteTeamMemberModal, ViewTeamMemberModal
@@ -94,12 +95,14 @@ src/
 │   ├── features/         # Feature slices & injected endpoints
 │   │   ├── user/         # userSlice.ts, userApi.ts
 │   │   ├── company/      # companySlice.ts, companyApi.ts (user company affiliations, member list/invite/role update/removal, company roles, lookup)
-│   │   ├── product/      # productApi.ts (product catalog & stock allocation)
+│   │   ├── product/      # productApi.ts (product catalog, stock allocation, category assignment)
+│   │   ├── category/     # categoryApi.ts (product category CRUD and directory)
 │   │   ├── warehouse/    # warehouseApi.ts (warehouses and distribution hubs)
 │   │   ├── deal/         # dealApi.ts (deals lifecycle, quotations generation & revisions)
+│   │   ├── customer/     # customerApi.ts (customers directory, search, tier assignments, and customer account addition)
 │   │   └── subscription/ # subscriptionApi.ts (recurring contracts, renewals, pricing tiers)
 │   └── index.ts          # Central Redux store configuration
-├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, product.ts, warehouse.ts, deal.ts, quotation.ts, subscription.ts, SelectType.ts)
+├── types/                # Global TypeScript interfaces and type definitions (auth.ts, profile.ts, company.ts, product.ts, category.ts, warehouse.ts, deal.ts, quotation.ts, subscription.ts, dealhealth.ts, SelectType.ts)
 ├── utils/                # Pure helper functions and formatters
 └── assets/               # Static assets, icons, and media
 ```

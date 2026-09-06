@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
 import { ProductModal } from "./ProductModal";
 import { DeleteProductModal } from "./DeleteProductModal";
+import { useGetCategoriesQuery } from "@/store/features/category/categoryApi";
 import {
   Package,
   Plus,
@@ -16,6 +17,7 @@ import {
   Edit2,
   Trash2,
   Boxes,
+  FolderTree,
 } from "lucide-react";
 
 interface ProductListProps {
@@ -27,6 +29,8 @@ interface ProductListProps {
   onPageChange?: (page: number) => void;
   onSearchChange?: (search: string) => void;
   onTypeChange?: (type: string) => void;
+  onCategoryChange?: (categoryId: string) => void;
+  selectedCategoryId?: string;
 }
 
 export const ProductList: React.FC<ProductListProps> = ({
@@ -38,14 +42,23 @@ export const ProductList: React.FC<ProductListProps> = ({
   onPageChange,
   onSearchChange,
   onTypeChange,
+  onCategoryChange,
+  selectedCategoryId,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [categoryFilter, setCategoryFilter] = useState(selectedCategoryId || "ALL");
   const [selectedProduct, setSelectedProduct] =
     useState<ProductResponseType | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteProduct, setDeleteProduct] =
     useState<ProductResponseType | null>(null);
+
+  const { data: categoryData } = useGetCategoriesQuery(
+    { companyId, params: { limit: 100 } },
+    { skip: !companyId }
+  );
+  const categories = categoryData?.data?.docs ?? [];
 
   const handleSearchChange = (val: string) => {
     setSearchTerm(val);
@@ -57,16 +70,22 @@ export const ProductList: React.FC<ProductListProps> = ({
     onTypeChange?.(val);
   };
 
+  const handleCategoryChange = (val: string) => {
+    setCategoryFilter(val);
+    onCategoryChange?.(val);
+  };
+
   const filteredProducts = products.filter((p) => {
-    // If parent handles search, products are already server filtered;
-    // this also provides instantaneous client-side fallback.
     const matchesSearch =
       !searchTerm ||
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.description &&
         p.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = typeFilter === "ALL" || p.type === typeFilter;
-    return matchesSearch && matchesType;
+    const matchesCategory =
+      categoryFilter === "ALL" ||
+      p.categories?.some((c) => c.id === categoryFilter);
+    return matchesSearch && matchesType && matchesCategory;
   });
 
   const handleEdit = (prod: ProductResponseType) => {
@@ -109,7 +128,17 @@ export const ProductList: React.FC<ProductListProps> = ({
             onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
-        <div className="w-full sm:w-56">
+        <div className="w-full sm:w-48">
+          <Select
+            value={categoryFilter}
+            onChange={(val) => handleCategoryChange(val)}
+            options={[
+              { key: "ALL", value: "All Categories" },
+              ...categories.map((c) => ({ key: c.id, value: c.name })),
+            ]}
+          />
+        </div>
+        <div className="w-full sm:w-48">
           <Select
             value={typeFilter}
             onChange={(val) => handleTypeChange(val)}
@@ -185,6 +214,19 @@ export const ProductList: React.FC<ProductListProps> = ({
                         {prod.description && (
                           <div className="text-xs text-text-muted truncate max-w-md mt-0.5">
                             {prod.description}
+                          </div>
+                        )}
+                        {prod.categories && prod.categories.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {prod.categories.map((c) => (
+                              <span
+                                key={c.id}
+                                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200/60"
+                              >
+                                <FolderTree className="w-2.5 h-2.5 text-brand-500" />
+                                {c.name}
+                              </span>
+                            ))}
                           </div>
                         )}
                       </td>

@@ -111,10 +111,29 @@ export const productApi = baseApi.injectEndpoints({
         { type: "Product", id: productId },
       ],
     }),
+
+    updateProductCategories: builder.mutation<
+      ApiResponse<{ product: ProductResponseType }>,
+      {
+        companyId: string;
+        productId: string;
+        data: { categoryIdList?: string[]; categoryIds?: string[] };
+      }
+    >({
+      query: ({ companyId, productId, data }) => ({
+        url: `/products/${companyId}/${productId}/categories`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { productId }) => [
+        "Product",
+        "Category",
+        { type: "Product", id: productId },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
-
 
 export const {
   useGetProductsQuery,
@@ -125,4 +144,5 @@ export const {
   useDeleteProductMutation,
   useUpsertProductStockMutation,
   useDeleteProductStockMutation,
+  useUpdateProductCategoriesMutation,
 } = productApi;
