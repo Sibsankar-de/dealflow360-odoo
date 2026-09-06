@@ -12,16 +12,17 @@ import {
   DealStage,
   DealStatus,
   Negotiation,
+  NegotiationItem,
   NegotiationStatus,
-  NegotiationOffer,
-  NegotiationOfferItem,
-  OfferParty,
-  OfferStatus,
   Product,
   User,
   Company,
 } from "@prisma/client";
 import { UserResponseDto, toUserDto } from "./user.dto";
+import { SalesOrderResponseDto, toSalesOrderDto } from "./salesOrder.dto";
+import { DeliveryResponseDto } from "./delivery.dto";
+import { InvoiceResponseDto } from "./invoice.dto";
+import { BackorderResponseDto } from "./backorder.dto";
 import { DiscountViolationEvaluation } from "../utils/discount-violation.util";
 import {
   addQuotationItemSchema,
@@ -32,8 +33,11 @@ import {
   cancelQuotationSchema,
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
-  counterOfferItemSchema,
-  submitCounterOfferSchema,
+  submitNegotiationSchema,
+  acceptQuotationSchema,
+  approveNegotiationSchema,
+  rejectNegotiationSchema,
+  fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
 
 export type AddQuotationItemDto = z.infer<typeof addQuotationItemSchema>;
@@ -44,8 +48,20 @@ export type QuotationFilterDto = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationDto = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationDto = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryDto = z.infer<typeof dealQuotationsQuerySchema>;
-export type CounterOfferItemDto = z.infer<typeof counterOfferItemSchema>;
-export type SubmitCounterOfferDto = z.infer<typeof submitCounterOfferSchema>;
+export type SubmitNegotiationDto = z.infer<typeof submitNegotiationSchema>;
+export type AcceptQuotationDto = z.infer<typeof acceptQuotationSchema>;
+export type ApproveNegotiationDto = z.infer<typeof approveNegotiationSchema>;
+export type RejectNegotiationDto = z.infer<typeof rejectNegotiationSchema>;
+export type FulfillQuotationDto = z.infer<typeof fulfillQuotationSchema>;
+
+export interface FulfillmentResultDto {
+  quotation: QuotationResponseDto;
+  salesOrder: SalesOrderResponseDto;
+  delivery: DeliveryResponseDto | null;
+  invoice: InvoiceResponseDto | null;
+  backorder: BackorderResponseDto | null;
+  deal?: DealResponseDto | null;
+}
 
 export interface QuotationItemResponseDto {
   id: string;
@@ -126,6 +142,14 @@ export interface QuotationResponseDto {
   };
   negotiations?: NegotiationResponseDto[];
   discountEvaluation?: DiscountViolationEvaluation;
+  salesOrders?: SalesOrderResponseDto[];
+}
+
+export interface FulfillmentSummaryResponseDto {
+  readyToFulfillCount: number;
+  partiallyFulfilledCount: number;
+  backorderedCount: number;
+  completedCount: number;
 }
 
 export interface DealResponseDto {
@@ -151,9 +175,9 @@ export interface DealResponseDto {
   };
 }
 
-export interface NegotiationOfferItemResponseDto {
+export interface NegotiationItemResponseDto {
   id: string;
-  negotiationOfferId: string;
+  negotiationId: string;
   quotationItemId: string | null;
   productId: string;
   productName?: string;
@@ -164,26 +188,22 @@ export interface NegotiationOfferItemResponseDto {
   requestedLineTotal: number;
 }
 
-export interface NegotiationOfferResponseDto {
-  id: string;
-  negotiationId: string;
-  baseRevisionId: string | null;
-  offeredBy: OfferParty;
-  status: OfferStatus;
-  message: string | null;
-  createdAt: Date;
-  items?: NegotiationOfferItemResponseDto[];
-}
-
 export interface NegotiationResponseDto {
   id: string;
   quotationId: string;
   status: NegotiationStatus;
-  startedAt: Date;
-  closedAt: Date | null;
+  message: string | null;
+  riskScore: number | null;
+  riskLevel: string | null;
+  requiredRole: string | null;
+  approvedBy: string | null;
+  approvedAt: Date | null;
+  rejectedBy: string | null;
+  rejectedAt: Date | null;
+  rejectionReason: string | null;
   createdAt: Date;
   updatedAt: Date;
-  offers?: NegotiationOfferResponseDto[];
+  items?: NegotiationItemResponseDto[];
 }
 
 export const toQuotationItemDto = (
@@ -286,12 +306,12 @@ export const toDealDto = (
   };
 };
 
-export const toNegotiationOfferItemDto = (
-  item: NegotiationOfferItem & { product?: Product },
-): NegotiationOfferItemResponseDto => {
+export const toNegotiationItemDto = (
+  item: NegotiationItem & { product?: Product },
+): NegotiationItemResponseDto => {
   return {
     id: item.id,
-    negotiationOfferId: item.negotiationOfferId,
+    negotiationId: item.negotiationId,
     quotationItemId: item.quotationItemId,
     productId: item.productId,
     productName: item.product?.name,
@@ -303,42 +323,28 @@ export const toNegotiationOfferItemDto = (
   };
 };
 
-export const toNegotiationOfferDto = (
-  offer: NegotiationOffer & {
-    items?: (NegotiationOfferItem & { product?: Product })[];
-  },
-): NegotiationOfferResponseDto => {
-  return {
-    id: offer.id,
-    negotiationId: offer.negotiationId,
-    baseRevisionId: offer.baseRevisionId,
-    offeredBy: offer.offeredBy,
-    status: offer.status,
-    message: offer.message,
-    createdAt: offer.createdAt,
-    items: offer.items
-      ? offer.items.map(toNegotiationOfferItemDto)
-      : undefined,
-  };
-};
-
 export const toNegotiationDto = (
   negotiation: Negotiation & {
-    offers?: (NegotiationOffer & {
-      items?: (NegotiationOfferItem & { product?: Product })[];
-    })[];
+    items?: (NegotiationItem & { product?: Product })[];
   },
 ): NegotiationResponseDto => {
   return {
     id: negotiation.id,
     quotationId: negotiation.quotationId,
     status: negotiation.status,
-    startedAt: negotiation.startedAt,
-    closedAt: negotiation.closedAt,
+    message: negotiation.message,
+    riskScore: negotiation.riskScore !== null ? Number(negotiation.riskScore) : null,
+    riskLevel: negotiation.riskLevel,
+    requiredRole: negotiation.requiredRole,
+    approvedBy: negotiation.approvedBy,
+    approvedAt: negotiation.approvedAt,
+    rejectedBy: negotiation.rejectedBy,
+    rejectedAt: negotiation.rejectedAt,
+    rejectionReason: negotiation.rejectionReason,
     createdAt: negotiation.createdAt,
     updatedAt: negotiation.updatedAt,
-    offers: negotiation.offers
-      ? negotiation.offers.map(toNegotiationOfferDto)
+    items: negotiation.items
+      ? negotiation.items.map(toNegotiationItemDto)
       : undefined,
   };
 };
@@ -361,6 +367,7 @@ export const toQuotationDto = (
     customer?: User;
     company?: Company;
     negotiations?: Parameters<typeof toNegotiationDto>[0][];
+    salesOrders?: Parameters<typeof toSalesOrderDto>[0][];
   },
 ): QuotationResponseDto => {
   const items = quotation.items ? quotation.items.map(toQuotationItemDto) : [];
@@ -413,7 +420,8 @@ export const toQuotationDto = (
     negotiations: quotation.negotiations
       ? quotation.negotiations.map(toNegotiationDto)
       : undefined,
+    salesOrders: quotation.salesOrders
+      ? quotation.salesOrders.map(toSalesOrderDto)
+      : undefined,
   };
 };
-
-

@@ -189,6 +189,42 @@ export class ProductService {
         );
       }
 
+      if (dto.stocks !== undefined) {
+        for (const entry of dto.stocks) {
+          const warehouse = await this.warehouseRepo.findById(
+            entry.warehouseId,
+            companyId,
+            tx,
+          );
+          if (!warehouse) {
+            throw new ApiError(
+              StatusCodes.NOT_FOUND,
+              `Warehouse ${entry.warehouseId} not found in this company`,
+            );
+          }
+        }
+
+        const incomingWarehouseIds = new Set(
+          dto.stocks.map((s) => s.warehouseId),
+        );
+        const existingStockRecords = existing.productStocks || [];
+
+        for (const es of existingStockRecords) {
+          if (!incomingWarehouseIds.has(es.warehouseId)) {
+            await this.productRepo.deleteStock(productId, es.warehouseId, tx);
+          }
+        }
+
+        for (const entry of dto.stocks) {
+          await this.productRepo.upsertStock(
+            productId,
+            entry.warehouseId,
+            new Prisma.Decimal(entry.stockQty),
+            tx,
+          );
+        }
+      }
+
       await this.productRepo.update(
         productId,
         {

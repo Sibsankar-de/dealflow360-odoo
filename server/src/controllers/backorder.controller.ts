@@ -23,7 +23,7 @@ export class BackorderController {
   }
 
   public getById = asyncHandler(async (req: Request, res: Response) => {
-    const backorderId = req.params.id || req.params.backorderId;
+    const backorderId = String(req.params.id || req.params.backorderId || "");
     if (!backorderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Backorder ID is required");
     }
@@ -86,7 +86,7 @@ export class BackorderController {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
     }
 
-    const backorderId = req.params.id || req.params.backorderId;
+    const backorderId = String(req.params.id || req.params.backorderId || "");
     if (!backorderId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Backorder ID is required");
     }
@@ -111,6 +111,25 @@ export class BackorderController {
           StatusCodes.CREATED,
           { delivery },
           "Backorder fulfilled successfully",
+        ),
+      );
+  });
+
+  public getSummary = asyncHandler(async (req: Request, res: Response) => {
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const summary = await this.backorderService.getBackorderSummary(companyId);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          summary,
+          "Backorder summary fetched successfully",
         ),
       );
   });

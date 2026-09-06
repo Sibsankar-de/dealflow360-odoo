@@ -16,7 +16,11 @@ import {
   cancelQuotationSchema,
   rejectQuotationSchema,
   dealQuotationsQuerySchema,
-  submitCounterOfferSchema,
+  submitNegotiationSchema,
+  acceptQuotationSchema,
+  approveNegotiationSchema,
+  rejectNegotiationSchema,
+  fulfillQuotationSchema,
 } from "../schemas/quotation.schema";
 import { QuotationStatus } from "@prisma/client";
 
@@ -323,6 +327,52 @@ export class QuotationController {
       );
   });
 
+  public customerApprove = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const companyId =
+      req.company?.id ||
+      (typeof req.params.companyId === "string"
+        ? req.params.companyId
+        : undefined);
+
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const validated =
+      req.body && Object.keys(req.body).length > 0
+        ? validateBody(acceptQuotationSchema, req.body)
+        : {};
+
+    const quotation = await this.quotationService.customerApproveQuotation(
+      companyId,
+      quotationId,
+      userId,
+      validated.notes,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          { quotation },
+          "Quotation approved and accepted successfully by customer",
+        ),
+      );
+  });
+
+  public accept = this.customerApprove;
+
   public cancel = asyncHandler(async (req: Request, res: Response) => {
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
@@ -347,6 +397,11 @@ export class QuotationController {
   });
 
   public reject = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
     const quotationId = req.params.quotationId || req.params.id;
     if (!quotationId || typeof quotationId !== "string") {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
@@ -359,7 +414,7 @@ export class QuotationController {
 
     const rejected = await this.quotationService.rejectQuotation(
       quotationId,
-      req.user?.id,
+      userId,
       validatedDto,
     );
 
@@ -374,7 +429,7 @@ export class QuotationController {
       );
   });
 
-  public counterOffer = asyncHandler(async (req: Request, res: Response) => {
+  public negotiate = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
     if (!userId) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
@@ -385,8 +440,8 @@ export class QuotationController {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
     }
 
-    const validated = validateBody(submitCounterOfferSchema, req.body);
-    const quotation = await this.quotationService.submitCounterOffer(
+    const validated = validateBody(submitNegotiationSchema, req.body);
+    const quotation = await this.quotationService.submitNegotiation(
       quotationId,
       userId,
       validated,
@@ -398,10 +453,12 @@ export class QuotationController {
         new ApiResponse(
           StatusCodes.OK,
           { quotation },
-          "Counter-offer submitted successfully",
+          "Negotiation submitted successfully",
         ),
       );
   });
+
+  public counterOffer = this.negotiate;
 
   public getNegotiations = asyncHandler(async (req: Request, res: Response) => {
     const quotationId = req.params.quotationId || req.params.id;
@@ -440,6 +497,186 @@ export class QuotationController {
             StatusCodes.OK,
             { evaluation },
             "Discount violation evaluation calculated successfully",
+          ),
+        );
+    },
+  );
+
+  public approveNegotiation = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+      }
+
+      const companyId =
+        req.company?.id ||
+        (typeof req.params.companyId === "string"
+          ? req.params.companyId
+          : undefined);
+      if (!companyId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+      }
+
+      const quotationId = req.params.quotationId || req.params.id;
+      if (!quotationId || typeof quotationId !== "string") {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+      }
+
+      const negotiationId = req.params.negotiationId;
+      if (!negotiationId || typeof negotiationId !== "string") {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Negotiation ID is required");
+      }
+
+      const reviewerRole = req.companyRole;
+      if (!reviewerRole) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "No company role found for user",
+        );
+      }
+
+      const validated =
+        req.body && Object.keys(req.body).length > 0
+          ? validateBody(approveNegotiationSchema, req.body)
+          : {};
+      const quotation = await this.quotationService.approveNegotiation(
+        companyId,
+        quotationId,
+        negotiationId,
+        userId,
+        reviewerRole,
+        validated,
+      );
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { quotation },
+            "Negotiation approved successfully",
+          ),
+        );
+    },
+  );
+
+  public rejectNegotiation = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+      }
+
+      const companyId =
+        req.company?.id ||
+        (typeof req.params.companyId === "string"
+          ? req.params.companyId
+          : undefined);
+      if (!companyId) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+      }
+
+      const quotationId = req.params.quotationId || req.params.id;
+      if (!quotationId || typeof quotationId !== "string") {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+      }
+
+      const negotiationId = req.params.negotiationId;
+      if (!negotiationId || typeof negotiationId !== "string") {
+        throw new ApiError(StatusCodes.BAD_REQUEST, "Negotiation ID is required");
+      }
+
+      const reviewerRole = req.companyRole;
+      if (!reviewerRole) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "No company role found for user",
+        );
+      }
+
+      const validated =
+        req.body && Object.keys(req.body).length > 0
+          ? validateBody(rejectNegotiationSchema, req.body)
+          : {};
+      const quotation = await this.quotationService.rejectNegotiation(
+        companyId,
+        quotationId,
+        negotiationId,
+        userId,
+        reviewerRole,
+        validated,
+      );
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            { quotation },
+            "Negotiation rejected successfully",
+          ),
+        );
+    },
+  );
+
+  public fulfill = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const companyId = req.company?.id;
+    if (!companyId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Company context is required");
+    }
+
+    const quotationId = req.params.quotationId || req.params.id;
+    if (!quotationId || typeof quotationId !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Quotation ID is required");
+    }
+
+    const validated = req.body && Object.keys(req.body).length > 0
+      ? validateBody(fulfillQuotationSchema, req.body)
+      : {};
+    const result = await this.quotationService.fulfillQuotation(
+      companyId,
+      quotationId,
+      userId,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          result,
+          "Quotation fulfillment processed successfully",
+        ),
+      );
+  });
+
+  public getFulfillmentSummary = asyncHandler(
+    async (req: Request, res: Response) => {
+      const companyId = req.company?.id;
+      if (!companyId) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          "Company context is required",
+        );
+      }
+
+      const summary =
+        await this.quotationService.getFulfillmentSummary(companyId);
+
+      return res
+        .status(StatusCodes.OK)
+        .json(
+          new ApiResponse(
+            StatusCodes.OK,
+            summary,
+            "Fulfillment summary retrieved successfully",
           ),
         );
     },

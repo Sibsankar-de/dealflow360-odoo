@@ -15,6 +15,17 @@ export interface CustomerResponseType {
   updatedAt: string;
 }
 
+export interface CustomerSummaryResponseType {
+  id: string;
+  companyUserId?: string | null;
+  companyId: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  customerTier: CustomerTier | null;
+  role: BackendCompanyRole;
+}
+
 export interface PaginatedCustomersResponse {
   docs: CustomerResponseType[];
   total: number;

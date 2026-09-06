@@ -8,10 +8,12 @@ import {
   DeliveryService,
   deliveryService as defaultDeliveryService,
 } from "./delivery.service";
+import { prisma as defaultPrisma } from "../lib/prisma";
 import { ApiError } from "../utils/apiErrorHandler";
 import { PaginatedResult } from "../utils/paginate";
 import {
   BackorderResponseDto,
+  BackorderSummaryResponseDto,
   BackorderFilterDto,
   FulfillBackorderDto,
   toBackorderDto,
@@ -71,6 +73,52 @@ export class BackorderService {
     return {
       ...paginated,
       docs: paginated.docs.map((b) => toBackorderDto(b)),
+    };
+  }
+
+  public async getBackorderSummary(
+    companyId: string,
+  ): Promise<BackorderSummaryResponseDto> {
+    const [
+      totalCount,
+      pendingCount,
+      partiallyFulfilledCount,
+      fulfilledCount,
+      cancelledCount,
+      aggregates,
+    ] = await Promise.all([
+      defaultPrisma.backorder.count({ where: { companyId } }),
+      defaultPrisma.backorder.count({
+        where: { companyId, status: BackorderStatus.PENDING },
+      }),
+      defaultPrisma.backorder.count({
+        where: { companyId, status: BackorderStatus.PARTIALLY_FULFILLED },
+      }),
+      defaultPrisma.backorder.count({
+        where: { companyId, status: BackorderStatus.FULFILLED },
+      }),
+      defaultPrisma.backorder.count({
+        where: { companyId, status: BackorderStatus.CANCELLED },
+      }),
+      defaultPrisma.backorder.aggregate({
+        where: { companyId },
+        _sum: {
+          totalQuantity: true,
+          fulfilledQuantity: true,
+          remainingQuantity: true,
+        },
+      }),
+    ]);
+
+    return {
+      totalCount,
+      pendingCount,
+      partiallyFulfilledCount,
+      fulfilledCount,
+      cancelledCount,
+      totalQuantity: Number(aggregates._sum.totalQuantity || 0),
+      fulfilledQuantity: Number(aggregates._sum.fulfilledQuantity || 0),
+      remainingQuantity: Number(aggregates._sum.remainingQuantity || 0),
     };
   }
 

@@ -8,6 +8,7 @@ import { FulfillmentOrderDetail, FulfillmentStatus } from "@/types/fulfillment";
 
 export interface FulfillmentDetailHeaderProps {
   order: FulfillmentOrderDetail;
+  companyId?: string;
   className?: string;
 }
 
@@ -28,16 +29,18 @@ const getStatusConfig = (status: FulfillmentStatus): { variant: BadgeVariant; do
 
 export const FulfillmentDetailHeader: React.FC<FulfillmentDetailHeaderProps> = ({
   order,
+  companyId,
   className,
 }) => {
   const statusConfig = getStatusConfig(order.status);
+  const backHref = companyId ? `/company/${companyId}/app/fulfillment` : "/fulfillment";
 
   return (
     <div className={clsx("space-y-4", className)}>
       {/* Back to Fulfillment Link */}
       <div>
         <Link
-          href="/fulfillment"
+          href={backHref}
           className="inline-flex items-center gap-1 text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors select-none"
         >
           <ChevronLeft className="w-4 h-4 shrink-0" />

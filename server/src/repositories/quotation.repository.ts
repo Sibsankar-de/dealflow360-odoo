@@ -16,8 +16,12 @@ import {
   Company,
   Deal,
   Negotiation,
-  NegotiationOffer,
-  NegotiationOfferItem,
+  NegotiationItem,
+  SalesOrder,
+  Delivery,
+  Backorder,
+  Invoice,
+  SalesOrderItem,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { TransactionClient } from "../utils/transactionHandler";
@@ -36,9 +40,13 @@ export type QuotationWithRelations = Quotation & {
   customer: User;
   company: Company;
   negotiations?: (Negotiation & {
-    offers: (NegotiationOffer & {
-      items: (NegotiationOfferItem & { product: Product })[];
-    })[];
+    items: (NegotiationItem & { product: Product })[];
+  })[];
+  salesOrders?: (SalesOrder & {
+    items?: (SalesOrderItem & { product?: Product | null })[];
+    deliveries?: Delivery[];
+    backorders?: Backorder[];
+    invoices?: Invoice[];
   })[];
 };
 
@@ -402,16 +410,23 @@ export class QuotationRepository {
         negotiations: {
           orderBy: { createdAt: "desc" },
           include: {
-            offers: {
-              orderBy: { createdAt: "asc" },
+            items: {
               include: {
-                items: {
-                  include: {
-                    product: true,
-                  },
-                },
+                product: true,
               },
             },
+          },
+        },
+        salesOrders: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            deliveries: true,
+            backorders: true,
+            invoices: true,
           },
         },
       },
@@ -437,16 +452,23 @@ export class QuotationRepository {
       negotiations: {
         orderBy: { createdAt: "desc" as const },
         include: {
-          offers: {
-            orderBy: { createdAt: "asc" as const },
+          items: {
             include: {
-              items: {
-                include: {
-                  product: true,
-                },
-              },
+              product: true,
             },
           },
+        },
+      },
+      salesOrders: {
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          deliveries: true,
+          backorders: true,
+          invoices: true,
         },
       },
     };
@@ -657,14 +679,9 @@ export class QuotationRepository {
       where: { quotationId },
       orderBy: { createdAt: "desc" },
       include: {
-        offers: {
-          orderBy: { createdAt: "asc" },
+        items: {
           include: {
-            items: {
-              include: {
-                product: true,
-              },
-            },
+            product: true,
           },
         },
       },

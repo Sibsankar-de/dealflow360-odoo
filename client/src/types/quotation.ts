@@ -62,9 +62,11 @@ export interface QuotationRevisionDetail {
   items?: QuotationRevisionItemDetail[];
 }
 
-export interface NegotiationOfferItemDetail {
+export type NegotiationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface NegotiationItemDetail {
   id: string;
-  negotiationOfferId: string;
+  negotiationId: string;
   quotationItemId: string | null;
   productId: string;
   productName?: string;
@@ -75,26 +77,35 @@ export interface NegotiationOfferItemDetail {
   requestedLineTotal: number;
 }
 
-export interface NegotiationOfferDetail {
-  id: string;
-  negotiationId: string;
-  baseRevisionId: string | null;
-  offeredBy: "CUSTOMER" | "SALES";
-  status: "PENDING" | "ACCEPTED" | "REJECTED" | "SUPERSEDED";
-  message: string | null;
-  createdAt: string;
-  items?: NegotiationOfferItemDetail[];
-}
-
 export interface NegotiationDetail {
   id: string;
   quotationId: string;
-  status: "OPEN" | "CLOSED";
-  startedAt: string;
-  closedAt: string | null;
+  status: NegotiationStatus;
+  message: string | null;
+  riskScore: number | null;
+  riskLevel: string | null;
+  requiredRole: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectedBy: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
-  offers?: NegotiationOfferDetail[];
+  items?: NegotiationItemDetail[];
+}
+
+export interface DiscountViolationEvaluation {
+  maxLineViolation: number;
+  blendedViolationScore: number;
+  riskLevel: "LOW" | "MID" | "HIGH";
+  requiredApprovalRole: "SALES_MANAGER" | "FINANCE_MANAGER" | null;
+  lineItems?: Array<{
+    productId: string;
+    actualDiscountPercentage: number;
+    allowedDiscountPercentage: number;
+    violationScore: number;
+  }>;
 }
 
 export interface QuotationResponse {
@@ -118,8 +129,38 @@ export interface QuotationResponse {
   currentRevision?: QuotationRevisionDetail;
   revisions?: QuotationRevisionDetail[];
   negotiations?: NegotiationDetail[];
+  discountEvaluation?: DiscountViolationEvaluation;
+  salesOrders?: Array<{
+    id: string;
+    orderNo: string;
+    status: string;
+    deliveriesCount?: number;
+    invoicesCount?: number;
+    backordersCount?: number;
+    items?: Array<{
+      id: string;
+      productId: string;
+      productName?: string;
+      orderedQuantity: number;
+      deliveredQuantity: number;
+      invoicedQuantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }>;
+  }>;
   customer?: UserResponseType;
   salesRep?: UserResponseType;
+  company?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface FulfillmentSummaryResponse {
+  readyToFulfillCount: number;
+  partiallyFulfilledCount: number;
+  backorderedCount: number;
+  completedCount: number;
 }
 
 export interface CreateQuotationItemRequest {
@@ -132,10 +173,10 @@ export interface CreateQuotationItemRequest {
 }
 
 export interface CreateQuotationRequest {
-  companyId: string;
+  companyId?: string;
   dealId: string;
   customerId: string;
-  items: CreateQuotationItemRequest[];
+  items?: CreateQuotationItemRequest[];
   validUntil?: string | null;
   currency?: string;
   customerNote?: string | null;
@@ -152,7 +193,40 @@ export interface UpdateQuotationRequest {
   customerNote?: string | null;
   internalNote?: string | null;
   discountAmount?: number;
-  status?: QuotationStatus;
+}
+
+export interface SubmitNegotiationItemPayload {
+  quotationItemId?: string;
+  productId?: string;
+  requestedQuantity?: number;
+  requestedUnitPrice?: number;
+  requestedDiscountType?: DiscountType;
+  requestedDiscountValue?: number;
+}
+
+export interface SubmitNegotiationPayload {
+  message?: string;
+  items?: SubmitNegotiationItemPayload[];
+}
+
+export interface ApproveNegotiationPayload {
+  notes?: string;
+}
+
+export interface RejectNegotiationPayload {
+  reason?: string;
+}
+
+export interface FulfillQuotationPayload {
+  warehouseId?: string;
+  items?: Array<{
+    productId: string;
+    warehouseId?: string;
+    quantity?: number;
+  }>;
+  notes?: string;
+  trackingNumber?: string;
+  paymentTerms?: string;
 }
 
 export interface PaginatedQuotationsResponse {

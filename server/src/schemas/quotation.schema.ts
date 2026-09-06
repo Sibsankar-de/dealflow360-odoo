@@ -66,7 +66,6 @@ export const createQuotationSchema = z.object({
     .nullable(),
 });
 
-
 export const updateQuotationSchema = z.object({
   customerId: z.string().uuid("Invalid customer ID").optional(),
   items: z
@@ -94,7 +93,6 @@ export const updateQuotationSchema = z.object({
     .number()
     .nonnegative("Discount amount cannot be negative")
     .optional(),
-  status: z.nativeEnum(QuotationStatus).optional(),
 });
 
 export const quotationFilterSchema = z.object({
@@ -122,7 +120,7 @@ export const rejectQuotationSchema = z.object({
     .optional(),
 });
 
-export const counterOfferItemSchema = z.object({
+export const negotiationItemSchema = z.object({
   quotationItemId: z.string().uuid("Invalid quotation item ID").optional(),
   productId: z.string().uuid("Invalid product ID").optional(),
   requestedQuantity: z
@@ -144,25 +142,13 @@ export const counterOfferItemSchema = z.object({
     .optional(),
 });
 
-export const submitCounterOfferSchema = z.object({
+export const submitNegotiationSchema = z.object({
   message: z
     .string()
     .max(2000, "Message cannot exceed 2000 characters")
     .optional()
     .nullable(),
-  proposedPrice: z
-    .number()
-    .nonnegative("Proposed price cannot be negative")
-    .optional(),
-  proposedDiscount: z
-    .number()
-    .nonnegative("Proposed discount cannot be negative")
-    .optional(),
-  discountType: z
-    .nativeEnum(DiscountType)
-    .default(DiscountType.PERCENTAGE)
-    .optional(),
-  items: z.array(counterOfferItemSchema).optional(),
+  items: z.array(negotiationItemSchema).optional(),
 });
 
 export const dealQuotationsQuerySchema = z.object({
@@ -170,6 +156,50 @@ export const dealQuotationsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
   status: z.nativeEnum(QuotationStatus).optional(),
   search: z.string().optional(),
+});
+
+export const acceptQuotationSchema = z.object({
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+});
+
+export const approveNegotiationSchema = z.object({
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+});
+
+export const rejectNegotiationSchema = z.object({
+  reason: z
+    .string()
+    .max(1000, "Reason cannot exceed 1000 characters")
+    .optional(),
+});
+
+export const fulfillQuotationItemSchema = z.object({
+  productId: z.string().uuid("Invalid product ID"),
+  warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
+  quantity: z.number().positive("Quantity must be greater than 0").optional(),
+});
+
+export const fulfillQuotationSchema = z.object({
+  warehouseId: z.string().uuid("Invalid warehouse ID").optional(),
+  items: z.array(fulfillQuotationItemSchema).optional(),
+  notes: z
+    .string()
+    .max(1000, "Notes cannot exceed 1000 characters")
+    .optional(),
+  trackingNumber: z
+    .string()
+    .max(255, "Tracking number cannot exceed 255 characters")
+    .optional(),
+  paymentTerms: z
+    .string()
+    .max(100, "Payment terms cannot exceed 100 characters")
+    .optional(),
 });
 
 export type AddQuotationItemInput = z.infer<typeof addQuotationItemSchema>;
@@ -182,5 +212,9 @@ export type QuotationFilterInput = z.infer<typeof quotationFilterSchema>;
 export type CancelQuotationInput = z.infer<typeof cancelQuotationSchema>;
 export type RejectQuotationInput = z.infer<typeof rejectQuotationSchema>;
 export type DealQuotationsQueryInput = z.infer<typeof dealQuotationsQuerySchema>;
-export type CounterOfferItemInput = z.infer<typeof counterOfferItemSchema>;
-export type SubmitCounterOfferInput = z.infer<typeof submitCounterOfferSchema>;
+export type NegotiationItemInput = z.infer<typeof negotiationItemSchema>;
+export type SubmitNegotiationInput = z.infer<typeof submitNegotiationSchema>;
+export type AcceptQuotationInput = z.infer<typeof acceptQuotationSchema>;
+export type ApproveNegotiationInput = z.infer<typeof approveNegotiationSchema>;
+export type RejectNegotiationInput = z.infer<typeof rejectNegotiationSchema>;
+export type FulfillQuotationInput = z.infer<typeof fulfillQuotationSchema>;

@@ -37,6 +37,8 @@ model User {
   createdQuotations     Quotation[]            @relation("QuotationSalesRep")
   receivedQuotations    Quotation[]            @relation("QuotationCustomer")
   createdRevisions      QuotationRevision[]    @relation("RevisionCreator")
+  approvedNegotiations  Negotiation[]          @relation("NegotiationApprover")
+  rejectedNegotiations  Negotiation[]          @relation("NegotiationRejecter")
 
   // Sales Order & Invoice Relations
   salesOrdersAsCustomer SalesOrder[]           @relation("SalesOrderCustomer")

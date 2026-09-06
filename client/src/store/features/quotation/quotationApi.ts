@@ -7,6 +7,12 @@ import {
   QuotationItemDetail,
   QuotationRevisionDetail,
   NegotiationDetail,
+  DiscountViolationEvaluation,
+  SubmitNegotiationPayload,
+  ApproveNegotiationPayload,
+  RejectNegotiationPayload,
+  FulfillQuotationPayload,
+  FulfillmentSummaryResponse,
 } from "@/types/quotation";
 
 export interface ListQuotationsQuery {
@@ -22,17 +28,25 @@ export interface ListQuotationsQuery {
 export const quotationApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getQuotations: builder.query<
-      ApiResponse<{ docs: QuotationResponse[]; total: number; page: number; totalPages: number }>,
-      { companyId?: string; params?: ListQuotationsQuery }
+      ApiResponse<{
+        docs: QuotationResponse[];
+        totalDocs?: number;
+        total?: number;
+        page: number;
+        limit?: number;
+        totalPages: number;
+      }>,
+      { companyId?: string; params?: ListQuotationsQuery } | void
     >({
-      query: ({ companyId, params }) => ({
-        url: "/quotations",
-        method: "GET",
-        params: {
-          ...params,
-          ...(companyId ? { companyId } : {}),
-        },
-      }),
+      query: (arg) => {
+        const companyId = arg && typeof arg === "object" ? arg.companyId : undefined;
+        const params = arg && typeof arg === "object" ? arg.params : undefined;
+        return {
+          url: companyId ? `/quotations/${companyId}` : "/quotations",
+          method: "GET",
+          params,
+        };
+      },
       providesTags: ["Quotation"],
     }),
 
@@ -165,31 +179,34 @@ export const quotationApi = baseApi.injectEndpoints({
       ],
     }),
 
-    submitCounterOffer: builder.mutation<
+    acceptQuotation: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      { companyId?: string; id: string; notes?: string }
+    >({
+      query: ({ companyId, id, notes }) => ({
+        url: companyId ? `/quotations/${companyId}/${id}/accept` : `/quotations/${id}/accept`,
+        method: "POST",
+        body: notes ? { notes } : undefined,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Quotation",
+        { type: "Quotation", id },
+        "Deal",
+      ],
+    }),
+
+    submitNegotiation: builder.mutation<
       ApiResponse<{ quotation: QuotationResponse }>,
       {
         companyId?: string;
         id: string;
-        data: {
-          message?: string;
-          proposedPrice?: number;
-          proposedDiscount?: number;
-          discountType?: "PERCENTAGE" | "FIXED";
-          items?: {
-            quotationItemId?: string;
-            productId?: string;
-            requestedQuantity?: number;
-            requestedUnitPrice?: number;
-            requestedDiscountType?: "PERCENTAGE" | "FIXED";
-            requestedDiscountValue?: number;
-          }[];
-        };
+        data: SubmitNegotiationPayload;
       }
     >({
       query: ({ companyId, id, data }) => ({
         url: companyId
-          ? `/quotations/${companyId}/${id}/counter-offer`
-          : `/quotations/${id}/counter-offer`,
+          ? `/quotations/${companyId}/${id}/negotiate`
+          : `/quotations/${id}/negotiate`,
         method: "POST",
         body: data,
       }),
@@ -200,20 +217,66 @@ export const quotationApi = baseApi.injectEndpoints({
       ],
     }),
 
-    updateQuotationStatus: builder.mutation<
+    submitCounterOffer: builder.mutation<
       ApiResponse<{ quotation: QuotationResponse }>,
-      { companyId?: string; id: string; status: string }
+      {
+        companyId?: string;
+        id: string;
+        data: SubmitNegotiationPayload;
+      }
     >({
-      query: ({ companyId, id, status }) => ({
+      query: ({ companyId, id, data }) => ({
         url: companyId
-          ? `/quotations/${companyId}/${id}/status`
-          : `/quotations/${id}/status`,
-        method: "PATCH",
-        body: { status },
+          ? `/quotations/${companyId}/${id}/negotiate`
+          : `/quotations/${id}/negotiate`,
+        method: "POST",
+        body: data,
       }),
       invalidatesTags: (_result, _error, { id }) => [
         "Quotation",
         { type: "Quotation", id },
+        "Deal",
+      ],
+    }),
+
+    approveNegotiation: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      {
+        companyId: string;
+        quotationId: string;
+        negotiationId: string;
+        data?: ApproveNegotiationPayload;
+      }
+    >({
+      query: ({ companyId, quotationId, negotiationId, data }) => ({
+        url: `/quotations/${companyId}/${quotationId}/negotiations/${negotiationId}/approve`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { quotationId }) => [
+        "Quotation",
+        { type: "Quotation", id: quotationId },
+        "Deal",
+      ],
+    }),
+
+    rejectNegotiation: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      {
+        companyId: string;
+        quotationId: string;
+        negotiationId: string;
+        data?: RejectNegotiationPayload;
+      }
+    >({
+      query: ({ companyId, quotationId, negotiationId, data }) => ({
+        url: `/quotations/${companyId}/${quotationId}/negotiations/${negotiationId}/reject`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { quotationId }) => [
+        "Quotation",
+        { type: "Quotation", id: quotationId },
         "Deal",
       ],
     }),
@@ -248,20 +311,62 @@ export const quotationApi = baseApi.injectEndpoints({
       ],
     }),
 
-    createRevision: builder.mutation<
-      ApiResponse<{ quotation: QuotationResponse }>,
-      { companyId?: string; quotationId: string; data: Record<string, unknown> }
+    getDiscountEvaluation: builder.query<
+      ApiResponse<{ evaluation: DiscountViolationEvaluation }>,
+      { companyId?: string; id: string }
     >({
-      query: ({ companyId, quotationId, data }) => ({
+      query: ({ companyId, id }) => ({
         url: companyId
-          ? `/quotations/${companyId}/${quotationId}`
-          : `/quotations/${quotationId}`,
-        method: "PATCH",
+          ? `/quotations/${companyId}/${id}/discount-evaluation`
+          : `/quotations/${id}/discount-evaluation`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, { id }) => [
+        { type: "Quotation", id },
+      ],
+    }),
+
+    fulfillQuotation: builder.mutation<
+      ApiResponse<unknown>,
+      { companyId: string; id: string; data?: FulfillQuotationPayload }
+    >({
+      query: ({ companyId, id, data }) => ({
+        url: `/quotations/${companyId}/${id}/fulfill`,
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: (_result, _error, { quotationId }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         "Quotation",
-        { type: "Quotation", id: quotationId },
+        { type: "Quotation", id },
+        "Deal",
+      ],
+    }),
+
+    getFulfillmentSummary: builder.query<
+      ApiResponse<FulfillmentSummaryResponse>,
+      { companyId: string }
+    >({
+      query: ({ companyId }) => ({
+        url: `/quotations/${companyId}/fulfillment-summary`,
+        method: "GET",
+      }),
+      providesTags: ["Quotation"],
+    }),
+
+    updateQuotationStatus: builder.mutation<
+      ApiResponse<{ quotation: QuotationResponse }>,
+      { companyId?: string; id: string; status: string }
+    >({
+      query: ({ companyId, id, status }) => ({
+        url: companyId
+          ? `/quotations/${companyId}/${id}/status`
+          : `/quotations/${id}/status`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Quotation",
+        { type: "Quotation", id },
         "Deal",
       ],
     }),
@@ -274,6 +379,8 @@ export const {
   useGetQuotationByIdQuery,
   useGetNegotiationsQuery,
   useGetRevisionsQuery,
+  useGetDiscountEvaluationQuery,
+  useGetFulfillmentSummaryQuery,
   useCreateQuotationMutation,
   useUpdateQuotationMutation,
   useSendQuotationMutation,
@@ -281,9 +388,11 @@ export const {
   useRemoveQuotationItemMutation,
   useCancelQuotationMutation,
   useRejectQuotationMutation,
+  useAcceptQuotationMutation,
+  useSubmitNegotiationMutation,
   useSubmitCounterOfferMutation,
+  useApproveNegotiationMutation,
+  useRejectNegotiationMutation,
+  useFulfillQuotationMutation,
   useUpdateQuotationStatusMutation,
-  useCreateRevisionMutation,
 } = quotationApi;
-
-

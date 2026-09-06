@@ -8,6 +8,7 @@ export interface FulfillmentPlanAllocationProps {
   plan: RecommendedFulfillmentPlan;
   onAcceptSplit?: () => void;
   onConfirmOverride?: (allocations: Record<string, number>) => void;
+  isSubmitting?: boolean;
   className?: string;
 }
 
@@ -15,6 +16,7 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
   plan,
   onAcceptSplit,
   onConfirmOverride,
+  isSubmitting = false,
   className,
 }) => {
   const [activeMode, setActiveMode] = useState<"Suggested" | "Manual Override">(plan.mode);
@@ -23,11 +25,18 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
   const [overrideAllocations, setOverrideAllocations] = useState<Record<string, number | string>>(() => {
     const initialMap: Record<string, number | string> = {};
     plan.warehouses.forEach((wh) => {
-      // In the mockup for Manual Override, Main Warehouse is 8 and East Depot is 4
-      initialMap[wh.id] = wh.id === "wh_main" ? 8 : wh.allocatedQty;
+      initialMap[wh.id] = wh.allocatedQty;
     });
     return initialMap;
   });
+
+  React.useEffect(() => {
+    const initialMap: Record<string, number | string> = {};
+    plan.warehouses.forEach((wh) => {
+      initialMap[wh.id] = wh.allocatedQty;
+    });
+    setOverrideAllocations(initialMap);
+  }, [plan]);
 
   const handleAllocationInputChange = (warehouseId: string, valueStr: string) => {
     setOverrideAllocations((prev) => ({
@@ -203,15 +212,25 @@ export const FulfillmentPlanAllocation: React.FC<FulfillmentPlanAllocationProps>
         {/* Primary Action Button */}
         <button
           type="button"
+          disabled={isSubmitting || totalAllocated === 0}
           onClick={handlePrimaryAction}
-          className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+          className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>
-            {activeMode === "Manual Override"
-              ? "Confirm Manual Override"
-              : "Accept Suggested Split"}
-          </span>
+          {isSubmitting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+              <span>Processing Fulfillment...</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>
+                {activeMode === "Manual Override"
+                  ? "Confirm Manual Override"
+                  : "Accept Suggested Split"}
+              </span>
+            </>
+          )}
         </button>
       </CardContent>
     </Card>

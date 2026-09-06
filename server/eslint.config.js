@@ -24,7 +24,7 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist", "node_modules", "*.config.ts", "eslint.config.js"],
+    ignores: ["dist", "node_modules", "*.config.ts", "eslint.config.js", "tests"],
   },
   prettier,
 );

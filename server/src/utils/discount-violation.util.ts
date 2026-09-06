@@ -1,3 +1,11 @@
+import { CompanyUserRole } from "@prisma/client";
+
+export enum RiskLevel {
+  LOW = "LOW",
+  MID = "MID",
+  HIGH = "HIGH",
+}
+
 export interface DiscountLineItemInput {
   productId?: string;
   actualDiscountPercentage: number;
@@ -23,12 +31,14 @@ export interface DiscountViolationEvaluation {
   hasLineLevelViolation: boolean;
   hasBlendedViolation: boolean;
   requiresApproval: boolean;
+  riskLevel: RiskLevel;
+  requiredApprovalRole: CompanyUserRole | null;
 }
-
 
 export function calculateDiscountViolations(
   items: DiscountLineItemInput[],
   blendedThreshold: number = 0,
+  midThreshold: number = 15,
 ): DiscountViolationEvaluation {
   let totalPreDiscountValue = 0;
   let sumWeightedViolations = 0;
@@ -67,6 +77,19 @@ export function calculateDiscountViolations(
   const hasBlendedViolation = blendedViolationScore > blendedThreshold;
   const requiresApproval = hasLineLevelViolation || hasBlendedViolation;
 
+  let riskLevel = RiskLevel.LOW;
+  let requiredApprovalRole: CompanyUserRole | null = null;
+
+  if (requiresApproval) {
+    if (blendedViolationScore <= midThreshold) {
+      riskLevel = RiskLevel.MID;
+      requiredApprovalRole = CompanyUserRole.SALES_MANAGER;
+    } else {
+      riskLevel = RiskLevel.HIGH;
+      requiredApprovalRole = CompanyUserRole.FINANCE_MANAGER;
+    }
+  }
+
   return {
     lineViolations,
     maxLineViolation: Number(maxLineViolation.toFixed(4)),
@@ -76,5 +99,7 @@ export function calculateDiscountViolations(
     hasLineLevelViolation,
     hasBlendedViolation,
     requiresApproval,
+    riskLevel,
+    requiredApprovalRole,
   };
 }

@@ -3,6 +3,8 @@ import {
   DeliveryStatus,
   BackorderStatus,
   SalesOrderStatus,
+  DealStage,
+  DealStatus,
 } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import {
@@ -17,6 +19,14 @@ import {
   BackorderRepository,
   backorderRepository as defaultBackorderRepository,
 } from "../repositories/backorder.repository";
+import {
+  InvoiceRepository,
+  invoiceRepository as defaultInvoiceRepository,
+} from "../repositories/invoice.repository";
+import {
+  StockService,
+  stockService as defaultStockService,
+} from "./stock.service";
 import { ApiError } from "../utils/apiErrorHandler";
 import {
   prismaTransaction,
@@ -35,15 +45,21 @@ export class DeliveryService {
   private deliveryRepo: DeliveryRepository;
   private salesOrderRepo: SalesOrderRepository;
   private backorderRepo: BackorderRepository;
+  private invoiceRepo: InvoiceRepository;
+  private stockService: StockService;
 
   public constructor(
     deliveryRepo: DeliveryRepository = defaultDeliveryRepository,
     salesOrderRepo: SalesOrderRepository = defaultSalesOrderRepository,
     backorderRepo: BackorderRepository = defaultBackorderRepository,
+    invoiceRepo: InvoiceRepository = defaultInvoiceRepository,
+    stockService: StockService = defaultStockService,
   ) {
     this.deliveryRepo = deliveryRepo;
     this.salesOrderRepo = salesOrderRepo;
     this.backorderRepo = backorderRepo;
+    this.invoiceRepo = invoiceRepo;
+    this.stockService = stockService;
   }
 
   private async generateDeliveryNo(tx?: TransactionClient): Promise<string> {
@@ -288,18 +304,36 @@ export class DeliveryService {
         tx,
       );
 
-      for (const itemDto of dto.items) {
-        const orderItem = orderItemsMap.get(itemDto.salesOrderItemId)!;
-        const newDelivered =
-          Number(orderItem.deliveredQuantity) + itemDto.deliveredQuantity;
-        await this.salesOrderRepo.updateItem(
-          orderItem.id,
-          {
-            deliveredQuantity: newDelivered,
-          },
-          tx,
-        );
+      // Deduct warehouse stock splits concurrently
+      const stockSplits = dto.items
+        .filter((item) => item.warehouseId)
+        .map((item) => {
+          const orderItem = orderItemsMap.get(item.salesOrderItemId)!;
+          return {
+            productId: orderItem.productId,
+            warehouseId: item.warehouseId!,
+            quantity: item.deliveredQuantity,
+          };
+        });
+
+      if (stockSplits.length > 0) {
+        await this.stockService.deductStockSplits(companyId, stockSplits, tx);
       }
+
+      await Promise.all(
+        dto.items.map(async (itemDto) => {
+          const orderItem = orderItemsMap.get(itemDto.salesOrderItemId)!;
+          const newDelivered =
+            Number(orderItem.deliveredQuantity) + itemDto.deliveredQuantity;
+          await this.salesOrderRepo.updateItem(
+            orderItem.id,
+            {
+              deliveredQuantity: newDelivered,
+            },
+            tx,
+          );
+        }),
+      );
 
       const allItemsDelivered = itemsWithRemaining.length === 0;
       await this.salesOrderRepo.update(
@@ -311,6 +345,21 @@ export class DeliveryService {
         },
         tx,
       );
+
+      if (allItemsDelivered && order.quotationId) {
+        const quotation = await tx.quotation.findUnique({
+          where: { id: order.quotationId },
+        });
+        if (quotation?.dealId) {
+          await tx.deal.update({
+            where: { id: quotation.dealId },
+            data: {
+              stage: DealStage.WON,
+              status: DealStatus.WON,
+            },
+          });
+        }
+      }
 
       const loadedDelivery = await this.deliveryRepo.findByIdWithRelations(
         delivery.id,

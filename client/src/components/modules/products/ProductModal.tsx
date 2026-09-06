@@ -123,6 +123,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     }
 
     try {
+      const formattedStocks = stocks.map((s) => ({
+        warehouseId: s.warehouseId,
+        stockQty: Number(s.stockQty) || 0,
+      }));
+
       if (isEditing && product) {
         await updateProduct({
           companyId,
@@ -133,14 +138,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             price: Number(price),
             baseUnit,
             type,
+            stocks: formattedStocks,
           },
         }).unwrap();
       } else {
-        const formattedStocks = stocks.map((s) => ({
-          warehouseId: s.warehouseId,
-          stockQty: Number(s.stockQty) || 0,
-        }));
-
         await createProduct({
           companyId,
           data: {
@@ -174,7 +175,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       title={isEditing ? "Edit Product" : "Create New Product"}
       description={
         isEditing
-          ? "Update product details and pricing."
+          ? "Update product details, pricing, and warehouse stock allocations."
           : "Add a new product with pricing and initial stock allocations."
       }
       size="lg"
@@ -242,77 +243,77 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             />
           </div>
 
-          {!isEditing && (
-            <div className="pt-2 border-t border-border space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-text-primary">
-                    Warehouse Stock Allocation
-                  </h4>
-                  <p className="text-xs text-text-muted">
-                    Assign initial inventory quantity per warehouse.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                  onClick={handleAddStock}
-                  disabled={warehouses.length === 0}
-                >
-                  Add Warehouse
-                </Button>
+          <div className="pt-2 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-text-primary">
+                  Warehouse Stock Allocation
+                </h4>
+                <p className="text-xs text-text-muted">
+                  {isEditing
+                    ? "Manage inventory quantities across warehouses."
+                    : "Assign initial inventory quantity per warehouse."}
+                </p>
               </div>
-
-              {stocks.length === 0 ? (
-                <div className="text-xs text-text-muted text-center py-3 bg-surface rounded-lg border border-dashed border-border">
-                  {warehouses.length === 0
-                    ? "No warehouses found. You can add warehouses in the Warehouses tab."
-                    : "No stock allocated. Click 'Add Warehouse' to assign stock."}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {stocks.map((stock, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 bg-surface p-2.5 rounded-lg border border-border"
-                    >
-                      <div className="flex-1">
-                        <Select
-                          value={stock.warehouseId}
-                          onChange={(val) =>
-                            handleStockWarehouseChange(idx, val)
-                          }
-                          options={warehouseOptions}
-                          placeholder="Select warehouse"
-                        />
-                      </div>
-                      <div className="w-32">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={stock.stockQty}
-                          onChange={(e) =>
-                            handleStockQtyChange(idx, e.target.value)
-                          }
-                          placeholder="0"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveStock(idx)}
-                        className="p-2 text-text-muted hover:text-danger hover:bg-card rounded-md transition-colors"
-                        title="Remove stock"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+                onClick={handleAddStock}
+                disabled={warehouses.length === 0}
+              >
+                Add Warehouse
+              </Button>
             </div>
-          )}
+
+            {stocks.length === 0 ? (
+              <div className="text-xs text-text-muted text-center py-3 bg-surface rounded-lg border border-dashed border-border">
+                {warehouses.length === 0
+                  ? "No warehouses found. You can add warehouses in the Warehouses tab."
+                  : "No stock allocated. Click 'Add Warehouse' to assign stock."}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {stocks.map((stock, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 bg-surface p-2.5 rounded-lg border border-border"
+                  >
+                    <div className="flex-1">
+                      <Select
+                        value={stock.warehouseId}
+                        onChange={(val) =>
+                          handleStockWarehouseChange(idx, val)
+                        }
+                        options={warehouseOptions}
+                        placeholder="Select warehouse"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={stock.stockQty}
+                        onChange={(e) =>
+                          handleStockQtyChange(idx, e.target.value)
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveStock(idx)}
+                      className="p-2 text-text-muted hover:text-danger hover:bg-card rounded-md transition-colors"
+                      title="Remove stock"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </ModalBody>
 
         <ModalFooter>

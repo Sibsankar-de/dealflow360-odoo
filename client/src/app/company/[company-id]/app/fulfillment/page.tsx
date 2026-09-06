@@ -1,78 +1,151 @@
 "use client";
 
-import React, { useState } from "react";
-import { Navbar } from "@/components/modules/layout/Navbar";
+import React, { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { FulfillmentSummaryCards } from "@/components/modules/fulfillment/FulfillmentSummaryCards";
 import { FulfillmentOrdersTable } from "@/components/modules/fulfillment/FulfillmentOrdersTable";
-import { FulfillmentKPI, FulfillmentOrder } from "@/types/fulfillment";
-
-const INITIAL_KPI: FulfillmentKPI = {
-  readyToFulfillCount: 1,
-  partiallyFulfilledCount: 1,
-  backorderedCount: 1,
-  completedCount: 1,
-};
-
-const INITIAL_ORDERS: FulfillmentOrder[] = [
-  {
-    id: "ord_1042",
-    orderNumber: "SO-1042",
-    customerName: "Acme Corporation",
-    itemsCount: 3,
-    totalQty: 10,
-    qtyUnit: "units",
-    warehousesCount: 2,
-    shipmentsCount: 2,
-    status: "Ready to Fulfill",
-    requiredBy: "10 Sep 2026",
-  },
-  {
-    id: "ord_1039",
-    orderNumber: "SO-1039",
-    customerName: "Apex Technologies",
-    itemsCount: 2,
-    totalQty: 15,
-    qtyUnit: "units",
-    warehousesCount: 2,
-    shipmentsCount: 2,
-    status: "Partially Fulfilled",
-    requiredBy: "8 Sep 2026",
-  },
-  {
-    id: "ord_1038",
-    orderNumber: "SO-1038",
-    customerName: "Zenith Corp",
-    itemsCount: 1,
-    totalQty: 5,
-    qtyUnit: "units",
-    warehousesCount: 1,
-    shipmentsCount: 1,
-    status: "Fulfilled",
-    requiredBy: "5 Sep 2026",
-  },
-  {
-    id: "ord_1036",
-    orderNumber: "SO-1036",
-    customerName: "Beta Industries",
-    itemsCount: 2,
-    totalQty: 3,
-    qtyUnit: "units",
-    warehousesCount: 1,
-    shipmentsCount: 1,
-    status: "Backordered",
-    requiredBy: "12 Sep 2026",
-    isUrgentDate: true,
-  },
-];
+import { FulfillmentKPI, FulfillmentOrder, FulfillmentStatus } from "@/types/fulfillment";
+import {
+  useGetQuotationsQuery,
+  useGetFulfillmentSummaryQuery,
+} from "@/store/features/quotation/quotationApi";
+import { useGetWarehousesQuery } from "@/store/features/warehouse/warehouseApi";
 
 export default function FulfillmentPage() {
-  const [kpi] = useState<FulfillmentKPI>(INITIAL_KPI);
-  const [orders] = useState<FulfillmentOrder[]>(INITIAL_ORDERS);
+  const params = useParams();
+  const companyId = params["company-id"] as string;
 
-  const mockUser = {
-    fullName: "Alex Rivera",
-    email: "alex.rivera@example.com",
-    platformRole: "User",
+  const [page, setPage] = useState<number>(1);
+  const [limit] = useState<number>(10);
+  const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string | undefined>(undefined);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Query quotations pending fulfillment (ACCEPTED status)
+  const {
+    data: quotationsData,
+    isLoading: isLoadingQuotations,
+    isFetching: isFetchingQuotations,
+  } = useGetQuotationsQuery(
+    {
+      companyId,
+      params: {
+        status: "ACCEPTED",
+        page,
+        limit,
+        search: debouncedSearch || undefined,
+      },
+    },
+    { skip: !companyId }
+  );
+
+  // Query real-time fulfillment KPI metrics
+  const { data: summaryData, isLoading: isLoadingSummary } =
+    useGetFulfillmentSummaryQuery(
+      { companyId },
+      { skip: !companyId }
+    );
+
+  // Query company warehouses for accurate warehouse count
+  const { data: warehousesData } = useGetWarehousesQuery(
+    { companyId },
+    { skip: !companyId }
+  );
+
+  const totalWarehousesCount = warehousesData?.data?.warehouses?.length || 0;
+
+  // Transform live quotations into FulfillmentOrder models
+  const orders: FulfillmentOrder[] = useMemo(() => {
+    const rawDocs = quotationsData?.data?.docs || [];
+
+    return rawDocs.map((q) => {
+      const totalQty = (q.items || []).reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+      );
+
+      const latestSalesOrder = q.salesOrders?.[0];
+      let status: FulfillmentStatus = "Ready to Fulfill";
+
+      if (latestSalesOrder?.status === "DELIVERED") {
+        status = "Fulfilled";
+      } else if ((latestSalesOrder?.backordersCount || 0) > 0) {
+        status = "Backordered";
+      } else if (latestSalesOrder?.status === "PARTIALLY_DELIVERED") {
+        status = "Partially Fulfilled";
+      }
+
+      let requiredBy = "Not specified";
+      let isUrgentDate = false;
+
+      if (q.validUntil) {
+        const validDate = new Date(q.validUntil);
+        requiredBy = validDate.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+        const diffMs = validDate.getTime() - Date.now();
+        if (diffMs > 0 && diffMs < 3 * 24 * 60 * 60 * 1000) {
+          isUrgentDate = true;
+        }
+      }
+
+      return {
+        id: q.id,
+        orderNumber: q.quotationNo,
+        customerName:
+          q.customer?.userName ||
+          q.customer?.email ||
+          "Customer",
+        itemsCount: q.items?.length || 0,
+        totalQty,
+        qtyUnit: "units",
+        warehousesCount: totalWarehousesCount || 1,
+        shipmentsCount: latestSalesOrder?.deliveriesCount || 1,
+        status,
+        requiredBy,
+        isUrgentDate,
+      };
+    });
+  }, [quotationsData?.data?.docs, totalWarehousesCount]);
+
+  // Filter orders client-side if a specific KPI filter is selected
+  const filteredOrders = useMemo(() => {
+    if (!activeFilter) return orders;
+
+    switch (activeFilter) {
+      case "ready":
+        return orders.filter((o) => o.status === "Ready to Fulfill");
+      case "partial":
+        return orders.filter((o) => o.status === "Partially Fulfilled");
+      case "backordered":
+        return orders.filter((o) => o.status === "Backordered");
+      case "completed":
+        return orders.filter((o) => o.status === "Fulfilled");
+      default:
+        return orders;
+    }
+  }, [orders, activeFilter]);
+
+  const kpi: FulfillmentKPI = {
+    readyToFulfillCount: summaryData?.data?.readyToFulfillCount || 0,
+    partiallyFulfilledCount: summaryData?.data?.partiallyFulfilledCount || 0,
+    backorderedCount: summaryData?.data?.backorderedCount || 0,
+    completedCount: summaryData?.data?.completedCount || 0,
+  };
+
+  const handleFilterSelect = (filterId: string) => {
+    setActiveFilter((prev) => (prev === filterId ? undefined : filterId));
   };
 
   return (
@@ -83,15 +156,31 @@ export default function FulfillmentPage() {
           Fulfillment
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          Warehouse allocation and shipment tracking for confirmed orders.
+          Warehouse allocation, shipment tracking, and delivery fulfillment for accepted quotations.
         </p>
       </div>
 
       {/* Summary KPI Cards */}
-      <FulfillmentSummaryCards kpi={kpi} />
+      <FulfillmentSummaryCards
+        kpi={kpi}
+        isLoading={isLoadingSummary}
+        activeFilter={activeFilter}
+        onFilterSelect={handleFilterSelect}
+      />
 
       {/* Orders Table Container */}
-      <FulfillmentOrdersTable orders={orders} />
+      <FulfillmentOrdersTable
+        orders={filteredOrders}
+        companyId={companyId}
+        isLoading={isLoadingQuotations || isFetchingQuotations}
+        page={quotationsData?.data?.page || page}
+        totalPages={quotationsData?.data?.totalPages || 1}
+        totalDocs={quotationsData?.data?.total || quotationsData?.data?.totalDocs}
+        limit={limit}
+        onPageChange={setPage}
+        search={search}
+        onSearchChange={setSearch}
+      />
     </main>
   );
 }

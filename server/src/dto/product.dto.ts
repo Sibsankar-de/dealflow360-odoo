@@ -64,6 +64,7 @@ export interface UpdateProductDto {
   price?: number;
   baseUnit?: string;
   type?: ProductType;
+  stocks?: StockEntryDto[];
   categoryIds?: string[];
   categoryIdList?: string[];
 }
