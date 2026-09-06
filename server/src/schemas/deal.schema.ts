@@ -85,7 +85,21 @@ export const customerDealFilterSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
+export const dealHealthQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+  search: z.string().optional(),
+  riskType: z
+    .enum(["ALL", "IDLE", "EXPIRING_SOON", "EXPIRED"])
+    .default("ALL")
+    .optional(),
+  idleDays: z.coerce.number().int().nonnegative().optional(),
+  idleMonths: z.coerce.number().int().nonnegative().optional(),
+  expiringDays: z.coerce.number().int().nonnegative().default(2).optional(),
+});
+
 export type CreateDealInput = z.infer<typeof createDealSchema>;
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 export type DealFilterInput = z.infer<typeof dealFilterSchema>;
 export type CustomerDealFilterInput = z.infer<typeof customerDealFilterSchema>;
+export type DealHealthQueryInput = z.infer<typeof dealHealthQuerySchema>;

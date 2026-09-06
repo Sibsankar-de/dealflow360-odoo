@@ -7,6 +7,7 @@ import {
   CompanySetting,
   CompanyConfig,
   User,
+  CustomerTier,
 } from "@prisma/client";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { prismaTransaction, TransactionClient } from "../utils/transactionHandler";
@@ -221,12 +222,37 @@ export class CompanyRepository {
     companyId: string,
     userId: string,
     role: CompanyUserRole,
+    customerTier?: CustomerTier | null,
   ): Promise<CompanyUser & { user: User }> {
     return this.prisma.companyUser.create({
       data: {
         companyId,
         userId,
         role,
+        customerTier:
+          customerTier ??
+          (role === CompanyUserRole.CUSTOMER ? CustomerTier.BRONZE : null),
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+
+  public async updateCompanyUserCustomerTier(
+    companyId: string,
+    userId: string,
+    customerTier: CustomerTier,
+  ): Promise<CompanyUser & { user: User }> {
+    return this.prisma.companyUser.update({
+      where: {
+        companyId_userId: {
+          companyId,
+          userId,
+        },
+      },
+      data: {
+        customerTier,
       },
       include: {
         user: true,
@@ -238,6 +264,7 @@ export class CompanyRepository {
     companyId: string,
     userId: string,
     role: CompanyUserRole,
+    customerTier?: CustomerTier | null,
   ): Promise<CompanyUser & { user: User }> {
     return this.prisma.companyUser.update({
       where: {
@@ -248,6 +275,7 @@ export class CompanyRepository {
       },
       data: {
         role,
+        ...(customerTier !== undefined ? { customerTier } : {}),
       },
       include: {
         user: true,

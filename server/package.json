@@ -17,7 +17,9 @@
     "db:migrate": "prisma migrate dev --schema=prisma/schema",
     "db:migrate:deploy": "prisma migrate deploy --schema=prisma/schema",
     "db:studio": "prisma studio --schema=prisma/schema",
-    "db:reset": "prisma migrate reset --schema=prisma/schema"
+    "db:reset": "prisma migrate reset --schema=prisma/schema",
+    "db:seed": "tsx scripts/seed.ts",
+    "customer:create": "tsx scripts/create-customer.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.19.2",

@@ -3,11 +3,15 @@ import { StatusCodes } from "http-status-codes";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/apiResponseHandler";
 import { ApiError } from "../utils/apiErrorHandler";
+import { validateBody } from "../utils/validate.utils";
 import {
   CustomerService,
   customerService as defaultCustomerService,
 } from "../services/customer.service";
-import { customerListQuerySchema } from "../schemas/customer.schema";
+import {
+  customerListQuerySchema,
+  createCustomerSchema,
+} from "../schemas/customer.schema";
 import { searchCustomersInElasticsearch } from "../services/elasticsearch.service";
 
 export class CustomerController {
@@ -18,6 +22,28 @@ export class CustomerController {
   ) {
     this.customerService = customerService;
   }
+
+  public create = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.company) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Company not found");
+    }
+
+    const validated = validateBody(createCustomerSchema, req.body);
+    const customer = await this.customerService.addCustomer(
+      req.company.id,
+      validated,
+    );
+
+    return res
+      .status(StatusCodes.CREATED)
+      .json(
+        new ApiResponse(
+          StatusCodes.CREATED,
+          { customer },
+          "Customer added successfully",
+        ),
+      );
+  });
 
   public list = asyncHandler(async (req: Request, res: Response) => {
     if (!req.company) {

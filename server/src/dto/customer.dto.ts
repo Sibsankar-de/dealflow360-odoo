@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { User, CompanyUser, CustomerTier, CompanyUserRole } from "@prisma/client";
-import { customerListQuerySchema } from "../schemas/customer.schema";
+import { customerListQuerySchema, createCustomerSchema } from "../schemas/customer.schema";
 
 export type CustomerListQueryDto = z.infer<typeof customerListQuerySchema>;
+export type CreateCustomerDto = z.infer<typeof createCustomerSchema>;
 
 export interface CustomerResponseDto {
   id: string;

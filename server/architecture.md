@@ -177,6 +177,7 @@ Responsibilities:
 - Provide paginated company listing (GET /api/v1/companies) scoped to the authenticated user's memberships and ownerships with assigned userRole, search, status filtering, and standard PaginatedResult metadata (docs, totalDocs, limit, page, totalPages, hasNextPage, hasPrevPage).
 - Provide company role definition endpoint (GET /api/v1/companies/:id/roles) listing all company roles (ADMIN, SALES_REP, SALES_MANAGER, FINANCE_MANAGER, CUSTOMER).
 - Provide paginated customer listing endpoint (GET /api/v1/customers/:companyId and GET /api/v1/companies/:id/customers) returning all customers associated with the company, supporting search by name or email, filtering by customer tier, and pagination.
+- Provide add customer endpoint (POST /api/v1/customers/:companyId and POST /api/v1/companies/:id/customers) accepting user email (`userEmail`) and optional customer tier (`customerTier`: BRONZE, SILVER, GOLD), adding the user with the CUSTOMER role and assigned tier or updating existing membership.
 - Ensure soft-delete support with `deletedAt` timestamps.
 
 ### 4.7 Warehouse, Product, and Stock Persistence Context
@@ -201,6 +202,11 @@ Responsibilities:
   - Maintain commercial forecasts including `expected_value`, `probability`, `expected_close_date`, and lead `source`.
   - Provide paginated deal listing for company sales members via GET /api/v1/deals/:companyId.
   - Provide paginated deal listing for customers via GET /api/v1/deals/customer and GET /api/v1/deals/customer/:companyId scoped to the authenticated user's customer ID with status filtering and pagination.
+  - Provide paginated deal health and anomaly evaluation via GET /api/v1/deals/:companyId/health:
+    - Filters and identifies open, non-terminal deals (`status: OPEN`) that are either idle for extended periods (e.g. no activity for >= 30 days or months) or whose expected close date / expiry is close (e.g. <= 2 days or overdue).
+    - Classifies alert records with `riskType` (`IDLE`, `EXPIRING_SOON`, `EXPIRED`), `severity` (`HIGH`, `MEDIUM`, `LOW`), age formatting, and suggested follow-up actions.
+    - Aggregates company-wide deal health KPIs (`stalledDealsCount`, `expiringSoonCount`, `deliveryRiskCount`, `quoteApprovalsCount`).
+    - Supports search, risk type filtering (`ALL`, `IDLE`, `EXPIRING_SOON`, `EXPIRED`), configurable threshold params (`idleDays`, `idleMonths`, `expiringDays`), and standard pagination.
 - Store quotation records (`quotations`) linking company, parent deal, sales representative, and customer.
   - Track quotation status via `QuotationStatus` enum (`DRAFT`, `SENT`, `NEGOTIATING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `CANCELLED`).
   - Protect commercial endpoints with RBAC middleware (`verifyCompanyAccess`, `requireRole`).

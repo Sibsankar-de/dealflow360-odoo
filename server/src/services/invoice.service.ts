@@ -525,7 +525,13 @@ export class InvoiceService {
 
   public async getInvoiceSummary(
     companyId: string,
+    customerId?: string,
   ): Promise<InvoiceSummaryResponseDto> {
+    const where: Prisma.InvoiceWhereInput = {
+      companyId,
+      ...(customerId ? { customerId } : {}),
+    };
+
     const [
       totalCount,
       paidCount,
@@ -534,24 +540,24 @@ export class InvoiceService {
       cancelledCount,
       aggregates,
     ] = await Promise.all([
-      defaultPrisma.invoice.count({ where: { companyId } }),
+      defaultPrisma.invoice.count({ where }),
       defaultPrisma.invoice.count({
-        where: { companyId, status: InvoiceStatus.PAID },
+        where: { ...where, status: InvoiceStatus.PAID },
       }),
       defaultPrisma.invoice.count({
-        where: { companyId, status: InvoiceStatus.PARTIALLY_PAID },
+        where: { ...where, status: InvoiceStatus.PARTIALLY_PAID },
       }),
       defaultPrisma.invoice.count({
-        where: { companyId, status: InvoiceStatus.POSTED },
+        where: { ...where, status: InvoiceStatus.POSTED },
       }),
       defaultPrisma.invoice.count({
         where: {
-          companyId,
+          ...where,
           status: { in: [InvoiceStatus.CANCELLED, InvoiceStatus.VOID] },
         },
       }),
       defaultPrisma.invoice.aggregate({
-        where: { companyId },
+        where,
         _sum: {
           total: true,
           paidAmount: true,

@@ -33,6 +33,7 @@ export const productListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20).optional(),
   type: z.nativeEnum(ProductType).optional(),
   search: z.string().optional(),
+  categoryId: z.string().uuid().optional(),
 });
 
 export const upsertStockSchema = z.object({

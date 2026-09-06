@@ -94,7 +94,7 @@ export class ProductRepository {
 
   public async findMany(
     companyId: string,
-    filters: { type?: ProductType; search?: string },
+    filters: { type?: ProductType; search?: string; categoryId?: string },
     page: number = 1,
     limit: number = 20,
     tx?: TransactionClient,
@@ -105,6 +105,15 @@ export class ProductRepository {
     const where: Prisma.ProductWhereInput = {
       companyId,
       ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.categoryId
+        ? {
+            categories: {
+              some: {
+                categoryId: filters.categoryId,
+              },
+            },
+          }
+        : {}),
       ...(filters.search
         ? {
             name: {

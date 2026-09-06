@@ -69,13 +69,13 @@ router.get(
 router.post(
   "/:companyId/:id/pay",
   verifyCompanyAccess,
-  requireRole(...financeRoles),
+  requireRole(...financeRoles, CompanyUserRole.CUSTOMER),
   invoiceController.pay,
 );
 router.post(
   "/:id/pay",
   verifyCompanyAccess,
-  requireRole(...financeRoles),
+  requireRole(...financeRoles, CompanyUserRole.CUSTOMER),
   invoiceController.pay,
 );
 
