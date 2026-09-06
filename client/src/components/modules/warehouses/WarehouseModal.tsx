@@ -9,6 +9,7 @@ import {
   useCreateWarehouseMutation,
   useUpdateWarehouseMutation,
 } from "@/store/features/warehouse/warehouseApi";
+import toast from "react-hot-toast";
 
 interface WarehouseModalProps {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
             addressLine: addressLine.trim(),
           },
         }).unwrap();
+        toast.success(`Warehouse "${name.trim()}" updated.`);
       } else {
         await createWarehouse({
           companyId,
@@ -88,6 +90,7 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
             addressLine: addressLine.trim(),
           },
         }).unwrap();
+        toast.success(`Warehouse "${name.trim()}" created.`);
       }
       onClose();
     } catch (err: unknown) {
@@ -95,6 +98,7 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to save warehouse";
       setErrors({ form: errorMsg });
+      toast.error(errorMsg);
     }
   };
 

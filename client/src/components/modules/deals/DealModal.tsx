@@ -11,6 +11,7 @@ import {
   useUpdateDealMutation,
 } from "@/store/features/deal/dealApi";
 import { useGetCustomersQuery } from "@/store/features/customer/customerApi";
+import toast from "react-hot-toast";
 
 interface DealModalProps {
   isOpen: boolean;
@@ -130,6 +131,7 @@ export const DealModal: React.FC<DealModalProps> = ({
             source: source.trim() || null,
           },
         }).unwrap();
+        toast.success(`Deal "${name.trim()}" updated successfully.`);
       } else {
         await createDeal({
           companyId,
@@ -142,6 +144,7 @@ export const DealModal: React.FC<DealModalProps> = ({
             source: source.trim() || null,
           },
         }).unwrap();
+        toast.success(`Deal "${name.trim()}" created successfully.`);
       }
       onClose();
     } catch (err: unknown) {
@@ -149,6 +152,7 @@ export const DealModal: React.FC<DealModalProps> = ({
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to save deal";
       setErrors({ form: errorMsg });
+      toast.error(errorMsg);
     }
   };
 

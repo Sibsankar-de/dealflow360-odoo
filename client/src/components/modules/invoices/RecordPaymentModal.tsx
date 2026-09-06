@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { InvoiceResponse } from "@/types/invoice";
 import { useRecordInvoicePaymentMutation } from "@/store/features/invoice/invoiceApi";
 import { DollarSign, CreditCard, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
 
 export interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -72,6 +73,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       }).unwrap();
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
+        toast.success(`Payment of ${invoice.currency} ${numAmount.toFixed(2)} recorded successfully.`);
         onSuccess?.();
         onClose();
       }
@@ -80,6 +82,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to record payment. Please try again.";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

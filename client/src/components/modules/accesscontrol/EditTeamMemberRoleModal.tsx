@@ -11,6 +11,7 @@ import {
   CompanyMemberType,
 } from "@/types/accesscontrol";
 import { useUpdateCompanyMemberRoleMutation } from "@/store/features/company/companyApi";
+import toast from "react-hot-toast";
 
 interface EditTeamMemberRoleModalProps {
   isOpen: boolean;
@@ -77,12 +78,14 @@ export function EditTeamMemberRoleModal({
         },
       }).unwrap();
 
+      toast.success(`Role for ${targetName} updated to ${role}.`);
       handleClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to update team member role.";
       setServerError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

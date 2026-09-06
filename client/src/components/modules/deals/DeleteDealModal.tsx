@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { DealResponseType } from "@/types/deal";
 import { useDeleteDealMutation } from "@/store/features/deal/dealApi";
 import { AlertTriangle } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface DeleteDealModalProps {
   isOpen: boolean;
@@ -29,12 +30,14 @@ export const DeleteDealModal: React.FC<DeleteDealModalProps> = ({
     try {
       setError(null);
       await deleteDeal({ companyId, id: deal.id }).unwrap();
+      toast.success(`Deal "${deal.name}" deleted.`);
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to delete deal";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

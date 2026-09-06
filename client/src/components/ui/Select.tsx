@@ -121,7 +121,11 @@ export const Select: React.FC<SelectType> = ({
   return (
     <div
       ref={containerRef}
-      className={clsx("flex flex-col gap-1.5 w-full relative", className)}
+      className={clsx(
+        "flex flex-col gap-1.5 w-full relative",
+        isOpen && "z-30",
+        className
+      )}
     >
       {label && (
         <label

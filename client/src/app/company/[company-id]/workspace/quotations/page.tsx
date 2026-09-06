@@ -56,7 +56,7 @@ export default function CompanyQuotationsPage() {
           </p>
         </div>
 
-        <Link href={`/company/${companyId}/app/deals`}>
+        <Link href={`/company/${companyId}/workspace/deals`}>
           <Button
             variant="primary"
             leftIcon={<Plus className="w-4 h-4" />}

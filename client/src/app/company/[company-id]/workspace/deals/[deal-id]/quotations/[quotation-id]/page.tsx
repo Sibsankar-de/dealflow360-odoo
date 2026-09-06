@@ -23,6 +23,7 @@ import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   Plus,
@@ -362,9 +363,9 @@ export default function QuotationEditorPage() {
 
           if (action === "send") {
             await sendQuotation({ companyId, id: createdQuotation.id }).unwrap();
-            setNotification("Quotation created and sent successfully!");
+            toast.success("Quotation created and sent successfully!");
           } else {
-            setNotification("Quotation draft saved successfully!");
+            toast.success("Quotation draft saved successfully!");
           }
         }
       } else {
@@ -385,18 +386,18 @@ export default function QuotationEditorPage() {
         if (action === "send") {
           if (existingQuotation?.status === "DRAFT") {
             await sendQuotation({ companyId, id: quotationId }).unwrap();
-            setNotification("Quotation updated and sent successfully!");
+            toast.success("Quotation updated and sent successfully!");
           } else {
-            setNotification("Counter-proposal submitted to customer successfully!");
+            toast.success("Counter-proposal submitted to customer successfully!");
           }
         } else {
-          setNotification("Quotation changes saved successfully!");
+          toast.success("Quotation changes saved successfully!");
         }
       }
 
       setTimeout(() => {
         router.push(
-          `/company/${companyId}/app/deals/${deal.id}/quotations`
+          `/company/${companyId}/workspace/deals/${deal.id}/quotations`
         );
       }, 1200);
     } catch (err: unknown) {
@@ -404,6 +405,7 @@ export default function QuotationEditorPage() {
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to save quotation";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -419,12 +421,13 @@ export default function QuotationEditorPage() {
       }).unwrap();
       setIsApproveNegModalOpen(false);
       setApproveNotes("");
-      setNotification("Customer counter-offer approved! The quotation has been updated and presented to the customer.");
+      toast.success("Customer counter-offer approved! Quotation updated.");
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to approve negotiation";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -440,12 +443,13 @@ export default function QuotationEditorPage() {
       }).unwrap();
       setIsRejectNegModalOpen(false);
       setRejectNegReason("");
-      setNotification("Customer counter-offer rejected. Original proposal terms have been restored.");
+      toast.success("Customer counter-offer rejected.");
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to reject negotiation";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -468,7 +472,7 @@ export default function QuotationEditorPage() {
         <p className="text-xs text-text-muted mt-1">
           The requested deal could not be located.
         </p>
-        <Link href={`/company/${companyId}/app/deals`}>
+        <Link href={`/company/${companyId}/workspace/deals`}>
           <Button variant="outline" size="sm" className="mt-4">
             Back to Deals
           </Button>
@@ -498,7 +502,7 @@ export default function QuotationEditorPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div className="flex items-center gap-3">
           <Link
-            href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
+            href={`/company/${companyId}/workspace/deals/${deal.id}/quotations`}
             className="p-2 rounded-xl bg-card border border-border text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -594,7 +598,7 @@ export default function QuotationEditorPage() {
         )}
 
         {existingQuotation?.status === "ACCEPTED" && (
-          <Link href={`/company/${companyId}/app/fulfillment/${existingQuotation.id}`}>
+          <Link href={`/company/${companyId}/workspace/fulfillment/${existingQuotation.id}`}>
             <Button variant="primary" size="md" leftIcon={<Truck className="w-4 h-4" />}>
               Fulfill Quotation
             </Button>
@@ -1178,7 +1182,7 @@ export default function QuotationEditorPage() {
       {/* Bottom Actions Bar */}
       <div className="flex items-center justify-end gap-3 pt-2">
         <Link
-          href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
+          href={`/company/${companyId}/workspace/deals/${deal.id}/quotations`}
         >
           <Button variant="outline" size="md">
             {isReadOnly ? "Back to Quotations" : "Cancel"}

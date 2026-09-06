@@ -51,7 +51,7 @@ export const FulfillmentOrdersTable: React.FC<FulfillmentOrdersTableProps> = ({
 }) => {
   const getFulfillmentHref = (order: FulfillmentOrder) => {
     return companyId
-      ? `/company/${companyId}/app/fulfillment/${order.id}`
+      ? `/company/${companyId}/workspace/fulfillment/${order.id}`
       : `/fulfillment/${order.id}`;
   };
 
@@ -174,15 +174,21 @@ export const FulfillmentOrdersTable: React.FC<FulfillmentOrdersTableProps> = ({
                       {order.requiredBy}
                     </td>
                     <td className="py-4 px-6 text-right whitespace-nowrap">
-                      <Link href={href}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-lg text-xs font-medium px-3.5 py-1.5 border-border hover:bg-surface text-text-primary"
-                        >
-                          Manage
-                        </Button>
-                      </Link>
+                      {order.status !== "Fulfilled" ? (
+                        <Link href={href}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg text-xs font-medium px-3.5 py-1.5 border-border hover:bg-surface text-text-primary"
+                          >
+                            Manage
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-text-muted font-medium px-2 py-1">
+                          Completed
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

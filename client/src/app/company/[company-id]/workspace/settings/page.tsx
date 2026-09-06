@@ -12,7 +12,8 @@ import {
   useUpdateCompanyMutation,
   useUpdateCompanySettingsMutation,
 } from "@/store/features/company/companyApi";
-import { Building2, Save, CheckCircle2, ShieldCheck, DollarSign, Percent, AlertCircle } from "lucide-react";
+import { Building2, Save, ShieldCheck, DollarSign, Percent, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function CompanySettingsPage() {
   const params = useParams();
@@ -98,13 +99,13 @@ export default function CompanySettingsPage() {
         },
       }).unwrap();
 
-      setNotification("Company profile and discount tier settings updated successfully.");
-      setTimeout(() => setNotification(null), 3500);
+      toast.success("Company profile and discount tier settings updated successfully.");
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to update company settings";
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 
@@ -131,13 +132,6 @@ export default function CompanySettingsPage() {
           Manage company profile, base currency, and customer tier discount configurations.
         </p>
       </div>
-
-      {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-          <span>{notification}</span>
-        </div>
-      )}
 
       {errorMessage && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-danger flex items-center gap-2">

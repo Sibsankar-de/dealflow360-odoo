@@ -27,6 +27,7 @@ export default function CustomerPortalLayout({
         {/* Top Navbar with AppLogo on left and CompanyInfo before Avatar icon */}
         <Navbar
           variant="customer"
+          companyId={companyId}
           companyInfo={
             company
               ? {

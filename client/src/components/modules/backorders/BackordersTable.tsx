@@ -144,7 +144,7 @@ export const BackordersTable: React.FC<BackordersTableProps> = ({
             ) : (
               backorders.map((bo) => {
                 const badge = getStatusBadgeConfig(bo.status);
-                const detailHref = `/company/${companyId}/app/backorders/${bo.id}`;
+                const detailHref = `/company/${companyId}/workspace/backorders/${bo.id}`;
                 const canFulfill =
                   bo.status !== "FULFILLED" &&
                   bo.status !== "CANCELLED" &&

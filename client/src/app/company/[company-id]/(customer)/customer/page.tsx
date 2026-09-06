@@ -21,8 +21,8 @@ import {
   Building2,
   FileText,
   XCircle,
-  CheckCircle2,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const STAGE_BADGES: Record<string, BadgeVariant> = {
   NEW: "secondary",
@@ -44,7 +44,6 @@ export default function CustomerDealsPage() {
   const [dealToClose, setDealToClose] = useState<DealResponseType | null>(null);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
-  const [notification, setNotification] = useState<string | null>(null);
 
   const { data: companyData } = useGetCompanyByIdQuery(companyId, {
     skip: !companyId,
@@ -91,12 +90,14 @@ export default function CustomerDealsPage() {
           status: "LOST",
         },
       }).unwrap();
-      setNotification(`Deal "${dealToClose.name}" marked as closed.`);
+      toast.success(`Deal "${dealToClose.name}" marked as closed.`);
       setIsCloseModalOpen(false);
       setDealToClose(null);
-      setTimeout(() => setNotification(null), 4000);
-    } catch {
-      // Error handling
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to close deal.";
+      toast.error(msg);
     }
   };
 
@@ -114,13 +115,6 @@ export default function CustomerDealsPage() {
           </p>
         </div>
       </div>
-
-      {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-          <span>{notification}</span>
-        </div>
-      )}
 
       {/* Search & Filter Bar */}
       <div className="flex items-center gap-3">

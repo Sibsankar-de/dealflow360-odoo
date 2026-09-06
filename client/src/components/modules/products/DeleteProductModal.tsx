@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { ProductResponseType } from "@/types/product";
 import { useDeleteProductMutation } from "@/store/features/product/productApi";
 import { AlertTriangle } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface DeleteProductModalProps {
   isOpen: boolean;
@@ -29,12 +30,14 @@ export const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
     try {
       setError(null);
       await deleteProduct({ companyId, productId: product.id }).unwrap();
+      toast.success(`Product "${product.name}" deleted.`);
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to delete product";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

@@ -10,6 +10,7 @@ import { EditProfileModal } from "@/components/modules/profile/EditProfileModal"
 import { ChangePasswordModal } from "@/components/modules/profile/ChangePasswordModal";
 import { CreateCompanyModal, CreateCompanyData } from "@/components/modules/profile/CreateCompanyModal";
 import { CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import {
   useGetUserCompaniesQuery,
@@ -27,7 +28,6 @@ export default function ProfilePage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -46,41 +46,58 @@ export default function ProfilePage() {
     companies,
   };
 
-  const showNotification = (message: string) => {
-    setFeedbackMessage(message);
-    setTimeout(() => {
-      setFeedbackMessage(null);
-    }, 4000);
-  };
-
   const handleSaveProfile = async (data: { fullName: string }) => {
-    await updateProfile({ userName: data.fullName });
-    showNotification("Profile details updated successfully.");
+    try {
+      await updateProfile({ userName: data.fullName });
+      toast.success("Profile details updated successfully.");
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to update profile details.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   const handleSavePassword = async (data: { currentPassword: string; newPassword: string }) => {
-    await updatePassword(data);
-    showNotification("Password changed successfully.");
+    try {
+      await updatePassword(data);
+      toast.success("Password changed successfully.");
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to change password.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   const handleCreateCompany = async (data: CreateCompanyData) => {
-    const response = await createCompanyMutation({
-      name: data.name,
-      country: data.country,
-      postalCode: data.postalCode,
-      addressLine: data.addressLine,
-      currency: data.currency,
-    }).unwrap();
+    try {
+      const response = await createCompanyMutation({
+        name: data.name,
+        country: data.country,
+        postalCode: data.postalCode,
+        addressLine: data.addressLine,
+        currency: data.currency,
+      }).unwrap();
 
-    const createdCompanyName = response.data?.company?.name || data.name;
-    showNotification(`Company "${createdCompanyName}" created successfully. You are assigned as Company Admin.`);
+      const createdCompanyName = response.data?.company?.name || data.name;
+      toast.success(`Company "${createdCompanyName}" created successfully.`);
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Failed to create company.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   const handleViewCompany = (company: CompanyAffiliation) => {
     if (company.role === "Customer") {
       router.push(`/company/${company.id}/customer`);
     } else {
-      router.push(`/company/${company.id}/app/dashboard`);
+      router.push(`/company/${company.id}/workspace/dashboard`);
     }
   };
 
@@ -93,13 +110,6 @@ export default function ProfilePage() {
             Manage your personal details, credentials, and company workspace affiliations
           </p>
         </div>
-
-        {feedbackMessage && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-success" />
-            <span>{feedbackMessage}</span>
-          </div>
-        )}
 
         <ProfileInfoCard
           user={displayUser}

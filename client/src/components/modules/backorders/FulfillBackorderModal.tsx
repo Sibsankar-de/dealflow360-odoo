@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { BackorderResponse } from "@/types/backorder";
 import { useFulfillBackorderMutation } from "@/store/features/backorder/backorderApi";
 import { Package, Truck, AlertCircle, CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 export interface FulfillBackorderModalProps {
   isOpen: boolean;
@@ -83,6 +84,7 @@ export const FulfillBackorderModal: React.FC<FulfillBackorderModalProps> = ({
       }).unwrap();
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
+        toast.success(`Backorder ${backorder.backorderNo} fulfilled successfully.`);
         onSuccess?.();
         onClose();
       }
@@ -91,6 +93,7 @@ export const FulfillBackorderModal: React.FC<FulfillBackorderModalProps> = ({
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to fulfill backorder. Please check stock availability and try again.";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

@@ -12,6 +12,7 @@ import {
 } from "@/types/accesscontrol";
 import { useAddCompanyMemberMutation, useGetCompanyMembersQuery } from "@/store/features/company/companyApi";
 import { useGetCustomersQuery } from "@/store/features/customer/customerApi";
+import toast from "react-hot-toast";
 
 interface InviteTeamMemberModalProps {
   isOpen: boolean;
@@ -109,12 +110,14 @@ export function InviteTeamMemberModal({
         },
       }).unwrap();
 
+      toast.success(`Team member ${email.trim()} added successfully.`);
       handleClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to add team member to company.";
       setServerError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

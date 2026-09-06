@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { WarehouseResponseType } from "@/types/warehouse";
 import { useDeleteWarehouseMutation } from "@/store/features/warehouse/warehouseApi";
 import { AlertTriangle } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface DeleteWarehouseModalProps {
   isOpen: boolean;
@@ -29,12 +30,14 @@ export const DeleteWarehouseModal: React.FC<DeleteWarehouseModalProps> = ({
     try {
       setError(null);
       await deleteWarehouse({ companyId, warehouseId: warehouse.id }).unwrap();
+      toast.success(`Warehouse "${warehouse.name}" deleted.`);
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to delete warehouse";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
