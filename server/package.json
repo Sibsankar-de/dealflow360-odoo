@@ -19,6 +19,7 @@
     "db:studio": "prisma studio --schema=prisma/schema",
     "db:reset": "prisma migrate reset --schema=prisma/schema",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed:synthetic": "tsx scripts/seed-synthetic-transactions.ts",
     "customer:create": "tsx scripts/create-customer.ts"
   },
   "dependencies": {

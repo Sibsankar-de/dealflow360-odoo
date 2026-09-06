@@ -35,6 +35,7 @@ interface ProductDefinition {
   price: number;
   baseUnit: string;
   type: ProductType;
+  discountTiers?: Array<{ customerTier: CustomerTier; discountPercent: number }>;
 }
 
 const CATEGORY_DEFINITIONS: Array<{
@@ -840,12 +841,21 @@ export async function seedAll() {
       }
 
       // Link Product Discount Tiers
+      const discountTierData =
+        prodDef.discountTiers && prodDef.discountTiers.length > 0
+          ? prodDef.discountTiers.map((dt) => ({
+              productId: product.id,
+              customerTier: dt.customerTier,
+              discountPercent: dt.discountPercent,
+            }))
+          : [
+              { productId: product.id, customerTier: CustomerTier.BRONZE, discountPercent: 5.0 },
+              { productId: product.id, customerTier: CustomerTier.SILVER, discountPercent: 10.0 },
+              { productId: product.id, customerTier: CustomerTier.GOLD, discountPercent: 18.0 },
+            ];
+
       await prisma.productDiscountTier.createMany({
-        data: [
-          { productId: product.id, customerTier: CustomerTier.BRONZE, discountPercent: 5.0 },
-          { productId: product.id, customerTier: CustomerTier.SILVER, discountPercent: 10.0 },
-          { productId: product.id, customerTier: CustomerTier.GOLD, discountPercent: 18.0 },
-        ],
+        data: discountTierData,
       });
     }
   }

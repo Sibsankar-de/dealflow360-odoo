@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Select";
@@ -9,7 +9,7 @@ import { SearchableInput } from "@/components/ui/SearchableInput";
 import { useSearchCustomersQuery } from "@/store/features/customer/customerApi";
 import { CustomerTier } from "@/types/customer";
 import { useAuth } from "@/context/AuthContext";
-import { User, Check, Shield } from "lucide-react";
+import { User, Check } from "lucide-react";
 
 export interface CreateCustomerModalProps {
   isOpen: boolean;
@@ -112,82 +112,84 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
       description="Enter or search the registered DealFlow360 work email to add them as a customer in this company."
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
-            {error}
-          </div>
-        )}
-
-        <SearchableInput<CustomerSearchItem>
-          label="Work Email / Search User"
-          type="email"
-          placeholder="customer@example.com"
-          value={email}
-          onChange={(val) => {
-            setEmail(val);
-            if (error) setError(null);
-          }}
-          onSelect={(item) => {
-            setEmail(item.value);
-            if (error) setError(null);
-          }}
-          items={customerMatches}
-          isLoading={isFetching}
-          emptyMessage={
-            email.trim()
-              ? "No registered user found with that email. You can still type the full email to register them."
-              : "Type to search registered accounts..."
-          }
-          required
-          autoFocus
-          renderItem={(item) => (
-            <div className="flex items-center justify-between gap-3 text-xs w-full py-0.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 font-bold text-[11px] shrink-0">
-                  {item.name ? item.name.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5" />}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary truncate">
-                    {item.name || "Customer"}
-                  </p>
-                  <p className="text-text-muted truncate text-[11px]">
-                    {item.value}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {item.customerTier && (
-                  <Badge variant="info" className="text-[10px] px-1.5 py-0">
-                    {item.customerTier}
-                  </Badge>
-                )}
-                {email.toLowerCase() === item.value.toLowerCase() && (
-                  <Check className="w-4 h-4 text-brand-600" />
-                )}
-              </div>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
+              {error}
             </div>
           )}
-        />
 
-        <div>
-          <Select
-            label="Customer Pricing Tier"
-            value={customerTier}
-            onChange={(val) => setCustomerTier(val as CustomerTier)}
-            options={[
-              { key: "BRONZE", value: "Bronze Tier (Standard Discounts)" },
-              { key: "SILVER", value: "Silver Tier (Preferred Volume Discounts)" },
-              { key: "GOLD", value: "Gold Tier (VIP Premium Discounts)" },
-            ]}
+          <SearchableInput<CustomerSearchItem>
+            label="Work Email / Search User"
+            type="email"
+            placeholder="customer@example.com"
+            value={email}
+            onChange={(val) => {
+              setEmail(val);
+              if (error) setError(null);
+            }}
+            onSelect={(item) => {
+              setEmail(item.value);
+              if (error) setError(null);
+            }}
+            items={customerMatches}
+            isLoading={isFetching}
+            emptyMessage={
+              email.trim()
+                ? "No registered user found with that email. You can still type the full email to register them."
+                : "Type to search registered accounts..."
+            }
+            required
+            autoFocus
+            renderItem={(item) => (
+              <div className="flex items-center justify-between gap-3 text-xs w-full py-0.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 font-bold text-[11px] shrink-0">
+                    {item.name ? item.name.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-text-primary truncate">
+                      {item.name || "Customer"}
+                    </p>
+                    <p className="text-text-muted truncate text-[11px]">
+                      {item.value}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {item.customerTier && (
+                    <Badge variant="info" className="text-[10px] px-1.5 py-0">
+                      {item.customerTier}
+                    </Badge>
+                  )}
+                  {email.toLowerCase() === item.value.toLowerCase() && (
+                    <Check className="w-4 h-4 text-brand-600" />
+                  )}
+                </div>
+              </div>
+            )}
           />
-          <p className="text-[11px] text-text-muted mt-1.5">
-            Customer tier determines automated discount thresholds and subscription pricing tier resolution on quotations.
-          </p>
-        </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-6">
+          <div>
+            <Select
+              label="Customer Pricing Tier"
+              value={customerTier}
+              onChange={(val) => setCustomerTier(val as CustomerTier)}
+              options={[
+                { key: "BRONZE", value: "Bronze Tier (Standard Discounts)" },
+                { key: "SILVER", value: "Silver Tier (Preferred Volume Discounts)" },
+                { key: "GOLD", value: "Gold Tier (VIP Premium Discounts)" },
+              ]}
+            />
+            <p className="text-[11px] text-text-muted mt-1.5">
+              Customer tier determines automated discount thresholds and subscription pricing tier resolution on quotations.
+            </p>
+          </div>
+        </ModalBody>
+
+        <ModalFooter>
           <Button
             type="button"
             variant="outline"
@@ -204,7 +206,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
           >
             Add Customer
           </Button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

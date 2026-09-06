@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { BackorderResponse } from "@/types/backorder";
@@ -24,74 +24,84 @@ export const FulfillBackorderModal: React.FC<FulfillBackorderModalProps> = ({
   companyId,
   onSuccess,
 }) => {
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [trackingNumber, setTrackingNumber] = useState<string>("");
-  const [expectedDate, setExpectedDate] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const [items, setItems] = useState<
+    Array<{ quotationItemId: string; quantityToFulfill: number; maxQty: number; name: string }>
+  >([]);
+  const [carrier, setCarrier] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [expectedDate, setExpectedDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [fulfillBackorder, { isLoading }] = useFulfillBackorderMutation();
 
   useEffect(() => {
-    if (backorder) {
-      const initialQtys: Record<string, number> = {};
-      (backorder.items || []).forEach((item) => {
-        initialQtys[item.salesOrderItemId] = item.remainingQuantity || 0;
-      });
-      setQuantities(initialQtys);
+    if (backorder && isOpen) {
+      setItems(
+        (backorder.items || []).map((it) => ({
+          quotationItemId: it.salesOrderItemId,
+          quantityToFulfill: it.remainingQuantity || 0,
+          maxQty: it.remainingQuantity || 0,
+          name: it.productName || "Product Item",
+        }))
+      );
+      setCarrier("");
       setTrackingNumber("");
       setExpectedDate("");
       setNotes("");
       setError(null);
     }
-  }, [backorder]);
+  }, [backorder, isOpen]);
 
-  const handleQtyChange = (salesOrderItemId: string, val: string, maxQty: number) => {
-    const num = val === "" ? 0 : Number(val);
-    setQuantities((prev) => ({
-      ...prev,
-      [salesOrderItemId]: Math.min(Math.max(0, num), maxQty),
-    }));
+  const handleQtyChange = (quotationItemId: string, val: string) => {
+    const num = Number(val);
+    setItems((prev) =>
+      prev.map((it) =>
+        it.quotationItemId === quotationItemId
+          ? {
+              ...it,
+              quantityToFulfill: isNaN(num) ? 0 : Math.min(Math.max(0, num), it.maxQty),
+            }
+          : it
+      )
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!backorder || !companyId) return;
+    if (!backorder) return;
 
-    const itemsToDeliver = Object.entries(quantities)
-      .filter(([_, qty]) => qty > 0)
-      .map(([salesOrderItemId, deliveredQuantity]) => ({
-        salesOrderItemId,
-        deliveredQuantity,
-      }));
-
-    if (itemsToDeliver.length === 0) {
-      setError("Please specify a delivered quantity greater than 0 for at least one item.");
+    const totalFulfilling = items.reduce((acc, curr) => acc + curr.quantityToFulfill, 0);
+    if (totalFulfilling <= 0) {
+      setError("Please specify at least 1 unit to fulfill.");
       return;
     }
 
-    setError(null);
     try {
-      const res = await fulfillBackorder({
+      setError(null);
+      await fulfillBackorder({
         companyId,
         backorderId: backorder.id,
         data: {
+          items: items
+            .filter((it) => it.quantityToFulfill > 0)
+            .map((it) => ({
+              salesOrderItemId: it.quotationItemId,
+              deliveredQuantity: it.quantityToFulfill,
+            })),
           trackingNumber: trackingNumber.trim() || undefined,
           expectedDate: expectedDate ? new Date(expectedDate).toISOString() : undefined,
           notes: notes.trim() || undefined,
-          items: itemsToDeliver,
         },
       }).unwrap();
 
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        toast.success(`Backorder ${backorder.backorderNo} fulfilled successfully.`);
-        onSuccess?.();
-        onClose();
-      }
+      toast.success(`Backorder fulfilled! Delivery created successfully.`);
+      onSuccess?.();
+      onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
-        "Failed to fulfill backorder. Please check stock availability and try again.";
+        "Failed to fulfill backorder. Please try again.";
       setError(errorMsg);
       toast.error(errorMsg);
     }
@@ -107,120 +117,109 @@ export const FulfillBackorderModal: React.FC<FulfillBackorderModalProps> = ({
       description={`Allocate warehouse stock and create delivery for Backorder ${backorder.backorderNo}`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        {/* Backorder Header Summary */}
-        <div className="p-3.5 bg-surface/60 rounded-xl border border-border flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div>
-            <span className="text-text-muted">Sales Order: </span>
-            <span className="font-bold text-text-primary">
-              {backorder.orderNo || "Sales Order"}
-            </span>
+          {/* Backorder Header Summary */}
+          <div className="p-3.5 bg-surface/60 rounded-xl border border-border flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="text-text-muted">Sales Order: </span>
+              <span className="font-bold text-text-primary">
+                {backorder.orderNo || "Sales Order"}
+              </span>
+            </div>
+            <div>
+              <span className="text-text-muted">Remaining to Fulfill: </span>
+              <span className="font-bold text-red-600">
+                {backorder.remainingQuantity} units
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-text-muted">Remaining to Fulfill: </span>
-            <span className="font-bold text-red-600">
-              {backorder.remainingQuantity} units
-            </span>
-          </div>
-        </div>
 
-        {/* Item Quantities Selection */}
-        <div className="space-y-2">
-          <label className="block text-xs font-semibold text-text-primary">
-            Select Quantities to Deliver
-          </label>
-          <div className="border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-surface/50 font-semibold text-text-muted">
-                  <th className="py-2.5 px-4">Product</th>
-                  <th className="py-2.5 px-3 text-center">Remaining</th>
-                  <th className="py-2.5 px-4 text-right w-36">Fulfill Now</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {(backorder.items || []).map((item) => {
-                  const currentVal = quantities[item.salesOrderItemId] ?? item.remainingQuantity;
-                  return (
-                    <tr key={item.id} className="hover:bg-surface/30">
-                      <td className="py-3 px-4 font-medium text-text-primary">
-                        {item.productName || "Product Item"}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-text-secondary">
-                        {item.remainingQuantity} units
-                      </td>
-                      <td className="py-2 px-4 text-right">
-                        <Input
-                          type="number"
-                          min="0"
-                          max={item.remainingQuantity}
-                          value={currentVal}
-                          onChange={(e) =>
-                            handleQtyChange(
-                              item.salesOrderItemId,
-                              e.target.value,
-                              item.remainingQuantity
-                            )
-                          }
-                          className="w-24 ml-auto text-center py-1 text-xs"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          {/* Item Quantities Selection */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-text-primary">
+              Select Item Quantities to Deliver
+            </label>
+            <div className="space-y-2">
+              {items.map((it) => (
+                <div
+                  key={it.quotationItemId}
+                  className="p-3 bg-surface/40 rounded-xl border border-border flex items-center justify-between gap-4 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-text-primary truncate">{it.name}</p>
+                    <p className="text-text-muted text-[11px]">
+                      Available backorder qty:{" "}
+                      <span className="font-medium text-text-primary">{it.maxQty} units</span>
+                    </p>
+                  </div>
 
-        {/* Tracking & Logistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-text-muted text-[11px]">Deliver:</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={it.maxQty}
+                      value={it.quantityToFulfill}
+                      onChange={(e) => handleQtyChange(it.quotationItemId, e.target.value)}
+                      className="w-24 text-right"
+                      required
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Shipping & Courier Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-primary mb-1">
+                Tracking Number
+              </label>
+              <Input
+                type="text"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="e.g. 7849102931"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-primary mb-1">
+                Expected Date
+              </label>
+              <Input
+                type="date"
+                value={expectedDate}
+                onChange={(e) => setExpectedDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Remarks / Notes */}
           <div>
             <label className="block text-xs font-semibold text-text-primary mb-1">
-              Tracking Number (Optional)
+              Fulfillment Notes (Optional)
             </label>
-            <Input
-              type="text"
-              value={trackingNumber}
-              onChange={(e) => setTrackingNumber(e.target.value)}
-              placeholder="e.g. TRK-881249"
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-xs bg-surface/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all text-text-primary placeholder:text-text-muted"
+              placeholder="Delivery instructions, courier name, warehouse dispatch notes..."
             />
           </div>
+        </ModalBody>
 
-          <div>
-            <label className="block text-xs font-semibold text-text-primary mb-1">
-              Expected Delivery Date (Optional)
-            </label>
-            <Input
-              type="date"
-              value={expectedDate}
-              onChange={(e) => setExpectedDate(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Remarks / Notes */}
-        <div>
-          <label className="block text-xs font-semibold text-text-primary mb-1">
-            Fulfillment Notes (Optional)
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            className="w-full px-3 py-2 text-xs bg-surface/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all text-text-primary placeholder:text-text-muted"
-            placeholder="Delivery instructions, courier name, warehouse dispatch notes..."
-          />
-        </div>
-
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+        <ModalFooter>
           <Button
             variant="outline"
             type="button"
@@ -237,7 +236,7 @@ export const FulfillBackorderModal: React.FC<FulfillBackorderModalProps> = ({
           >
             Dispatch & Fulfill
           </Button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

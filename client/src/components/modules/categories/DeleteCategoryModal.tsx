@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { CategoryResponseType } from "@/types/category";
 import { useDeleteCategoryMutation } from "@/store/features/category/categoryApi";
@@ -51,7 +51,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
       title="Delete Product Category"
       size="sm"
     >
-      <div className="space-y-4">
+      <ModalBody className="space-y-4">
         {error && (
           <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
             {error}
@@ -76,27 +76,27 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
             ) : null}
           </div>
         </div>
+      </ModalBody>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleDelete}
-            isLoading={isLoading}
-            loadingText="Deleting..."
-            className="bg-danger hover:bg-red-700 text-white border-transparent"
-          >
-            Delete Category
-          </Button>
-        </div>
-      </div>
+      <ModalFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={isLoading}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          onClick={handleDelete}
+          isLoading={isLoading}
+          loadingText="Deleting..."
+          className="bg-danger hover:bg-red-700 text-white border-transparent"
+        >
+          Delete Category
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };

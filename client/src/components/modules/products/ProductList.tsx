@@ -229,6 +229,35 @@ export const ProductList: React.FC<ProductListProps> = ({
                             ))}
                           </div>
                         )}
+                        {prod.discountTiers && prod.discountTiers.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            <span className="text-[10px] text-text-muted font-medium mr-0.5">
+                              Tier Discounts:
+                            </span>
+                            {prod.discountTiers.map((dt) => {
+                              const tierColors =
+                                {
+                                  BRONZE:
+                                    "bg-amber-50 text-amber-800 border-amber-200/60",
+                                  SILVER:
+                                    "bg-slate-50 text-slate-700 border-slate-200/60",
+                                  GOLD: "bg-yellow-50 text-yellow-800 border-yellow-200/60",
+                                }[dt.customerTier] ||
+                                "bg-surface text-text-secondary border-border";
+
+                              return (
+                                <span
+                                  key={dt.customerTier}
+                                  className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${tierColors}`}
+                                >
+                                  {dt.customerTier.charAt(0) +
+                                    dt.customerTier.slice(1).toLowerCase()}
+                                  : {Number(dt.discountPercent)}%
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         <Badge

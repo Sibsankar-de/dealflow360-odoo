@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -97,34 +97,36 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       }
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
-            {error}
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-danger">
+              {error}
+            </div>
+          )}
 
-        <Input
-          label="Category Name"
-          placeholder="e.g., Software Licenses, Cloud Hosting, Hardware..."
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (error) setError(null);
-          }}
-          required
-          autoFocus
-        />
+          <Input
+            label="Category Name"
+            placeholder="e.g., Software Licenses, Cloud Hosting, Hardware..."
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError(null);
+            }}
+            required
+            autoFocus
+          />
 
-        <Textarea
-          label="Description (Optional)"
-          placeholder="Brief description about the products classified under this category..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-        />
+          <Textarea
+            label="Description (Optional)"
+            placeholder="Brief description about the products classified under this category..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
+        </ModalBody>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-6">
+        <ModalFooter>
           <Button
             type="button"
             variant="outline"
@@ -141,7 +143,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
           >
             {isEditing ? "Update Category" : "Create Category"}
           </Button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

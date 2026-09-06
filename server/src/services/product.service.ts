@@ -86,6 +86,11 @@ export class ProductService {
         }
       }
 
+      const discountTiers = (dto.discountTiers || []).map((dt) => ({
+        customerTier: dt.customerTier,
+        discountPercent: new Prisma.Decimal(dt.discountPercent),
+      }));
+
       const product = await this.productRepo.create(
         {
           companyId,
@@ -97,6 +102,7 @@ export class ProductService {
         },
         stocks,
         categoryIdList,
+        discountTiers,
         tx,
       );
 
@@ -224,6 +230,17 @@ export class ProductService {
             tx,
           );
         }
+      }
+
+      if (dto.discountTiers !== undefined) {
+        await this.productRepo.syncDiscountTiers(
+          productId,
+          dto.discountTiers.map((dt) => ({
+            customerTier: dt.customerTier,
+            discountPercent: new Prisma.Decimal(dt.discountPercent),
+          })),
+          tx,
+        );
       }
 
       await this.productRepo.update(

@@ -34,6 +34,18 @@ export interface ProductResponseType {
   updatedAt: string;
 }
 
+export interface ProductSummaryResponseType {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  baseUnit: string;
+  type: ProductType;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PaginatedProductsResponse {
   products: ProductResponseType[];
   total: number;
@@ -50,6 +62,7 @@ export interface CreateProductRequest {
   baseUnit?: string;
   type?: ProductType;
   stocks?: { warehouseId: string; stockQty: number }[];
+  discountTiers?: { customerTier: CustomerTier; discountPercent: number }[];
   categoryIds?: string[];
   categoryIdList?: string[];
 }
@@ -61,6 +74,7 @@ export interface UpdateProductRequest {
   baseUnit?: string;
   type?: ProductType;
   stocks?: { warehouseId: string; stockQty: number }[];
+  discountTiers?: { customerTier: CustomerTier; discountPercent: number }[];
   categoryIds?: string[];
   categoryIdList?: string[];
 }

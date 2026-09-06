@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { CurrencySelector } from "@/components/ui/CurrencySelector";
-import { useGetProductsQuery } from "@/store/features/product/productApi";
+import { ProductSummaryResponseType } from "@/types/product";
+import { useLazySearchProductsQuery } from "@/store/features/product/productApi";
 import { useCreateDealQuotationMutation } from "@/store/features/deal/dealApi";
 import { useUpdateQuotationMutation } from "@/store/features/quotation/quotationApi";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search, X, Loader2, Package } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface CreateQuotationModalProps {
@@ -22,12 +23,175 @@ interface CreateQuotationModalProps {
 
 interface ItemState {
   productId: string;
+  productName?: string;
+  productBaseUnit?: string;
   quantity: number | string;
   unitPrice: number | string;
   discountType: "PERCENTAGE" | "FIXED";
   discountValue: number | string;
   taxRate: number | string;
 }
+
+interface LineItemProductSearchProps {
+  companyId: string;
+  selectedProductId: string;
+  selectedProductName?: string;
+  selectedProductBaseUnit?: string;
+  onSelectProduct: (product: ProductSummaryResponseType) => void;
+  onClearProduct: () => void;
+  hasError?: boolean;
+}
+
+const LineItemProductSearch: React.FC<LineItemProductSearchProps> = ({
+  companyId,
+  selectedProductId,
+  selectedProductName,
+  selectedProductBaseUnit,
+  onSelectProduct,
+  onClearProduct,
+  hasError,
+}) => {
+  const [triggerSearch, { data: searchData, isFetching }] =
+    useLazySearchProductsQuery();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const searchResults = searchData?.data ?? [];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  if (selectedProductId && selectedProductName) {
+    return (
+      <div>
+        <label className="text-xs font-medium text-text-primary block mb-1">
+          Product
+        </label>
+        <div className="flex items-center justify-between p-2 bg-card border border-border rounded-lg min-h-[38px]">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <Package className="w-4 h-4 text-brand-600 shrink-0" />
+            <span className="text-xs font-semibold text-text-primary truncate">
+              {selectedProductName}
+            </span>
+            {selectedProductBaseUnit && (
+              <span className="text-[10px] text-text-muted shrink-0">
+                ({selectedProductBaseUnit})
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClearProduct}
+            className="text-[11px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 px-2 py-0.5 rounded hover:bg-surface border border-transparent hover:border-border transition-colors cursor-pointer shrink-0"
+          >
+            Change
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <label className="text-xs font-medium text-text-primary block mb-1">
+        Product <span className="text-danger">*</span>
+      </label>
+      <div className="relative flex items-center">
+        <Search className="w-3.5 h-3.5 text-text-muted absolute left-2.5 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSearchQuery(val);
+            setIsOpen(true);
+            if (val.trim()) {
+              triggerSearch({ companyId, query: val.trim(), limit: 10 });
+            }
+          }}
+          onFocus={() => {
+            setIsOpen(true);
+            if (searchQuery.trim()) {
+              triggerSearch({ companyId, query: searchQuery.trim(), limit: 10 });
+            }
+          }}
+          placeholder="Search product by name..."
+          className={`w-full pl-8 pr-7 py-1.5 rounded-lg border bg-card text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 shadow-xs transition-colors ${
+            hasError ? "border-danger" : "border-border"
+          }`}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="absolute right-2 p-0.5 text-text-muted hover:text-text-primary rounded cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Suggestion Dropdown */}
+      {isOpen && searchQuery.trim() && (
+        <div className="absolute z-20 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-border/50">
+          {isFetching ? (
+            <div className="p-2.5 text-xs text-text-muted flex items-center justify-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />
+              <span>Searching products...</span>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="p-2.5 text-xs text-text-muted text-center">
+              No products found matching &quot;{searchQuery}&quot;
+            </div>
+          ) : (
+            searchResults.map((prod) => (
+              <button
+                key={prod.id}
+                type="button"
+                onClick={() => {
+                  onSelectProduct(prod);
+                  setSearchQuery("");
+                  setIsOpen(false);
+                }}
+                className="w-full px-2.5 py-2 text-left flex items-center justify-between hover:bg-surface transition-colors cursor-pointer group"
+              >
+                <div className="min-w-0 pr-2">
+                  <p className="text-xs font-medium text-text-primary truncate">
+                    {prod.name}
+                  </p>
+                  {prod.description && (
+                    <p className="text-[11px] text-text-muted truncate">
+                      {prod.description}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-semibold text-brand-600">
+                    ${Number(prod.price).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-text-muted block">
+                    / {prod.baseUnit || "Unit"}
+                  </span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
   isOpen,
@@ -40,11 +204,6 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
     useCreateDealQuotationMutation();
   const [updateQuotation, { isLoading: isUpdating }] =
     useUpdateQuotationMutation();
-  const { data: productData } = useGetProductsQuery(
-    { companyId },
-    { skip: !isOpen || !companyId }
-  );
-  const products = productData?.data?.products ?? [];
 
   const [items, setItems] = useState<ItemState[]>([]);
   const [currency, setCurrency] = useState("USD");
@@ -53,9 +212,20 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
   const [internalNote, setInternalNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
-      setItems([]);
+      setItems([
+        {
+          productId: "",
+          productName: "",
+          productBaseUnit: "",
+          quantity: 1,
+          unitPrice: "",
+          discountType: "PERCENTAGE",
+          discountValue: "",
+          taxRate: 0,
+        },
+      ]);
       setCurrency("USD");
       setValidUntil("");
       setCustomerNote("");
@@ -65,14 +235,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
   }, [isOpen]);
 
   const handleAddItem = () => {
-    if (products.length === 0) return;
-    const firstProd = products[0];
     setItems((prev) => [
       ...prev,
       {
-        productId: firstProd.id,
+        productId: "",
+        productName: "",
+        productBaseUnit: "",
         quantity: 1,
-        unitPrice: Number(firstProd.price) || 0,
+        unitPrice: "",
         discountType: "PERCENTAGE",
         discountValue: "",
         taxRate: 0,
@@ -84,15 +254,37 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleProductChange = (index: number, prodId: string) => {
-    const selectedProd = products.find((p) => p.id === prodId);
+  const handleSelectProduct = (index: number, product: ProductSummaryResponseType) => {
     setItems((prev) =>
       prev.map((item, i) =>
         i === index
           ? {
               ...item,
-              productId: prodId,
-              unitPrice: selectedProd ? Number(selectedProd.price) || 0 : item.unitPrice,
+              productId: product.id,
+              productName: product.name,
+              productBaseUnit: product.baseUnit,
+              unitPrice: Number(product.price) || 0,
+            }
+          : item
+      )
+    );
+    setErrors((prev) => {
+      const copy = { ...prev };
+      delete copy.items;
+      return copy;
+    });
+  };
+
+  const handleClearProduct = (index: number) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              productId: "",
+              productName: "",
+              productBaseUnit: "",
+              unitPrice: "",
             }
           : item
       )
@@ -129,6 +321,8 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
 
     if (items.length === 0) {
       newErrors.items = "Please add at least one line item";
+    } else if (items.some((it) => !it.productId)) {
+      newErrors.items = "Please search and select a valid product for all line items";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -187,11 +381,6 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
     }
   };
 
-  const productOptions = products.map((p) => ({
-    key: p.id,
-    value: `${p.name} ($${Number(p.price).toFixed(2)})`,
-  }));
-
   const subtotal = calculateSubtotal();
 
   return (
@@ -202,8 +391,8 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
       description="Create a commercial proposal and pricing schedule for this deal."
       size="xl"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0 max-h-[75vh] overflow-y-auto">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           {errors.form && (
             <div className="p-3 bg-red-50 border border-red-200 text-danger text-sm rounded-lg">
               {errors.form}
@@ -233,7 +422,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                   Quotation Line Items
                 </h4>
                 <p className="text-xs text-text-muted">
-                  Add product items, specify quantities and unit discounts.
+                  Search products, specify quantities and unit discounts.
                 </p>
               </div>
               <Button
@@ -242,7 +431,6 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                 variant="outline"
                 leftIcon={<Plus className="w-3.5 h-3.5" />}
                 onClick={handleAddItem}
-                disabled={products.length === 0}
               >
                 Add Line Item
               </Button>
@@ -254,7 +442,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
 
             {items.length === 0 ? (
               <div className="text-xs text-text-muted text-center py-6 bg-surface rounded-lg border border-dashed border-border">
-                No items added yet. Click "Add Line Item" to select products.
+                No items added yet. Click &quot;Add Line Item&quot; to search and select products.
               </div>
             ) : (
               <div className="space-y-3">
@@ -265,11 +453,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
-                        <Select
-                          label="Product"
-                          value={item.productId}
-                          onChange={(val) => handleProductChange(idx, val)}
-                          options={productOptions}
+                        <LineItemProductSearch
+                          companyId={companyId}
+                          selectedProductId={item.productId}
+                          selectedProductName={item.productName}
+                          selectedProductBaseUnit={item.productBaseUnit}
+                          onSelectProduct={(prod) => handleSelectProduct(idx, prod)}
+                          onClearProduct={() => handleClearProduct(idx)}
+                          hasError={Boolean(errors.items && !item.productId)}
                         />
                       </div>
                       <div className="w-24">

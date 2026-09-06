@@ -82,8 +82,8 @@ export const CancelSubscriptionModal: React.FC<
       }
       size="sm"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-danger flex items-start gap-2.5">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
             <div>

@@ -6,7 +6,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["src/**/*.ts"],
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.json",
@@ -24,7 +24,7 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist", "node_modules", "*.config.ts", "eslint.config.js", "tests"],
+    ignores: ["dist", "node_modules", "*.config.ts", "eslint.config.js", "tests", "scripts"],
   },
   prettier,
 );

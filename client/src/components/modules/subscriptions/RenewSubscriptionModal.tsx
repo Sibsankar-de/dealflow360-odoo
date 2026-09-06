@@ -100,8 +100,8 @@ export const RenewSubscriptionModal: React.FC<
       }
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           {/* Renewal Policy Notice */}
           <div
             className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -19,7 +19,7 @@ import {
   useDeleteSubscriptionPricingMutation,
 } from "@/store/features/subscription/subscriptionApi";
 import { useGetCategoriesQuery } from "@/store/features/category/categoryApi";
-import { Plus, Trash2, Layers, FolderTree, Check } from "lucide-react";
+import { Plus, Trash2, Layers, FolderTree, Check, Percent, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface ProductModalProps {
@@ -90,9 +90,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
     product?.categories?.map((c) => c.id) || []
   );
+  const [categorySearch, setCategorySearch] = useState("");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [bronzeDiscount, setBronzeDiscount] = useState<number | string>("");
+  const [silverDiscount, setSilverDiscount] = useState<number | string>("");
+  const [goldDiscount, setGoldDiscount] = useState<number | string>("");
 
   const [pricingTiers, setPricingTiers] = useState<PricingTierRow[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (product) {
@@ -108,6 +131,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         })) || []
       );
       setSelectedCategoryIds(product.categories?.map((c) => c.id) || []);
+      const bronze = product.discountTiers?.find((t) => t.customerTier === "BRONZE")?.discountPercent;
+      const silver = product.discountTiers?.find((t) => t.customerTier === "SILVER")?.discountPercent;
+      const gold = product.discountTiers?.find((t) => t.customerTier === "GOLD")?.discountPercent;
+      setBronzeDiscount(bronze !== undefined ? bronze : "");
+      setSilverDiscount(silver !== undefined ? silver : "");
+      setGoldDiscount(gold !== undefined ? gold : "");
     } else {
       setName("");
       setDescription("");
@@ -117,7 +146,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setStocks([]);
       setPricingTiers([]);
       setSelectedCategoryIds([]);
+      setBronzeDiscount("");
+      setSilverDiscount("");
+      setGoldDiscount("");
     }
+    setCategorySearch("");
+    setIsCategoryDropdownOpen(false);
     setErrors({});
   }, [product, isOpen]);
 
@@ -198,21 +232,49 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     );
   };
 
-  const handleToggleCategory = (categoryId: string) => {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId]
-    );
+  const handleAddCategory = (categoryId: string) => {
+    if (!selectedCategoryIds.includes(categoryId)) {
+      setSelectedCategoryIds((prev) => [...prev, categoryId]);
+    }
   };
+
+  const handleRemoveCategory = (categoryId: string) => {
+    setSelectedCategoryIds((prev) => prev.filter((id) => id !== categoryId));
+  };
+
+  const handleClearCategories = () => {
+    setSelectedCategoryIds([]);
+  };
+
+  const selectedCategories = categories.filter((c) =>
+    selectedCategoryIds.includes(c.id)
+  );
+  const availableCategories = categories.filter(
+    (c) => !selectedCategoryIds.includes(c.id)
+  );
+  const filteredCategories = availableCategories.filter(
+    (c) =>
+      c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+      (c.description &&
+        c.description.toLowerCase().includes(categorySearch.toLowerCase()))
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
-
     if (!name.trim()) newErrors.name = "Product name is required";
     if (price === "" || Number(price) < 0)
       newErrors.price = "Valid price is required";
+
+    if (bronzeDiscount !== "" && (Number(bronzeDiscount) < 0 || Number(bronzeDiscount) > 100)) {
+      newErrors.bronzeDiscount = "Discount must be between 0% and 100%";
+    }
+    if (silverDiscount !== "" && (Number(silverDiscount) < 0 || Number(silverDiscount) > 100)) {
+      newErrors.silverDiscount = "Discount must be between 0% and 100%";
+    }
+    if (goldDiscount !== "" && (Number(goldDiscount) < 0 || Number(goldDiscount) > 100)) {
+      newErrors.goldDiscount = "Discount must be between 0% and 100%";
+    }
 
     if (type === "RECURRING") {
       const activeTiers = pricingTiers.filter((t) => !t.isDeleted);
@@ -236,6 +298,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         stockQty: Number(s.stockQty) || 0,
       }));
 
+      const formattedDiscountTiers: Array<{
+        customerTier: "BRONZE" | "SILVER" | "GOLD";
+        discountPercent: number;
+      }> = [];
+      if (bronzeDiscount !== "" && !isNaN(Number(bronzeDiscount))) {
+        formattedDiscountTiers.push({
+          customerTier: "BRONZE",
+          discountPercent: Number(bronzeDiscount),
+        });
+      }
+      if (silverDiscount !== "" && !isNaN(Number(silverDiscount))) {
+        formattedDiscountTiers.push({
+          customerTier: "SILVER",
+          discountPercent: Number(silverDiscount),
+        });
+      }
+      if (goldDiscount !== "" && !isNaN(Number(goldDiscount))) {
+        formattedDiscountTiers.push({
+          customerTier: "GOLD",
+          discountPercent: Number(goldDiscount),
+        });
+      }
+
       let savedProductId = product?.id;
 
       if (isEditing && product) {
@@ -249,6 +334,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             baseUnit,
             type,
             stocks: formattedStocks,
+            discountTiers: formattedDiscountTiers,
             categoryIds: selectedCategoryIds,
           },
         }).unwrap();
@@ -263,6 +349,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             baseUnit,
             type,
             stocks: formattedStocks.length > 0 ? formattedStocks : undefined,
+            discountTiers:
+              formattedDiscountTiers.length > 0
+                ? formattedDiscountTiers
+                : undefined,
             categoryIds: selectedCategoryIds,
           },
         }).unwrap();
@@ -338,8 +428,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       }
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           {errors.form && (
             <div className="p-3 bg-red-50 border border-red-200 text-danger text-sm rounded-lg">
               {errors.form}
@@ -402,47 +492,126 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           </div>
 
           {/* Product Categories Selection */}
-          <div className="pt-2 border-t border-border space-y-2">
+          <div className="pt-2 border-t border-border space-y-2.5" ref={categoryDropdownRef}>
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-text-primary flex items-center gap-1.5">
                 <FolderTree className="w-4 h-4 text-brand-600" />
                 <span>Product Categories</span>
               </label>
-              <span className="text-xs text-text-muted">
-                {selectedCategoryIds.length} selected
-              </span>
+              {selectedCategoryIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">
+                    {selectedCategoryIds.length} {selectedCategoryIds.length === 1 ? "category" : "categories"} selected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearCategories}
+                    className="text-xs text-brand-600 hover:text-brand-700 hover:underline cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
             </div>
 
-            {categories.length === 0 ? (
-              <p className="text-xs text-text-muted bg-surface p-2.5 rounded-lg border border-dashed border-border">
-                No categories created yet. You can create categories in the Categories tab.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2 p-2.5 bg-surface rounded-lg border border-border min-h-[44px]">
-                {categories.map((cat) => {
-                  const isSelected = selectedCategoryIds.includes(cat.id);
-                  return (
+            {/* Selected Category Tags */}
+            {selectedCategories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-2 bg-surface rounded-lg border border-border">
+                {selectedCategories.map((cat) => (
+                  <span
+                    key={cat.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200 dark:bg-brand-950/40 dark:text-brand-300 dark:border-brand-800 transition-colors"
+                  >
+                    <span>{cat.name}</span>
                     <button
-                      key={cat.id}
                       type="button"
-                      onClick={() => handleToggleCategory(cat.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                        isSelected
-                          ? "bg-brand-600 text-white shadow-xs"
-                          : "bg-card text-text-secondary border border-border hover:border-brand-300 hover:text-text-primary"
-                      }`}
+                      onClick={() => handleRemoveCategory(cat.id)}
+                      className="text-brand-400 hover:text-brand-700 dark:hover:text-brand-100 rounded p-0.5 hover:bg-brand-100 dark:hover:bg-brand-900 transition-colors cursor-pointer"
+                      title={`Remove ${cat.name}`}
                     >
-                      <Check
-                        className={`w-3.5 h-3.5 transition-transform ${
-                          isSelected ? "scale-100 opacity-100" : "scale-0 opacity-0 -mr-3.5 w-0"
-                        }`}
-                      />
-                      <span>{cat.name}</span>
+                      <X className="w-3 h-3" />
                     </button>
-                  );
-                })}
+                  </span>
+                ))}
               </div>
             )}
+
+            {/* Search and Add Input */}
+            <div className="relative">
+              <div className="relative flex items-center">
+                <Search className="w-4 h-4 text-text-muted absolute left-3 pointer-events-none" />
+                <input
+                  type="text"
+                  value={categorySearch}
+                  onChange={(e) => {
+                    setCategorySearch(e.target.value);
+                    setIsCategoryDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsCategoryDropdownOpen(true)}
+                  placeholder={
+                    categories.length === 0
+                      ? "No categories available"
+                      : availableCategories.length === 0
+                      ? "All categories assigned"
+                      : "Search and add category..."
+                  }
+                  disabled={categories.length === 0 || availableCategories.length === 0}
+                  className="w-full pl-9 pr-8 py-2 rounded-lg border border-border bg-card text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 shadow-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                {categorySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCategorySearch("")}
+                    className="absolute right-2.5 p-0.5 text-text-muted hover:text-text-primary rounded cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Search suggestions dropdown */}
+              {isCategoryDropdownOpen && categories.length > 0 && availableCategories.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-border/50">
+                  {filteredCategories.length === 0 ? (
+                    <div className="p-3 text-xs text-text-muted text-center">
+                      No categories matching &quot;{categorySearch}&quot;
+                    </div>
+                  ) : (
+                    filteredCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          handleAddCategory(cat.id);
+                          setCategorySearch("");
+                        }}
+                        className="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-surface transition-colors group cursor-pointer"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="text-xs font-medium text-text-primary truncate">
+                            {cat.name}
+                          </p>
+                          {cat.description && (
+                            <p className="text-[11px] text-text-muted truncate">
+                              {cat.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 bg-brand-50 dark:bg-brand-950/40 px-2 py-0.5 rounded border border-brand-200 dark:border-brand-800 opacity-80 group-hover:opacity-100 shrink-0">
+                          <Plus className="w-3 h-3" /> Add
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {categories.length === 0 && (
+                <p className="text-xs text-text-muted mt-1">
+                  No categories found. Create categories in the Categories tab.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Subscription Pricing Tiers (Only for RECURRING products) */}
@@ -570,6 +739,77 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               )}
             </div>
           )}
+
+          {/* Customer Tier-Based Maximum Discounts */}
+          <div className="pt-2 border-t border-border space-y-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Percent className="w-4 h-4 text-amber-600" />
+                <h4 className="text-sm font-semibold text-text-primary">
+                  Customer Tier Maximum Discounts (%)
+                </h4>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Set maximum allowed discount thresholds for each customer tier. These limits are used for quotation evaluations and blended score calculations.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-surface p-3 rounded-lg border border-border">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-700" />
+                  <span className="text-xs font-semibold text-text-primary">Bronze Tier (%)</span>
+                </div>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={bronzeDiscount}
+                  onChange={(e) => setBronzeDiscount(e.target.value)}
+                  placeholder="e.g. 5"
+                  error={errors.bronzeDiscount}
+                  helperText="Max discount %"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                  <span className="text-xs font-semibold text-text-primary">Silver Tier (%)</span>
+                </div>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={silverDiscount}
+                  onChange={(e) => setSilverDiscount(e.target.value)}
+                  placeholder="e.g. 10"
+                  error={errors.silverDiscount}
+                  helperText="Max discount %"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                  <span className="text-xs font-semibold text-text-primary">Gold Tier (%)</span>
+                </div>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={goldDiscount}
+                  onChange={(e) => setGoldDiscount(e.target.value)}
+                  placeholder="e.g. 18"
+                  error={errors.goldDiscount}
+                  helperText="Max discount %"
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="pt-2 border-t border-border space-y-3">
             <div className="flex items-center justify-between">

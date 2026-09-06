@@ -114,8 +114,8 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
       }
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <ModalBody className="space-y-4 pt-0">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ModalBody className="space-y-4">
           {errors.form && (
             <div className="p-3 bg-red-50 border border-red-200 text-danger text-sm rounded-lg">
               {errors.form}
