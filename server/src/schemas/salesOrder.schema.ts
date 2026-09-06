@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SalesOrderStatus } from "@prisma/client";
+import { SalesOrderStatus, SubscriptionType } from "@prisma/client";
 
 export const createSalesOrderItemSchema = z.object({
   productId: z
@@ -54,6 +54,7 @@ export const deliverOrderItemSchema = z.object({
 
 export const deliverOrderSchema = z.object({
   backorderId: z.string().uuid("Invalid backorder ID").optional(),
+  subscriptionType: z.nativeEnum(SubscriptionType).optional(),
   trackingNumber: z.string().trim().optional(),
   notes: z.string().max(1000).optional(),
   expectedDate: z

@@ -23,6 +23,7 @@ import { SalesOrderResponseDto, toSalesOrderDto } from "./salesOrder.dto";
 import { DeliveryResponseDto } from "./delivery.dto";
 import { InvoiceResponseDto } from "./invoice.dto";
 import { BackorderResponseDto } from "./backorder.dto";
+import { SubscriptionResponseDto } from "./subscription.dto";
 import { DiscountViolationEvaluation } from "../utils/discount-violation.util";
 import {
   addQuotationItemSchema,
@@ -61,6 +62,7 @@ export interface FulfillmentResultDto {
   invoice: InvoiceResponseDto | null;
   backorder: BackorderResponseDto | null;
   deal?: DealResponseDto | null;
+  subscription?: SubscriptionResponseDto | null;
 }
 
 export interface QuotationItemResponseDto {

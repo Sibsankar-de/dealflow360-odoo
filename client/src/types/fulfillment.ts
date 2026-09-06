@@ -28,32 +28,49 @@ export interface FulfillmentOrder {
 export interface FulfillmentOrderItem {
   id: string;
   productName: string;
-  productType: "Hardware" | "Service" | "Software";
+  productType: string;
   requiredQty: number;
   weight: string;
 }
 
-export interface WarehouseAllocation {
-  id: string;
-  name: string;
+export interface ProductWarehouseStock {
+  warehouseId: string;
+  warehouseName: string;
   location: string;
   availableQty: number;
   allocatedQty: number;
   remainingQty: number;
-  shippingEstimate: number;
-  currencySymbol?: string;
+  id?: string;
+  name?: string;
+}
+
+export type WarehouseAllocation = ProductWarehouseStock;
+
+export interface ItemFulfillmentPlan {
+  productId: string;
+  productName: string;
+  productType?: string;
+  requiredQty: number;
+  allocatedQty: number;
+  backorderQty: number;
+  warehouses: ProductWarehouseStock[];
 }
 
 export interface RecommendedFulfillmentPlan {
-  productId: string;
-  productName: string;
-  targetQty: number;
   mode: "Suggested" | "Manual Override";
-  warehouses: WarehouseAllocation[];
+  currency: string;
+  items: ItemFulfillmentPlan[];
   totalRequired: number;
   totalAllocated: number;
+  totalBackordered: number;
   shipmentsCount: number;
-  estShippingCost: number;
+  primaryWarehouseId?: string;
+  // Optional backward-compatibility fields
+  productId?: string;
+  productName?: string;
+  targetQty?: number;
+  warehouses?: WarehouseAllocation[];
+  estShippingCost?: number;
 }
 
 export interface FulfillmentOrderDetail extends FulfillmentOrder {

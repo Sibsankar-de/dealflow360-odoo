@@ -33,6 +33,7 @@ model SalesOrder {
   deliveries Delivery[]
   backorders Backorder[]
   invoices   Invoice[]
+  subscriptions Subscription[]
 
   @@index([companyId])
   @@index([quotationId])

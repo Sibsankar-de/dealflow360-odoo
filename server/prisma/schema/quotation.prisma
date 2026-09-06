@@ -32,6 +32,7 @@ model Quotation {
   revisions       QuotationRevision[] @relation("QuotationRevisions")
   negotiations    Negotiation[]
   salesOrders     SalesOrder[]
+  subscriptions   Subscription[]
 
   @@index([companyId])
   @@index([dealId])

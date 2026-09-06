@@ -58,6 +58,11 @@ import {
   StockService,
   stockService as defaultStockService,
 } from "./stock.service";
+import {
+  SubscriptionService,
+  subscriptionService as defaultSubscriptionService,
+} from "./subscription.service";
+import { SubscriptionResponseDto } from "../dto/subscription.dto";
 import { ApiError } from "../utils/apiErrorHandler";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import {
@@ -131,6 +136,7 @@ export class QuotationService {
   private warehouseRepo: WarehouseRepository;
   private productRepo: ProductRepository;
   private stockService: StockService;
+  private subscriptionService: SubscriptionService;
 
   public constructor(
     quotationRepo: QuotationRepository = defaultQuotationRepository,
@@ -144,6 +150,7 @@ export class QuotationService {
     warehouseRepo: WarehouseRepository = defaultWarehouseRepository,
     productRepo: ProductRepository = defaultProductRepository,
     stockService: StockService = defaultStockService,
+    subscriptionService: SubscriptionService = defaultSubscriptionService,
   ) {
     this.quotationRepo = quotationRepo;
     this.companyRepo = companyRepo;
@@ -156,6 +163,7 @@ export class QuotationService {
     this.warehouseRepo = warehouseRepo;
     this.productRepo = productRepo;
     this.stockService = stockService;
+    this.subscriptionService = subscriptionService;
   }
 
   public async createQuotation(
@@ -1850,6 +1858,7 @@ export class QuotationService {
       let createdDelivery: DeliveryResponseDto | null = null;
       let createdInvoice: InvoiceResponseDto | null = null;
       let createdBackorder: BackorderResponseDto | null = null;
+      let createdSubscription: SubscriptionResponseDto | null = null;
 
       if (deliveredLines.length > 0) {
         createdDelivery = await this.createFulfillmentDelivery(
@@ -1869,6 +1878,23 @@ export class QuotationService {
           dto,
           tx,
         );
+
+        createdSubscription =
+          await this.subscriptionService.generateSubscriptionFromFulfillment(
+            companyId,
+            quotation.customerId,
+            salesOrder.id,
+            quotation.id,
+            quotation.currency,
+            deliveredLines.map((line) => ({
+              productId: line.productId,
+              quantity: line.deliverableQuantity,
+              unitPrice: line.finalUnitPrice,
+              discount: line.discount,
+            })),
+            dto.subscriptionType,
+            tx,
+          );
       }
 
       if (backorderLines.length > 0) {
@@ -1895,6 +1921,7 @@ export class QuotationService {
         createdDelivery,
         createdInvoice,
         createdBackorder,
+        createdSubscription,
         tx,
       );
     });
@@ -2482,6 +2509,7 @@ export class QuotationService {
     delivery: DeliveryResponseDto | null,
     invoice: InvoiceResponseDto | null,
     backorder: BackorderResponseDto | null,
+    subscription: SubscriptionResponseDto | null,
     tx: TransactionClient,
   ): Promise<FulfillmentResultDto> {
     const refreshedOrder = await this.salesOrderRepo.findByIdWithRelations(
@@ -2502,6 +2530,7 @@ export class QuotationService {
       invoice,
       backorder,
       deal: refreshedDeal ? toDealDto(refreshedDeal) : undefined,
+      subscription,
     };
   }
 

@@ -5,113 +5,42 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  SubscriptionResponseType,
+  SubscriptionStatus,
+} from "@/types/subscription";
+import { useListCustomerSubscriptionsQuery } from "@/store/features/subscription/subscriptionApi";
+import {
+  SubscriptionHistoryModal,
+  RenewSubscriptionModal,
+  CancelSubscriptionModal,
+} from "@/components/modules/subscriptions";
 import {
   CreditCard,
   Sparkles,
+  RefreshCw,
   Calendar,
   CheckCircle2,
-  RefreshCw,
-  AlertCircle,
   Clock,
-  Layers,
   Zap,
   Shield,
   Search,
+  History,
+  Package,
 } from "lucide-react";
-import toast from "react-hot-toast";
-
-interface SubscriptionPlan {
-  id: string;
-  name: string;
-  planCode: string;
-  dealRef: string;
-  billingCycle: "MONTHLY" | "QUARTERLY" | "ANNUAL";
-  amount: number;
-  currency: string;
-  status: "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELLED";
-  nextBillingDate: string;
-  startDate: string;
-  features: string[];
-  autoRenew: boolean;
-}
-
-const MOCK_SUBSCRIPTIONS: SubscriptionPlan[] = [
-  {
-    id: "sub-001",
-    name: "Enterprise Machinery Maintenance & Telemetry SLA",
-    planCode: "SLA-GOLD-2026",
-    dealRef: "Enterprise Machinery & Hardware Procurement",
-    billingCycle: "MONTHLY",
-    amount: 1200.0,
-    currency: "USD",
-    status: "ACTIVE",
-    nextBillingDate: "2026-04-01",
-    startDate: "2026-01-01",
-    features: [
-      "24/7 Priority Emergency Dispatch & Repair",
-      "IoT Sensor Health Monitoring & Predictive Alerts",
-      "Quarterly On-site Hardware Calibration",
-      "Unlimited Replacement Fasteners & Wear-Parts",
-    ],
-    autoRenew: true,
-  },
-  {
-    id: "sub-002",
-    name: "Automated Conveyor Fleet Software License",
-    planCode: "SW-CONVEYOR-PRO",
-    dealRef: "Automated Conveyor Belt System Expansion",
-    billingCycle: "ANNUAL",
-    amount: 4800.0,
-    currency: "USD",
-    status: "ACTIVE",
-    nextBillingDate: "2027-02-15",
-    startDate: "2026-02-15",
-    features: [
-      "Cloud Fleet Synchronization & Speed Optimization",
-      "Role-Based Access for 50 Factory Operators",
-      "Automated Throughput & Anomaly Diagnostics",
-      "Direct API Integration into ERP Systems",
-    ],
-    autoRenew: true,
-  },
-  {
-    id: "sub-003",
-    name: "Standard Tooling Calibration Support Tier",
-    planCode: "SLA-CALIB-BRONZE",
-    dealRef: "Q1 Raw Materials & Steel Alloy Supply",
-    billingCycle: "QUARTERLY",
-    amount: 750.0,
-    currency: "USD",
-    status: "TRIALING",
-    nextBillingDate: "2026-03-25",
-    startDate: "2026-02-25",
-    features: [
-      "Business Hours Remote Diagnostics",
-      "Monthly Calibration Report Export",
-      "10% Discount on Spare Machine Parts",
-    ],
-    autoRenew: false,
-  },
-];
 
 const getStatusBadge = (
-  status: SubscriptionPlan["status"]
+  status: SubscriptionStatus
 ): { variant: BadgeVariant; label: string; dotClass: string } => {
   switch (status) {
     case "ACTIVE":
       return { variant: "success", label: "Active", dotClass: "bg-emerald-500" };
-    case "TRIALING":
+    case "EXPIRED":
       return {
-        variant: "purple",
-        label: "Trial Period",
-        dotClass: "bg-purple-500",
-      };
-    case "PAST_DUE":
-      return {
-        variant: "danger",
-        label: "Past Due",
-        dotClass: "bg-red-500",
+        variant: "warning",
+        label: "Expired",
+        dotClass: "bg-amber-500",
       };
     case "CANCELLED":
       return {
@@ -133,11 +62,35 @@ export default function CustomerSubscriptionsPage() {
   const companyId =
     typeof params?.["company-id"] === "string" ? params["company-id"] : "";
 
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [selectedSub, setSelectedSub] = useState<SubscriptionPlan | null>(null);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [subscriptions, setSubscriptions] =
-    useState<SubscriptionPlan[]>(MOCK_SUBSCRIPTIONS);
+  const [activeFilter, setActiveFilter] = useState<SubscriptionStatus | "ALL">(
+    "ALL"
+  );
+
+  // Modals state
+  const [historySub, setHistorySub] = useState<SubscriptionResponseType | null>(
+    null
+  );
+  const [renewSub, setRenewSub] = useState<SubscriptionResponseType | null>(
+    null
+  );
+  const [cancelSub, setCancelSub] = useState<SubscriptionResponseType | null>(
+    null
+  );
+
+  const { data: subsData, isLoading } = useListCustomerSubscriptionsQuery({
+    companyId: companyId || undefined,
+    params: {
+      search: search.trim() || undefined,
+      status: activeFilter !== "ALL" ? activeFilter : undefined,
+      page,
+      limit: 9,
+    },
+  });
+
+  const subscriptions = subsData?.data?.docs || [];
+  const totalPages = subsData?.data?.totalPages || 1;
 
   const formatCurrency = (val: number = 0, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -146,51 +99,26 @@ export default function CustomerSubscriptionsPage() {
     }).format(val);
   };
 
-  const filteredSubs = subscriptions.filter((sub) => {
-    return (
-      sub.name.toLowerCase().includes(search.toLowerCase()) ||
-      sub.planCode.toLowerCase().includes(search.toLowerCase()) ||
-      sub.dealRef.toLowerCase().includes(search.toLowerCase())
-    );
-  });
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
+  // KPIs
   const activeCount = subscriptions.filter((s) => s.status === "ACTIVE").length;
   const totalMRR = subscriptions.reduce((sum, s) => {
     if (s.status !== "ACTIVE") return sum;
-    if (s.billingCycle === "MONTHLY") return sum + s.amount;
-    if (s.billingCycle === "QUARTERLY") return sum + s.amount / 3;
-    if (s.billingCycle === "ANNUAL") return sum + s.amount / 12;
+    if (s.subscriptionType === "MONTHLY") return sum + s.totalRecurringAmount;
+    if (s.subscriptionType === "QUARTERLY")
+      return sum + s.totalRecurringAmount / 3;
+    if (s.subscriptionType === "YEARLY")
+      return sum + s.totalRecurringAmount / 12;
     return sum;
   }, 0);
-
-  const handleToggleAutoRenew = (subId: string) => {
-    setSubscriptions((prev) =>
-      prev.map((s) => {
-        if (s.id === subId) {
-          const nextVal = !s.autoRenew;
-          toast.success(
-            nextVal
-              ? `Auto-renewal enabled for ${s.planCode}.`
-              : `Auto-renewal disabled for ${s.planCode}.`
-          );
-          return { ...s, autoRenew: nextVal };
-        }
-        return s;
-      })
-    );
-  };
-
-  const handleCancelSubscription = () => {
-    if (!selectedSub) return;
-    setSubscriptions((prev) =>
-      prev.map((s) =>
-        s.id === selectedSub.id ? { ...s, status: "CANCELLED", autoRenew: false } : s
-      )
-    );
-    setIsCancelModalOpen(false);
-    setSelectedSub(null);
-    toast.success(`Subscription ${selectedSub.planCode} has been cancelled.`);
-  };
 
   return (
     <div className="space-y-8">
@@ -202,11 +130,11 @@ export default function CustomerSubscriptionsPage() {
               <CreditCard className="w-6 h-6" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
-              Subscriptions & SLA Plans
+              My Subscriptions & SLAs
             </h1>
           </div>
           <p className="text-sm text-text-secondary mt-1.5">
-            Monitor recurring equipment maintenance SLAs, enterprise software licenses, and automated renewals.
+            View active contracts, renew recurring services, and track renewal dates.
           </p>
         </div>
       </div>
@@ -216,7 +144,7 @@ export default function CustomerSubscriptionsPage() {
         <Card className="p-6 rounded-2xl border border-border bg-card border-l-4 border-l-brand-600 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs sm:text-sm font-semibold text-text-secondary">
-              Active Plans
+              Active Recurring Plans
             </span>
             <div className="p-2 rounded-xl bg-surface/80 text-brand-600">
               <Zap className="w-5 h-5" />
@@ -227,7 +155,7 @@ export default function CustomerSubscriptionsPage() {
               {activeCount} Active
             </span>
             <span className="text-xs text-text-muted">
-              Across all delivered hardware fleets
+              {subscriptions.length} total contracts under your account
             </span>
           </div>
         </Card>
@@ -262,181 +190,243 @@ export default function CustomerSubscriptionsPage() {
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600">
-              100% Protected
+              {activeCount > 0 ? "Active Coverage" : "No Active Plans"}
             </span>
             <span className="text-xs text-text-muted">
-              Telemetry active on all production lines
+              Service telemetry and warranty enabled
             </span>
           </div>
         </Card>
       </div>
 
-      {/* Search Header */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Filter Tabs & Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {(
+            [
+              { id: "ALL", label: "All Plans" },
+              { id: "ACTIVE", label: "Active" },
+              { id: "EXPIRED", label: "Expired" },
+              { id: "CANCELLED", label: "Cancelled" },
+            ] as const
+          ).map((tab) => {
+            const isActive = activeFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveFilter(tab.id);
+                  setPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                  isActive
+                    ? "bg-brand-600 text-white font-semibold shadow-xs"
+                    : "bg-card text-text-secondary border border-border hover:bg-surface hover:text-text-primary"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search subscriptions or plans..."
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search subscriptions by number..."
             className="w-full pl-9 pr-4 py-2 text-xs font-medium bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all text-text-primary placeholder:text-text-muted shadow-xs"
           />
         </div>
       </div>
 
       {/* Subscription Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredSubs.map((sub) => {
-          const badge = getStatusBadge(sub.status);
+      {isLoading ? (
+        <div className="py-16 text-center text-text-muted space-y-2">
+          <Clock className="w-8 h-8 animate-spin mx-auto text-brand-600 opacity-60" />
+          <p className="text-sm">Loading your subscriptions...</p>
+        </div>
+      ) : subscriptions.length === 0 ? (
+        <div className="p-12 text-center bg-card border border-border rounded-2xl">
+          <CreditCard className="w-10 h-10 text-text-muted opacity-40 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-text-primary">
+            No subscriptions found
+          </h3>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+            When you accept and complete quotations with recurring products, your active subscription plans will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {subscriptions.map((sub) => {
+            const badge = getStatusBadge(sub.status);
+            const items = sub.items || [];
 
-          return (
-            <Card
-              key={sub.id}
-              className="rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between overflow-hidden hover:shadow-md transition-shadow"
-            >
-              <div>
-                <CardHeader className="p-6 pb-4 border-b border-border/50 bg-surface/30">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-[10px] font-bold text-brand-600 tracking-wider uppercase bg-brand-50 border border-brand-200 px-2 py-0.5 rounded">
-                      {sub.planCode}
-                    </span>
-                    <Badge
-                      variant={badge.variant}
-                      icon={
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.dotClass}`}
-                        />
-                      }
-                    >
-                      {badge.label}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-base font-bold text-text-primary mt-2.5 leading-snug">
-                    {sub.name}
-                  </CardTitle>
-                  <p className="text-xs text-text-muted mt-1 truncate">
-                    Linked to {sub.dealRef}
-                  </p>
-                </CardHeader>
-
-                <CardContent className="p-6 space-y-4">
-                  {/* Pricing Display */}
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl sm:text-3xl font-bold text-text-primary">
-                      {formatCurrency(sub.amount, sub.currency)}
-                    </span>
-                    <span className="text-xs font-semibold text-text-muted">
-                      / {sub.billingCycle.toLowerCase()}
-                    </span>
-                  </div>
-
-                  {/* Dates */}
-                  <div className="p-3 bg-surface rounded-xl border border-border/60 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between text-text-secondary">
-                      <span>Renewal Date:</span>
-                      <span className="font-semibold text-text-primary">
-                        {sub.nextBillingDate}
+            return (
+              <Card
+                key={sub.id}
+                className="rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between overflow-hidden hover:shadow-md transition-shadow"
+              >
+                <div>
+                  <CardHeader className="p-6 pb-4 border-b border-border/50 bg-surface/30">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[10px] font-bold text-brand-600 tracking-wider uppercase bg-brand-50 border border-brand-200 px-2 py-0.5 rounded">
+                        {sub.subscriptionNo}
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between text-text-secondary">
-                      <span>Auto-Renewal:</span>
-                      <span
-                        className={`font-semibold ${
-                          sub.autoRenew ? "text-emerald-600" : "text-amber-600"
-                        }`}
+                      <Badge
+                        variant={badge.variant}
+                        icon={
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.dotClass}`}
+                          />
+                        }
                       >
-                        {sub.autoRenew ? "Enabled" : "Manual Renewal"}
+                        {badge.label}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-base font-bold text-text-primary mt-2.5 leading-snug">
+                      {items[0]?.productName || "Recurring Subscription Plan"}
+                    </CardTitle>
+                    {sub.quotationNo && (
+                      <p className="text-xs text-text-muted mt-1 truncate">
+                        Linked Quote: <span className="font-mono text-text-secondary">{sub.quotationNo}</span>
+                      </p>
+                    )}
+                  </CardHeader>
+
+                  <CardContent className="p-6 space-y-4">
+                    {/* Pricing Display */}
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-bold text-text-primary">
+                        {formatCurrency(
+                          sub.totalRecurringAmount,
+                          sub.currency
+                        )}
+                      </span>
+                      <span className="text-xs font-semibold text-text-muted">
+                        / {sub.subscriptionType.toLowerCase()}
                       </span>
                     </div>
-                  </div>
 
-                  {/* Features List */}
-                  <div className="space-y-2 pt-1">
-                    <span className="text-xs font-semibold text-text-secondary block">
-                      Included SLA Coverage:
-                    </span>
-                    <ul className="space-y-1.5 text-xs text-text-primary">
-                      {sub.features.map((feat, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-brand-600 shrink-0 mt-0.5" />
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </div>
+                    {/* Dates Card */}
+                    <div className="p-3 bg-surface rounded-xl border border-border/60 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between text-text-secondary">
+                        <span>Started:</span>
+                        <span className="font-semibold text-text-primary">
+                          {formatDate(sub.startDate)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-text-secondary">
+                        <span>Next Renewal Date:</span>
+                        <span className="font-semibold text-brand-600">
+                          {formatDate(sub.nextRenewalDate)}
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Card Footer Actions */}
-              <div className="p-4 px-6 border-t border-border bg-surface/20 flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleToggleAutoRenew(sub.id)}
-                  className="text-xs"
-                >
-                  {sub.autoRenew ? "Disable Auto-Renew" : "Enable Auto-Renew"}
-                </Button>
-                {sub.status === "ACTIVE" && (
+                    {/* Included Products List */}
+                    <div className="space-y-2 pt-1">
+                      <span className="text-xs font-semibold text-text-secondary block">
+                        Subscribed Products:
+                      </span>
+                      <ul className="space-y-1.5 text-xs text-text-primary">
+                        {items.map((it, idx) => (
+                          <li key={idx} className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <Package className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                              <span>{it.productName || "Product"}</span>
+                              <span className="text-text-muted">× {it.quantity}</span>
+                            </div>
+                            <span className="font-semibold text-text-secondary">
+                              {formatCurrency(it.lineTotal, sub.currency)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                </div>
+
+                {/* Card Footer Actions */}
+                <div className="p-4 px-6 border-t border-border bg-surface/20 flex items-center justify-between gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setSelectedSub(sub);
-                      setIsCancelModalOpen(true);
-                    }}
-                    className="text-xs text-danger hover:bg-red-50 hover:border-red-200"
+                    onClick={() => setHistorySub(sub)}
+                    className="text-xs"
+                    leftIcon={<History className="w-3.5 h-3.5" />}
                   >
-                    Cancel Plan
+                    History
                   </Button>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
 
-      {/* Cancellation Confirmation Modal */}
-      {isCancelModalOpen && selectedSub && (
-        <Modal
-          isOpen={isCancelModalOpen}
-          onClose={() => setIsCancelModalOpen(false)}
-          title="Cancel Subscription"
-          description={`Are you sure you want to cancel ${selectedSub.name}?`}
-          size="sm"
-        >
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-danger flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold block">Telemetry SLA Warning</span>
-                <span>
-                  Cancelling this service will terminate real-time emergency dispatch and predictive calibration coverage at the end of the current billing cycle.
-                </span>
-              </div>
-            </div>
+                  <div className="flex items-center gap-2">
+                    {sub.status !== "CANCELLED" && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setRenewSub(sub)}
+                        className="text-xs"
+                        leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                      >
+                        Renew
+                      </Button>
+                    )}
 
-            <ModalFooter className="px-0 pb-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCancelModalOpen(false)}
-              >
-                Keep Plan
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-red-600 text-white hover:bg-red-700 hover:text-white border-transparent"
-                onClick={handleCancelSubscription}
-              >
-                Confirm Cancellation
-              </Button>
-            </ModalFooter>
-          </div>
-        </Modal>
+                    {sub.status === "ACTIVE" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCancelSub(sub)}
+                        className="text-xs text-danger hover:bg-red-50 hover:border-red-200"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={page}
+          totalPage={totalPages}
+          onPageChange={setPage}
+        />
+      )}
+
+      {/* Subscription Modals */}
+      <SubscriptionHistoryModal
+        isOpen={Boolean(historySub)}
+        onClose={() => setHistorySub(null)}
+        companyId={companyId}
+        subscription={historySub}
+      />
+
+      <RenewSubscriptionModal
+        isOpen={Boolean(renewSub)}
+        onClose={() => setRenewSub(null)}
+        companyId={companyId}
+        subscription={renewSub}
+        isCustomerPortal={true}
+      />
+
+      <CancelSubscriptionModal
+        isOpen={Boolean(cancelSub)}
+        onClose={() => setCancelSub(null)}
+        companyId={companyId}
+        subscription={cancelSub}
+        isCustomerPortal={true}
+      />
     </div>
   );
 }

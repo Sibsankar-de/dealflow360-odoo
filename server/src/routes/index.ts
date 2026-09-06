@@ -11,6 +11,8 @@ import salesOrderRoutes from "./salesOrder.routes";
 import deliveryRoutes from "./delivery.routes";
 import backorderRoutes from "./backorder.routes";
 import invoiceRoutes from "./invoice.routes";
+import subscriptionRoutes from "./subscription.routes";
+import subscriptionPricingRoutes from "./subscriptionPricing.routes";
 
 const router = Router();
 
@@ -27,5 +29,7 @@ router.use("/api/v1/sales-orders", salesOrderRoutes);
 router.use("/api/v1/deliveries", deliveryRoutes);
 router.use("/api/v1/backorders", backorderRoutes);
 router.use("/api/v1/invoices", invoiceRoutes);
+router.use("/api/v1/subscriptions", subscriptionRoutes);
+router.use("/api/v1/subscription-pricing", subscriptionPricingRoutes);
 
 export default router;

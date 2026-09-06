@@ -244,7 +244,27 @@ Responsibilities:
   - Track dates and terms: `issue_date`, `due_date`, `paid_at`, and `payment_terms`.
   - Track financial totals: `subtotal`, `discount`, `tax`, `total`, `paid_amount`, and `remaining_amount`.
 - Store invoice line items (`invoice_items`) linking invoices to sales order items and products.
-  - Track line-level quantities and commercial values: `delivered_quantity`, `unit_price`, `discount`, `tax`, and `line_total`.
+  - Track line-level quantities and commercial values: `delivered_quantity`, `unitPrice`, `discount`, `tax`, and `line_total`.
+
+### 4.11 Subscription and Recurring Pricing Persistence Context
+
+Responsibilities:
+
+- Store recurring pricing catalog configurations (`subscription_pricings`) linking products and companies.
+  - Support period options via `SubscriptionType` enum (`MONTHLY`, `QUARTERLY`, `YEARLY`).
+  - Support optional customer tier pricing (`customer_tier`: `BRONZE`, `SILVER`, `GOLD`).
+  - Track pricing constraints: `price`, `min_quantity`, `currency`, `valid_from`, `valid_until`, and `is_active`.
+  - Isolate catalog pricing configuration from active subscriptions so historical applied prices remain intact.
+- Store customer subscriptions (`subscriptions`) generated automatically when recurring products are fulfilled through quotation or sales order delivery.
+  - Track subscription lifecycle via `SubscriptionStatus` enum (`ACTIVE`, `EXPIRED`, `CANCELLED`).
+  - Maintain unique `subscription_no` (`SUB-YYYYMM-XXXX`), currency, and `total_recurring_amount`.
+  - Track terms: `start_date`, `end_date`, and `next_renewal_date`.
+  - Maintain commercial traceability to `company`, `customer`, `sales_order`, `quotation`, and `subscription_pricing`.
+- Store subscription line items (`subscription_items`) capturing exact applied pricing for recurring products:
+  - Track line-level `quantity`, applied `unit_price`, `discount`, and `line_total`.
+- Store versioned subscription period history records (`subscription_periods`):
+  - Record each period number (`period_number` = 1, 2, 3...), `start_date`, `end_date`, `subscription_type`, `total_amount`, and `renewed_at`.
+  - Snapshot active lines in `items_snapshot` (JSONB) to preserve full commercial and pricing history across successive renewals.
 
 
 
@@ -707,7 +727,69 @@ Payment records must reference the invoice or invoices they settle.
 
 Payment state must not be confused with delivery state.
 
-## 11. Deal and Discount Engine
+## 11. Subscription and Renewal Workflow
+
+Subscriptions represent ongoing recurring commercial arrangements generated from fulfilled recurring products.
+
+### 11.1 Subscription Generation on Fulfillment
+
+When a sales order or quotation fulfillment is executed:
+
+```text
+Delivered Products
+       |
+       +----> One-Time Products ----> Standard Invoicing Only
+       |
+       +----> Recurring Products ----> Customer Subscription Generated
+                                             |
+                                             +----> Match Configured Pricing (Customer Tier / Base)
+                                             |
+                                             +----> Calculate Start & Next Renewal Dates
+                                             |
+                                             +----> Store Agreed Applied Line Prices
+                                             |
+                                             +----> Create Period 1 Snapshot
+```
+
+Rules:
+1. One-time products (`type = ONE_TIME`) never generate subscriptions.
+2. Recurring products (`type = RECURRING`) automatically generate a `Subscription` and linked `SubscriptionItem` lines.
+3. The subscription applies the configured `SubscriptionPricing` for the customer tier and subscription period, or falls back to agreed order pricing.
+4. Active subscriptions store the actual applied price directly, isolating active customer contracts from future catalog price revisions.
+5. An initial `SubscriptionPeriod` (period 1) records the initial term snapshot.
+
+### 11.2 Subscription Renewal Workflow
+
+When an active or expired subscription is renewed:
+
+```text
+Customer / Staff Request Renewal
+       |
+       v
+Validate Status (ACTIVE or EXPIRED)
+       |
+       v
+Fetch Latest Active Configured Subscription Pricing
+       |
+       v
+Calculate New Period Dates:
+  - ACTIVE:  New Start = Current End Date,  New End = Start + Period
+  - EXPIRED: New Start = Now,               New End = Now + Period
+       |
+       v
+Create New SubscriptionPeriod Record with Items Snapshot
+       |
+       v
+Update Subscription Header & Line Items (Status = ACTIVE)
+```
+
+Rules:
+1. Eligibility: Only `ACTIVE` and `EXPIRED` subscriptions can be renewed. `CANCELLED` subscriptions cannot be renewed.
+2. Pricing: Renewal applies the latest active configured `SubscriptionPricing` available at the time of renewal.
+3. History Preservation: The previous subscription period and pricing are immutably preserved in `SubscriptionPeriod` records with item-level snapshots.
+4. Customer Visibility: The renewed subscription remains immediately accessible on the customer's portal.
+
+## 12. Deal and Discount Engine
 
 The deal engine evaluates applicable commercial rules.
 

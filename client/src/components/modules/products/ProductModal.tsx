@@ -1,17 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { ProductResponseType } from "@/types/product";
+import { SubscriptionType, CustomerTier } from "@/types/subscription";
 import { useGetWarehousesQuery } from "@/store/features/warehouse/warehouseApi";
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
 } from "@/store/features/product/productApi";
-import { Plus, Trash2 } from "lucide-react";
+import {
+  useListSubscriptionPricingQuery,
+  useCreateSubscriptionPricingMutation,
+  useUpdateSubscriptionPricingMutation,
+  useDeleteSubscriptionPricingMutation,
+} from "@/store/features/subscription/subscriptionApi";
+import { Plus, Trash2, Layers } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface ProductModalProps {
@@ -19,6 +26,15 @@ interface ProductModalProps {
   onClose: () => void;
   companyId: string;
   product?: ProductResponseType | null;
+}
+
+interface PricingTierRow {
+  id?: string;
+  subscriptionType: SubscriptionType;
+  customerTier: "ALL" | CustomerTier;
+  price: number | string;
+  minQuantity: number | string;
+  isDeleted?: boolean;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
@@ -30,9 +46,21 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const isEditing = Boolean(product);
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
+  const [createPricing] = useCreateSubscriptionPricingMutation();
+  const [updatePricing] = useUpdateSubscriptionPricingMutation();
+  const [deletePricing] = useDeleteSubscriptionPricingMutation();
+
   const { data: warehouseData } = useGetWarehousesQuery(
     { companyId },
     { skip: !isOpen || !companyId }
+  );
+
+  const { data: existingPricingData } = useListSubscriptionPricingQuery(
+    {
+      companyId,
+      params: { productId: product?.id, limit: 50 },
+    },
+    { skip: !isOpen || !companyId || !product?.id }
   );
 
   const warehouses = warehouseData?.data?.warehouses ?? [];
@@ -53,9 +81,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     })) || []
   );
 
+  const [pricingTiers, setPricingTiers] = useState<PricingTierRow[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (product) {
       setName(product.name || "");
       setDescription(product.description || "");
@@ -75,9 +104,24 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setBaseUnit("Unit");
       setType("ONE_TIME");
       setStocks([]);
+      setPricingTiers([]);
     }
     setErrors({});
   }, [product, isOpen]);
+
+  useEffect(() => {
+    if (existingPricingData?.data?.docs && isOpen && isEditing) {
+      setPricingTiers(
+        existingPricingData.data.docs.map((doc) => ({
+          id: doc.id,
+          subscriptionType: doc.subscriptionType,
+          customerTier: (doc.customerTier as CustomerTier) || "ALL",
+          price: doc.price,
+          minQuantity: doc.minQuantity || 1,
+        }))
+      );
+    }
+  }, [existingPricingData, isOpen, isEditing]);
 
   const handleAddStock = () => {
     if (warehouses.length === 0) return;
@@ -110,6 +154,38 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     );
   };
 
+  const handleAddPricingTier = () => {
+    setPricingTiers((prev) => [
+      ...prev,
+      {
+        subscriptionType: "MONTHLY",
+        customerTier: "ALL",
+        price: price !== "" ? Number(price) : 0,
+        minQuantity: 1,
+      },
+    ]);
+  };
+
+  const handleRemovePricingTier = (index: number) => {
+    setPricingTiers((prev) => {
+      const target = prev[index];
+      if (target?.id) {
+        return prev.map((t, i) => (i === index ? { ...t, isDeleted: true } : t));
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handlePricingTierChange = (
+    index: number,
+    field: keyof PricingTierRow,
+    value: any
+  ) => {
+    setPricingTiers((prev) =>
+      prev.map((t, i) => (i === index ? { ...t, [field]: value } : t))
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
@@ -117,6 +193,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (!name.trim()) newErrors.name = "Product name is required";
     if (price === "" || Number(price) < 0)
       newErrors.price = "Valid price is required";
+
+    if (type === "RECURRING") {
+      const activeTiers = pricingTiers.filter((t) => !t.isDeleted);
+      for (let i = 0; i < activeTiers.length; i++) {
+        const tier = activeTiers[i];
+        if (tier.price === "" || Number(tier.price) <= 0) {
+          newErrors.form = `Subscription pricing tier #${i + 1} must have a valid price greater than 0.`;
+          break;
+        }
+      }
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -129,8 +216,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         stockQty: Number(s.stockQty) || 0,
       }));
 
+      let savedProductId = product?.id;
+
       if (isEditing && product) {
-        await updateProduct({
+        const res = await updateProduct({
           companyId,
           productId: product.id,
           data: {
@@ -142,9 +231,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             stocks: formattedStocks,
           },
         }).unwrap();
-        toast.success(`Product "${name.trim()}" updated successfully.`);
+        savedProductId = res.data.product.id;
       } else {
-        await createProduct({
+        const res = await createProduct({
           companyId,
           data: {
             name: name.trim(),
@@ -155,8 +244,51 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             stocks: formattedStocks.length > 0 ? formattedStocks : undefined,
           },
         }).unwrap();
-        toast.success(`Product "${name.trim()}" created successfully.`);
+        savedProductId = res.data.product.id;
       }
+
+      // If RECURRING product, sync pricing tiers
+      if (type === "RECURRING" && savedProductId) {
+        for (const tier of pricingTiers) {
+          if (tier.id && tier.isDeleted) {
+            await deletePricing({ companyId, id: tier.id }).unwrap();
+          } else if (tier.id && !tier.isDeleted) {
+            await updatePricing({
+              companyId,
+              id: tier.id,
+              data: {
+                subscriptionType: tier.subscriptionType,
+                customerTier:
+                  tier.customerTier === "ALL"
+                    ? null
+                    : (tier.customerTier as CustomerTier),
+                price: Number(tier.price),
+                minQuantity: Number(tier.minQuantity) || 1,
+              },
+            }).unwrap();
+          } else if (!tier.id && !tier.isDeleted && Number(tier.price) > 0) {
+            await createPricing({
+              companyId,
+              data: {
+                productId: savedProductId,
+                subscriptionType: tier.subscriptionType,
+                customerTier:
+                  tier.customerTier === "ALL"
+                    ? null
+                    : (tier.customerTier as CustomerTier),
+                price: Number(tier.price),
+                minQuantity: Number(tier.minQuantity) || 1,
+              },
+            }).unwrap();
+          }
+        }
+      }
+
+      toast.success(
+        isEditing
+          ? `Product "${name.trim()}" updated successfully.`
+          : `Product "${name.trim()}" created successfully.`
+      );
       onClose();
     } catch (err: unknown) {
       const errorMsg =
@@ -246,6 +378,132 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               className="w-full rounded-lg border border-border bg-card p-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 shadow-xs resize-none"
             />
           </div>
+
+          {/* Subscription Pricing Tiers (Only for RECURRING products) */}
+          {type === "RECURRING" && (
+            <div className="pt-2 border-t border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-purple-600" />
+                    <h4 className="text-sm font-semibold text-text-primary">
+                      Subscription Pricing Tiers
+                    </h4>
+                  </div>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Configure recurring pricing intervals (Monthly, Quarterly, Yearly) and optional customer tier discounts.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  onClick={handleAddPricingTier}
+                >
+                  Add Tier
+                </Button>
+              </div>
+
+              {pricingTiers.filter((t) => !t.isDeleted).length === 0 ? (
+                <div className="text-xs text-text-muted text-center py-4 bg-purple-50/50 rounded-lg border border-dashed border-purple-200">
+                  No subscription pricing tiers defined. Click &quot;Add Tier&quot; to configure monthly, quarterly, or yearly rates.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-text-muted uppercase px-1">
+                    <span className="col-span-3">Billing Cycle</span>
+                    <span className="col-span-3">Customer Tier</span>
+                    <span className="col-span-3">Rate Price ($)</span>
+                    <span className="col-span-2">Min Qty</span>
+                    <span className="col-span-1 text-right">Action</span>
+                  </div>
+                  {pricingTiers.map((tier, idx) => {
+                    if (tier.isDeleted) return null;
+                    return (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-12 gap-2 items-center bg-surface p-2 rounded-lg border border-border"
+                      >
+                        <div className="col-span-3">
+                          <Select
+                            value={tier.subscriptionType}
+                            onChange={(val) =>
+                              handlePricingTierChange(
+                                idx,
+                                "subscriptionType",
+                                val as SubscriptionType
+                              )
+                            }
+                            options={[
+                              { key: "MONTHLY", value: "Monthly" },
+                              { key: "QUARTERLY", value: "Quarterly" },
+                              { key: "YEARLY", value: "Yearly" },
+                            ]}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Select
+                            value={tier.customerTier}
+                            onChange={(val) =>
+                              handlePricingTierChange(idx, "customerTier", val)
+                            }
+                            options={[
+                              { key: "ALL", value: "All Customers" },
+                              { key: "BRONZE", value: "Bronze Tier" },
+                              { key: "SILVER", value: "Silver Tier" },
+                              { key: "GOLD", value: "Gold Tier" },
+                            ]}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={tier.price}
+                            onChange={(e) =>
+                              handlePricingTierChange(
+                                idx,
+                                "price",
+                                e.target.value
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={tier.minQuantity}
+                            onChange={(e) =>
+                              handlePricingTierChange(
+                                idx,
+                                "minQuantity",
+                                e.target.value
+                              )
+                            }
+                            placeholder="1"
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePricingTier(idx)}
+                            className="p-1.5 text-text-muted hover:text-danger hover:bg-card rounded-md transition-colors"
+                            title="Remove tier"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="pt-2 border-t border-border space-y-3">
             <div className="flex items-center justify-between">
