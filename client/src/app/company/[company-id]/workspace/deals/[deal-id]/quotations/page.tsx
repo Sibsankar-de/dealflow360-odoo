@@ -124,7 +124,7 @@ export default function DealQuotationsListPage() {
         <p className="text-xs text-text-muted mt-1">
           The deal requested could not be located.
         </p>
-        <Link href={`/company/${companyId}/app/deals`}>
+        <Link href={`/company/${companyId}/workspace/deals`}>
           <Button variant="outline" size="sm" className="mt-4">
             Back to Deals
           </Button>
@@ -139,7 +139,7 @@ export default function DealQuotationsListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div className="flex items-center gap-3">
           <Link
-            href={`/company/${companyId}/app/deals`}
+            href={`/company/${companyId}/workspace/deals`}
             className="p-2 rounded-xl bg-card border border-border text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
             title="Back to Deals"
           >
@@ -174,7 +174,7 @@ export default function DealQuotationsListPage() {
             Edit Deal
           </Button>
           <Link
-            href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}
+            href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/new`}
           >
             <Button size="md" leftIcon={<Plus className="w-4 h-4" />}>
               Create Quotation
@@ -268,7 +268,7 @@ export default function DealQuotationsListPage() {
               : "Generate a commercial proposal for this deal to get started."}
           </p>
           <Link
-            href={`/company/${companyId}/app/deals/${deal.id}/quotations/new`}
+            href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/new`}
           >
             <Button
               className="mt-4"
@@ -317,7 +317,7 @@ export default function DealQuotationsListPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                          href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}`}
                           className="font-bold text-text-primary text-base hover:text-brand-600 transition-colors"
                         >
                           {quote.quotationNo}
@@ -349,7 +349,7 @@ export default function DealQuotationsListPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     {isNegotiating ? (
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                        href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}`}
                       >
                         <Button
                           size="sm"
@@ -362,7 +362,7 @@ export default function DealQuotationsListPage() {
                       </Link>
                     ) : isDraft ? (
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                        href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}`}
                       >
                         <Button
                           size="sm"
@@ -374,7 +374,7 @@ export default function DealQuotationsListPage() {
                       </Link>
                     ) : (
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                        href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}`}
                       >
                         <Button
                           size="sm"
@@ -388,7 +388,7 @@ export default function DealQuotationsListPage() {
 
                     {(isNegotiating || quote.status === "SENT") && (
                       <Link
-                        href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}?mode=counter`}
+                        href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}?mode=counter`}
                       >
                         <Button
                           size="sm"
@@ -403,7 +403,7 @@ export default function DealQuotationsListPage() {
 
                     {isAccepted && (
                       <Link
-                        href={`/company/${companyId}/app/fulfillment/${quote.id}`}
+                        href={`/company/${companyId}/workspace/fulfillment/${quote.id}`}
                       >
                         <Button
                           size="sm"
@@ -437,7 +437,7 @@ export default function DealQuotationsListPage() {
                       </span>
                     </div>
                     <Link
-                      href={`/company/${companyId}/app/deals/${deal.id}/quotations/${quote.id}`}
+                      href={`/company/${companyId}/workspace/deals/${deal.id}/quotations/${quote.id}`}
                       className="font-bold text-amber-800 hover:text-amber-950 underline shrink-0 cursor-pointer"
                     >
                       Review Terms &rarr;

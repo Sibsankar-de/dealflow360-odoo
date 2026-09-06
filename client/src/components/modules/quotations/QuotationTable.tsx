@@ -72,7 +72,7 @@ export const QuotationTable: React.FC<QuotationTableProps> = ({
               item.id;
             const total = Number(item.currentRevision?.totalAmount ?? item.totalAmount ?? 0);
             const detailUrl = companyId && item.dealId
-              ? `/company/${companyId}/app/deals/${item.dealId}/quotations/${item.id}`
+              ? `/company/${companyId}/workspace/deals/${item.dealId}/quotations/${item.id}`
               : undefined;
 
             return (

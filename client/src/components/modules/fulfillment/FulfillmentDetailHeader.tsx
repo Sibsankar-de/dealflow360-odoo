@@ -33,7 +33,7 @@ export const FulfillmentDetailHeader: React.FC<FulfillmentDetailHeaderProps> = (
   className,
 }) => {
   const statusConfig = getStatusConfig(order.status);
-  const backHref = companyId ? `/company/${companyId}/app/fulfillment` : "/fulfillment";
+  const backHref = companyId ? `/company/${companyId}/workspace/fulfillment` : "/fulfillment";
 
   return (
     <div className={clsx("space-y-4", className)}>

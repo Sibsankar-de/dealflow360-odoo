@@ -10,7 +10,7 @@ import {
   useGetCustomersQuery,
   useAddCustomerMutation,
 } from "@/store/features/customer/customerApi";
-import { CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function CustomersPage() {
   const params = useParams();
@@ -34,15 +34,9 @@ export default function CustomersPage() {
   const [viewMode, setViewMode] = useState<"list" | "detail">("list");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerResponseType | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [notification, setNotification] = useState<string | null>(null);
 
   const customers = data?.data?.docs ?? [];
   const totalPages = data?.data?.totalPages ?? 1;
-
-  const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
-  };
 
   const handleCreateCustomer = async (formData: { email: string }) => {
     if (!companyId) return;
@@ -54,13 +48,13 @@ export default function CustomersPage() {
           role: "CUSTOMER",
         },
       }).unwrap();
-      showNotification(`Customer with email "${formData.email}" registered successfully.`);
+      toast.success(`Customer with email "${formData.email}" registered successfully.`);
       setIsCreateModalOpen(false);
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to register customer account";
-      showNotification(msg);
+      toast.error(msg);
       throw err;
     }
   };
@@ -72,12 +66,6 @@ export default function CustomersPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-          <span>{notification}</span>
-        </div>
-      )}
 
       {/* Top Page Header */}
       <div className="flex flex-col gap-1">

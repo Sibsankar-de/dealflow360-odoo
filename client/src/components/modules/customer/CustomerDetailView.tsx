@@ -147,7 +147,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
             <Layers className="w-5 h-5 text-brand-600" />
             <span>Associated Deals ({customerDeals.length})</span>
           </CardTitle>
-          <Link href={`/company/${companyId}/app/deals`}>
+          <Link href={`/company/${companyId}/workspace/deals`}>
             <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
               All Deals
             </Button>
@@ -161,7 +161,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
           ) : customerDeals.length === 0 ? (
             <div className="p-8 text-center border border-dashed border-border rounded-xl bg-surface/40">
               <p className="text-sm text-text-secondary">No deals found for this customer.</p>
-              <Link href={`/company/${companyId}/app/deals`}>
+              <Link href={`/company/${companyId}/workspace/deals`}>
                 <Button variant="outline" size="sm" className="mt-3">
                   Create Deal for {customer.name}
                 </Button>
@@ -223,7 +223,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/company/${companyId}/app/deals/${deal.id}/quotations`}
+                          href={`/company/${companyId}/workspace/deals/${deal.id}/quotations`}
                           className="flex-1"
                         >
                           <Button

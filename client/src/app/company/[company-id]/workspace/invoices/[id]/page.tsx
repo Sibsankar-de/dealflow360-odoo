@@ -105,7 +105,7 @@ export default function InvoiceDetailPage() {
         <p className="text-sm text-text-secondary">
           The invoice you are looking for does not exist or you do not have permission to view it.
         </p>
-        <Link href={`/company/${companyId}/app/invoices`}>
+        <Link href={`/company/${companyId}/workspace/invoices`}>
           <Button variant="primary" leftIcon={<ArrowLeft className="w-4 h-4" />}>
             Back to Invoices
           </Button>
@@ -126,7 +126,7 @@ export default function InvoiceDetailPage() {
       {/* Top Navigation */}
       <div className="flex items-center justify-between gap-4 print:hidden">
         <Link
-          href={`/company/${companyId}/app/invoices`}
+          href={`/company/${companyId}/workspace/invoices`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-brand-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

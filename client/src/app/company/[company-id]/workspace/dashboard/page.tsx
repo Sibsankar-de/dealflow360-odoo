@@ -53,7 +53,7 @@ export default function CompanyDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            <Link href={`/company/${companyId}/app/quotations`}>
+            <Link href={`/company/${companyId}/workspace/quotations`}>
               <Button
                 variant="primary"
                 size="md"

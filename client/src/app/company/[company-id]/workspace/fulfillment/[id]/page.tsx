@@ -18,20 +18,16 @@ import {
 } from "@/store/features/quotation/quotationApi";
 import { useGetWarehousesQuery } from "@/store/features/warehouse/warehouseApi";
 import { useGetProductsQuery } from "@/store/features/product/productApi";
-import { CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import toast from "react-hot-toast";
 
 export default function FulfillmentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const companyId = params["company-id"] as string;
   const id = params["id"] as string;
-
-  const [notification, setNotification] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
 
   // RTK Queries
   const {
@@ -185,7 +181,6 @@ export default function FulfillmentDetailPage() {
     if (!quotation) return;
 
     try {
-      setNotification(null);
 
       // Build items array with warehouse allocations
       const itemsPayload: Array<{
@@ -232,22 +227,18 @@ export default function FulfillmentDetailPage() {
         },
       }).unwrap();
 
-      setNotification({
-        type: "success",
-        message: `Fulfillment processed successfully for ${quotation.quotationNo}! Stock deducted, delivery created, and invoice generated.`,
-      });
+      toast.success(
+        `Fulfillment processed successfully for ${quotation.quotationNo}! Stock deducted, delivery created, and invoice generated.`,
+      );
 
       setTimeout(() => {
-        router.push(`/company/${companyId}/app/fulfillment`);
-      }, 2500);
+        router.push(`/company/${companyId}/workspace/fulfillment`);
+      }, 1500);
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to fulfill quotation. Please check warehouse stock and try again.";
-      setNotification({
-        type: "error",
-        message: errorMsg,
-      });
+      toast.error(errorMsg);
     }
   };
 
@@ -279,7 +270,7 @@ export default function FulfillmentDetailPage() {
           <p className="text-xs text-text-muted max-w-md mx-auto">
             The requested quotation could not be loaded or is not available for fulfillment in this company.
           </p>
-          <Link href={`/company/${companyId}/app/fulfillment`}>
+          <Link href={`/company/${companyId}/workspace/fulfillment`}>
             <Button variant="outline" size="sm" className="mt-2 inline-flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Fulfillment</span>
@@ -292,23 +283,6 @@ export default function FulfillmentDetailPage() {
 
   return (
     <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
-      {notification && (
-        <div
-          className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
-            notification.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-success"
-              : "bg-red-50 border-red-200 text-danger"
-          }`}
-        >
-          {notification.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-          ) : (
-            <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
-          )}
-          <span>{notification.message}</span>
-        </div>
-      )}
-
       {/* Detail Header & Order Info Card */}
       <FulfillmentDetailHeader order={orderDetail} companyId={companyId} />
 
@@ -316,12 +290,35 @@ export default function FulfillmentDetailPage() {
       <FulfillmentOrderItemsTable items={orderDetail.items} />
 
       {/* Recommended Fulfillment Plan & Warehouse Allocations */}
-      <FulfillmentPlanAllocation
-        plan={orderDetail.fulfillmentPlan}
-        onAcceptSplit={handleAcceptSplit}
-        onConfirmOverride={handleConfirmOverride}
-        isSubmitting={isFulfilling}
-      />
+      {orderDetail.status !== "Fulfilled" ? (
+        <FulfillmentPlanAllocation
+          plan={orderDetail.fulfillmentPlan}
+          onAcceptSplit={handleAcceptSplit}
+          onConfirmOverride={handleConfirmOverride}
+          isSubmitting={isFulfilling}
+        />
+      ) : (
+        <div className="p-6 bg-card border border-border rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-success">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">
+                Order Fully Fulfilled
+              </h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                All line items for this quotation have been delivered and invoiced.
+              </p>
+            </div>
+          </div>
+          <Link href={`/company/${companyId}/workspace/fulfillment`}>
+            <Button variant="outline" size="sm">
+              Back to Fulfillment List
+            </Button>
+          </Link>
+        </div>
+      )}
     </main>
   );
 }

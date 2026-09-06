@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Dashboard",
-          href: `/company/${companyId}/app/dashboard`,
+          href: `/company/${companyId}/workspace/dashboard`,
           icon: <LayoutDashboard className="w-4 h-4" />,
         },
       ],
@@ -72,17 +72,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Deals",
-          href: `/company/${companyId}/app/deals`,
+          href: `/company/${companyId}/workspace/deals`,
           icon: <Briefcase className="w-4 h-4" />,
         },
         // {
         //   label: "Quotations",
-        //   href: `/company/${companyId}/app/quotations`,
+        //   href: `/company/${companyId}/workspace/quotations`,
         //   icon: <FileText className="w-4 h-4" />,
         // },
         {
           label: "Customers",
-          href: `/company/${companyId}/app/customers`,
+          href: `/company/${companyId}/workspace/customers`,
           icon: <Users className="w-4 h-4" />,
         },
       ],
@@ -92,32 +92,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Products",
-          href: `/company/${companyId}/app/products`,
+          href: `/company/${companyId}/workspace/products`,
           icon: <ShoppingBag className="w-4 h-4" />,
         },
         {
           label: "Warehouses",
-          href: `/company/${companyId}/app/warehouses`,
+          href: `/company/${companyId}/workspace/warehouses`,
           icon: <Warehouse className="w-4 h-4" />,
         },
         {
           label: "Fulfillment",
-          href: `/company/${companyId}/app/fulfillment`,
+          href: `/company/${companyId}/workspace/fulfillment`,
           icon: <Package className="w-4 h-4" />,
         },
         {
           label: "Backorders",
-          href: `/company/${companyId}/app/backorders`,
+          href: `/company/${companyId}/workspace/backorders`,
           icon: <Layers className="w-4 h-4" />,
         },
         {
           label: "Subscriptions",
-          href: `/company/${companyId}/app/subscriptions`,
+          href: `/company/${companyId}/workspace/subscriptions`,
           icon: <RefreshCw className="w-4 h-4" />,
         },
         {
           label: "Invoices",
-          href: `/company/${companyId}/app/invoices`,
+          href: `/company/${companyId}/workspace/invoices`,
           icon: <Receipt className="w-4 h-4" />,
         },
       ],
@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Deal Health",
-          href: `/company/${companyId}/app/deal-health`,
+          href: `/company/${companyId}/workspace/deal-health`,
           icon: <Activity className="w-4 h-4" />,
         },
       ],
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           label: "Access Control",
-          href: `/company/${companyId}/app/access-control`,
+          href: `/company/${companyId}/workspace/access-control`,
           icon: <ShieldCheck className="w-4 h-4" />,
         },
       ],
@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <>
               <Link
-                href={`/company/${companyId}/app/dashboard`}
+                href={`/company/${companyId}/workspace/dashboard`}
                 className="flex items-center min-w-0 hover:opacity-90 transition-opacity"
               >
                 <AppLogo
@@ -233,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Secondary Utility Links */}
         <div className="space-y-0.5">
           <Link
-            href={`/company/${companyId}/app/settings`}
+            href={`/company/${companyId}/workspace/settings`}
             title={isCollapsed ? "Settings" : undefined}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-text-muted hover:text-white hover:bg-navy-900 transition-colors ${
               isCollapsed ? "justify-center px-0" : ""

@@ -15,7 +15,7 @@ export default function DealDetailPage() {
   useEffect(() => {
     if (companyId && dealId) {
       router.replace(
-        `/company/${companyId}/app/deals/${dealId}/quotations`
+        `/company/${companyId}/workspace/deals/${dealId}/quotations`
       );
     }
   }, [companyId, dealId, router]);

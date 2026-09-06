@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { QuotationResponse } from "@/types/quotation";
 import { useReviseQuotationMutation } from "@/store/features/deal/dealApi";
+import toast from "react-hot-toast";
 
 interface ReQuotationModalProps {
   isOpen: boolean;
@@ -54,12 +55,14 @@ export const ReQuotationModal: React.FC<ReQuotationModalProps> = ({
           discountAmount: Number(discountAdjustment) || 0,
         },
       }).unwrap();
+      toast.success("Revised quotation issued successfully.");
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to issue revised quotation";
       setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

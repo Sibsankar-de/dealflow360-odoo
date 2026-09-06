@@ -151,7 +151,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
             ) : (
               invoices.map((inv) => {
                 const badge = getStatusBadgeConfig(inv.status);
-                const detailHref = `/company/${companyId}/app/invoices/${inv.id}`;
+                const detailHref = `/company/${companyId}/workspace/invoices/${inv.id}`;
                 const canRecordPayment =
                   inv.status !== "PAID" &&
                   inv.status !== "CANCELLED" &&

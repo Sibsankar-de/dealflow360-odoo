@@ -13,7 +13,8 @@ import {
 import { CustomerQuotationReview } from "@/components/modules/quotations/CustomerQuotationReview";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowLeft, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, FileText, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function CustomerQuotationDetailPage() {
   const router = useRouter();
@@ -25,7 +26,6 @@ export default function CustomerQuotationDetailPage() {
   const quotationId =
     typeof params?.["quotation-id"] === "string" ? params["quotation-id"] : "";
 
-  const [notification, setNotification] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: dealData, isLoading: isLoadingDeal } = useGetCustomerDealByIdQuery(
@@ -55,12 +55,13 @@ export default function CustomerQuotationDetailPage() {
         companyId,
         id: quotation.id,
       }).unwrap();
-      setNotification("Quotation approved successfully! The deal is now confirmed.");
+      toast.success("Quotation approved successfully! The deal is now confirmed.");
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to approve quotation";
       setError(msg);
+      toast.error(msg);
       throw err;
     }
   };
@@ -74,12 +75,13 @@ export default function CustomerQuotationDetailPage() {
         id: quotation.id,
         reason,
       }).unwrap();
-      setNotification("Quotation rejected.");
+      toast.success("Quotation rejected.");
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to reject quotation";
       setError(msg);
+      toast.error(msg);
       throw err;
     }
   };
@@ -106,14 +108,15 @@ export default function CustomerQuotationDetailPage() {
           items: payload.items,
         },
       }).unwrap();
-      setNotification(
-        "Counter-offer submitted to the sales team successfully! They will review your requested terms.",
+      toast.success(
+        "Counter-offer submitted to the sales team successfully!",
       );
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to submit counter-offer";
       setError(msg);
+      toast.error(msg);
       throw err;
     }
   };
@@ -160,20 +163,6 @@ export default function CustomerQuotationDetailPage() {
           Back to Deal Quotations
         </span>
       </div>
-
-      {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-success flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-          <span>{notification}</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-danger flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-danger shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* Customer Quotation Review & Negotiation Interface */}
       <CustomerQuotationReview

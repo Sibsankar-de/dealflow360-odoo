@@ -12,6 +12,7 @@ import {
   useUpdateProductMutation,
 } from "@/store/features/product/productApi";
 import { Plus, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -141,6 +142,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             stocks: formattedStocks,
           },
         }).unwrap();
+        toast.success(`Product "${name.trim()}" updated successfully.`);
       } else {
         await createProduct({
           companyId,
@@ -153,6 +155,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             stocks: formattedStocks.length > 0 ? formattedStocks : undefined,
           },
         }).unwrap();
+        toast.success(`Product "${name.trim()}" created successfully.`);
       }
       onClose();
     } catch (err: unknown) {
@@ -160,6 +163,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to save product";
       setErrors({ form: errorMsg });
+      toast.error(errorMsg);
     }
   };
 

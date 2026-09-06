@@ -6,6 +6,7 @@ import { Modal, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { CompanyMemberType, ROLE_LABELS } from "@/types/accesscontrol";
 import { useRemoveCompanyMemberMutation } from "@/store/features/company/companyApi";
+import toast from "react-hot-toast";
 
 interface DeleteTeamMemberModalProps {
   isOpen: boolean;
@@ -45,12 +46,14 @@ export function DeleteTeamMemberModal({
         userId: member.userId,
       }).unwrap();
 
+      toast.success(`${targetName} removed from company.`);
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to remove member from company.";
       setServerError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 

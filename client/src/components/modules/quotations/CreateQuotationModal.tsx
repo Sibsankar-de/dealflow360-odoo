@@ -10,6 +10,7 @@ import { useGetProductsQuery } from "@/store/features/product/productApi";
 import { useCreateDealQuotationMutation } from "@/store/features/deal/dealApi";
 import { useUpdateQuotationMutation } from "@/store/features/quotation/quotationApi";
 import { Plus, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface CreateQuotationModalProps {
   isOpen: boolean;
@@ -175,12 +176,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
         }).unwrap();
       }
 
+      toast.success("Quotation draft generated successfully.");
       onClose();
     } catch (err: unknown) {
       const errorMsg =
         (err as { data?: { message?: string } })?.data?.message ||
         "Failed to generate quotation";
       setErrors({ form: errorMsg });
+      toast.error(errorMsg);
     }
   };
 

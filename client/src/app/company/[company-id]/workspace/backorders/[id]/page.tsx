@@ -89,7 +89,7 @@ export default function BackorderDetailPage() {
         <p className="text-sm text-text-secondary">
           The backorder you are looking for does not exist or you do not have permission to view it.
         </p>
-        <Link href={`/company/${companyId}/app/backorders`}>
+        <Link href={`/company/${companyId}/workspace/backorders`}>
           <Button variant="primary" leftIcon={<ArrowLeft className="w-4 h-4" />}>
             Back to Backorders
           </Button>
@@ -109,7 +109,7 @@ export default function BackorderDetailPage() {
       {/* Top Navigation */}
       <div className="flex items-center justify-between gap-4">
         <Link
-          href={`/company/${companyId}/app/backorders`}
+          href={`/company/${companyId}/workspace/backorders`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-brand-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
